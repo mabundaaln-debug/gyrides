@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 import { MapPin, Search, Clock, CreditCard, ChevronLeft, Star, Home as HomeIcon, Briefcase, ShoppingBag, User, History, BookmarkPlus, Car, LogOut, Menu, X, Navigation } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { createTrip, updateTrip } from "@/lib/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
+import GiyaniMap from "@/components/GiyaniMap";
 import type { Trip, SavedPlace, VehicleType, User as UserType } from "@shared/schema";
 
 const GIYANI_LOCATIONS = [
@@ -326,8 +327,12 @@ export default function RiderApp() {
           <h1 className="text-xl font-bold">Confirm Ride</h1>
         </div>
 
-        <div className="bg-gradient-to-b from-green-50 to-gray-50 p-6">
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-4">
+        <div className="relative h-48 rounded-b-2xl overflow-hidden">
+          <GiyaniMap pickup={pickup} dropoff={dropoff} className="h-full" showRoute={true} />
+        </div>
+
+        <div className="p-6 -mt-4 relative z-10">
+          <div className="bg-white rounded-2xl p-5 shadow-md border border-gray-100 space-y-4">
             <div className="flex items-start gap-3">
               <div className="flex flex-col items-center gap-1 pt-1">
                 <div className="w-3 h-3 bg-green-500 rounded-full border-2 border-green-200" />
@@ -423,22 +428,20 @@ export default function RiderApp() {
   if (view === "tracking") {
     const driver = assignedDriver;
     return (
-      <div className="min-h-[100dvh] bg-gradient-to-b from-green-50 to-gray-50 flex flex-col">
-        <div className="p-4 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={handleCancelTrip} className="rounded-full bg-white shadow-sm"><ChevronLeft className="h-6 w-6" /></Button>
-          <span className="font-bold text-lg">Your Ride</span>
+      <div className="min-h-[100dvh] bg-gray-50 flex flex-col">
+        <div className="absolute top-0 left-0 right-0 z-20 p-4 flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={handleCancelTrip} className="rounded-full bg-white shadow-md"><ChevronLeft className="h-6 w-6" /></Button>
+          <span className="font-bold text-lg bg-white/90 backdrop-blur px-3 py-1 rounded-full shadow-sm">Your Ride</span>
         </div>
 
-        <div className="flex-1 flex items-center justify-center px-8 relative">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-black rounded-full mx-auto mb-4 flex items-center justify-center shadow-xl animate-bounce" style={{ animationDuration: "2s" }}>
-              <Car className="h-8 w-8 text-yellow-400" />
-            </div>
-            <div className="bg-white rounded-2xl px-6 py-3 shadow-sm border inline-block">
-              <p className="font-bold text-green-600">Driver is on the way</p>
-              <p className="text-sm text-gray-500">Arriving in ~{Math.round(Math.random() * 5 + 2)} minutes</p>
-            </div>
-          </div>
+        <div className="flex-1 relative">
+          <GiyaniMap
+            pickup={currentTrip ? { lat: currentTrip.pickupLat ?? -23.31, lng: currentTrip.pickupLng ?? 30.72, name: currentTrip.pickupName } : null}
+            dropoff={currentTrip ? { lat: currentTrip.dropoffLat ?? -23.32, lng: currentTrip.dropoffLng ?? 30.71, name: currentTrip.dropoffName } : null}
+            driverLocation={assignedDriver ? { lat: (currentTrip?.pickupLat ?? -23.31) + 0.005, lng: (currentTrip?.pickupLng ?? 30.72) - 0.003 } : null}
+            className="h-full absolute inset-0"
+            showRoute={true}
+          />
         </div>
 
         <div className="bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.08)] p-6 space-y-5">

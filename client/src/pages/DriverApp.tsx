@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { updateTrip, updateUser } from "@/lib/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
+import GiyaniMap from "@/components/GiyaniMap";
 import type { Trip, User as UserType } from "@shared/schema";
 
 export default function DriverApp() {
@@ -215,24 +216,22 @@ export default function DriverApp() {
   // ── Active Trip ──
   if (view === "trip" && onTrip) {
     return (
-      <div className="min-h-[100dvh] bg-gradient-to-b from-green-50 to-gray-50 flex flex-col">
-        <div className="p-4 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => { setOnTrip(null); setView("home"); }} className="rounded-full bg-white shadow-sm"><ChevronLeft className="h-6 w-6" /></Button>
-          <span className="font-bold text-lg">Active Trip</span>
+      <div className="min-h-[100dvh] bg-gray-50 flex flex-col relative">
+        <div className="absolute top-0 left-0 right-0 z-20 p-4 flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => { setOnTrip(null); setView("home"); }} className="rounded-full bg-white shadow-md"><ChevronLeft className="h-6 w-6" /></Button>
+          <span className="font-bold text-lg bg-white/90 backdrop-blur px-3 py-1 rounded-full shadow-sm">
+            {tripPhase === "arriving" ? "Navigate to Pickup" : tripPhase === "pickup" ? "At Pickup" : "Trip in Progress"}
+          </span>
         </div>
 
-        <div className="flex-1 flex items-center justify-center px-8">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-black rounded-full mx-auto mb-4 flex items-center justify-center shadow-xl">
-              <Navigation className="h-8 w-8 text-yellow-400" />
-            </div>
-            <div className="bg-white rounded-2xl px-6 py-3 shadow-sm border inline-block">
-              <p className="font-bold text-lg">
-                {tripPhase === "arriving" ? "Navigate to Pickup" : tripPhase === "pickup" ? "At Pickup Point" : "Trip in Progress"}
-              </p>
-              <p className="text-sm text-gray-500">{onTrip.pickupName} → {onTrip.dropoffName}</p>
-            </div>
-          </div>
+        <div className="flex-1 relative">
+          <GiyaniMap
+            pickup={{ lat: onTrip.pickupLat ?? -23.31, lng: onTrip.pickupLng ?? 30.72, name: onTrip.pickupName }}
+            dropoff={{ lat: onTrip.dropoffLat ?? -23.32, lng: onTrip.dropoffLng ?? 30.71, name: onTrip.dropoffName }}
+            driverLocation={{ lat: (onTrip.pickupLat ?? -23.31) + (tripPhase === "arriving" ? 0.006 : 0.001), lng: (onTrip.pickupLng ?? 30.72) - 0.003 }}
+            className="h-full absolute inset-0"
+            showRoute={true}
+          />
         </div>
 
         <div className="bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.08)] p-6 space-y-5">
@@ -282,26 +281,34 @@ export default function DriverApp() {
   const pendingRequest = requestedTrips[0];
 
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-b from-gray-900 to-gray-800 flex flex-col text-white">
-      <div className="p-4 flex justify-between items-center">
-        <Button variant="ghost" size="icon" className="text-white rounded-full" onClick={() => setView("menu")} data-testid="btn-driver-menu">
+    <div className="min-h-[100dvh] bg-gray-100 flex flex-col relative">
+      {/* Map background */}
+      <div className="absolute inset-0 z-0">
+        <GiyaniMap pickup={null} dropoff={null} className="h-full" />
+      </div>
+
+      {/* Header overlay */}
+      <div className="relative z-10 p-4 flex justify-between items-center">
+        <Button variant="ghost" size="icon" className="rounded-full bg-white shadow-md" onClick={() => setView("menu")} data-testid="btn-driver-menu">
           <Menu className="h-6 w-6" />
         </Button>
-        <div className="bg-white/10 backdrop-blur px-4 py-1.5 rounded-full font-bold text-sm flex items-center gap-2">
+        <div className="bg-black text-white backdrop-blur px-4 py-1.5 rounded-full font-bold text-sm flex items-center gap-2 shadow-md">
           <DollarSign className="h-4 w-4 text-yellow-400" />
           R{todayEarnings}
         </div>
-        <Avatar className="h-10 w-10 border-2 border-yellow-400">
+        <Avatar className="h-10 w-10 border-2 border-yellow-400 shadow-md">
           <AvatarFallback className="bg-yellow-400 text-black font-bold">{user.fullName[0]}</AvatarFallback>
         </Avatar>
       </div>
 
-      <div className="px-6 pt-4">
-        <h2 className="text-2xl font-bold mb-1">Hey, {user.fullName.split(" ")[0]}</h2>
-        <p className="text-gray-400">{isOnline ? "You're online and ready for trips" : "Go online to start earning"}</p>
+      <div className="relative z-10 px-6 pt-2">
+        <div className="bg-white/90 backdrop-blur-md rounded-2xl px-4 py-3 shadow-sm">
+          <h2 className="text-xl font-bold mb-0.5">Hey, {user.fullName.split(" ")[0]}</h2>
+          <p className="text-gray-500 text-sm">{isOnline ? "You're online and ready for trips" : "Go online to start earning"}</p>
+        </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center relative">
+      <div className="flex-1 flex items-center justify-center relative z-10">
         {!isOnline && (
           <button
             onClick={toggleOnline}
@@ -377,18 +384,18 @@ export default function DriverApp() {
 
       {/* Bottom stats bar when online */}
       {isOnline && !pendingRequest && (
-        <div className="bg-white/10 backdrop-blur-md mx-4 mb-6 rounded-2xl p-4 flex justify-around">
-          <div className="text-center">
+        <div className="bg-black/80 backdrop-blur-md mx-4 mb-6 rounded-2xl p-4 flex justify-around relative z-10 shadow-lg">
+          <div className="text-center text-white">
             <div className="text-xl font-bold text-yellow-400">{completedTrips.length}</div>
-            <div className="text-xs text-gray-400">Trips</div>
+            <div className="text-xs text-gray-300">Trips</div>
           </div>
-          <div className="text-center">
+          <div className="text-center text-white">
             <div className="text-xl font-bold text-yellow-400">{user.rating?.toFixed(1)}</div>
-            <div className="text-xs text-gray-400">Rating</div>
+            <div className="text-xs text-gray-300">Rating</div>
           </div>
-          <div className="text-center">
+          <div className="text-center text-white">
             <div className="text-xl font-bold text-yellow-400">R{todayEarnings}</div>
-            <div className="text-xs text-gray-400">Earned</div>
+            <div className="text-xs text-gray-300">Earned</div>
           </div>
         </div>
       )}
