@@ -162,11 +162,11 @@ export default function Home() {
 
         <div className="space-y-4 w-full">
           <Button size="lg" className="w-full h-16 text-lg rounded-2xl shadow-sm justify-between px-6 bg-black hover:bg-gray-900 text-white" onClick={() => setShowLogin(true)} data-testid="btn-get-started">
-            <span className="flex items-center gap-3">
+            <span className="flex items-center gap-3 text-white">
               <LogIn size={24} />
-              Get Started
+              Sign In
             </span>
-            <ArrowRight size={20} />
+            <ArrowRight size={20} className="text-white" />
           </Button>
         </div>
       </div>
