@@ -161,13 +161,18 @@ export default function Home() {
         <p className="text-gray-500 text-center mb-12 text-lg">Local transport for Giyani</p>
 
         <div className="space-y-4 w-full">
-          <Button size="lg" className="w-full h-16 text-lg rounded-2xl shadow-sm justify-between px-6 bg-black hover:bg-gray-900 text-white" onClick={() => setShowLogin(true)} data-testid="btn-get-started">
-            <span className="flex items-center gap-3 text-white">
-              <LogIn size={24} />
+          <button
+            className="w-full h-16 text-lg rounded-2xl shadow-sm flex items-center justify-between px-6 font-bold"
+            style={{ backgroundColor: "#000000", color: "#FFFFFF" }}
+            onClick={() => setShowLogin(true)}
+            data-testid="btn-get-started"
+          >
+            <span className="flex items-center gap-3">
+              <LogIn size={24} color="#FFFFFF" />
               Sign In
             </span>
-            <ArrowRight size={20} className="text-white" />
-          </Button>
+            <ArrowRight size={20} color="#FFFFFF" />
+          </button>
         </div>
       </div>
 
