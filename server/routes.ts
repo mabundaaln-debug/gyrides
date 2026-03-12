@@ -8,6 +8,11 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
 
+  // ── Health Check ──
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok", timestamp: Date.now() });
+  });
+
   // ── Auth / Users ──
   app.post("/api/auth/login", async (req, res) => {
     const { username, password } = req.body;
