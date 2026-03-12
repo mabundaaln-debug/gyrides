@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
-import { MapPin, Search, Clock, CreditCard, ChevronLeft, Star, Home as HomeIcon, Briefcase, ShoppingBag, User, History, BookmarkPlus, Car, LogOut, Menu, X, Navigation } from "lucide-react";
+import { MapPin, Search, Clock, CreditCard, ChevronLeft, Star, Home as HomeIcon, Briefcase, ShoppingBag, User, History, BookmarkPlus, Car, LogOut, Menu, X, Navigation, Share2, Crosshair } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { createTrip, updateTrip } from "@/lib/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import GiyaniMap from "@/components/GiyaniMap";
 import type { Trip, SavedPlace, VehicleType, User as UserType } from "@shared/schema";
 
@@ -27,7 +28,7 @@ const GIYANI_LOCATIONS = [
 export default function RiderApp() {
   const { user, logout } = useAuth();
   const [, setLocation] = useLocation();
-  const [view, setView] = useState<"home" | "search" | "confirm" | "searching" | "tracking" | "history" | "profile" | "menu">("home");
+  const [view, setView] = useState<"home" | "search" | "pickmap" | "confirm" | "searching" | "tracking" | "history" | "profile" | "menu">("home");
   const [pickup, setPickup] = useState<typeof GIYANI_LOCATIONS[0] | null>(null);
   const [dropoff, setDropoff] = useState<typeof GIYANI_LOCATIONS[0] | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -35,7 +36,9 @@ export default function RiderApp() {
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleType | null>(null);
   const [currentTrip, setCurrentTrip] = useState<Trip | null>(null);
   const [assignedDriver, setAssignedDriver] = useState<UserType | null>(null);
+  const [pinDrop, setPinDrop] = useState<{ lat: number; lng: number } | null>(null);
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!user || user.role !== "rider") {
@@ -122,6 +125,65 @@ export default function RiderApp() {
     setView("home");
     queryClient.invalidateQueries({ queryKey: ["/api/trips/rider"] });
   };
+
+  const reverseGeocode = useCallback(async (lat: number, lng: number): Promise<string> => {
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18`);
+      const data = await res.json();
+      if (data.display_name) {
+        const parts = data.display_name.split(",").slice(0, 3);
+        return parts.join(",").trim();
+      }
+    } catch {}
+    return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  }, []);
+
+  const handlePinDrop = useCallback(async (lat: number, lng: number) => {
+    setPinDrop({ lat, lng });
+  }, []);
+
+  const handleConfirmPin = useCallback(async () => {
+    if (!pinDrop) return;
+    const name = await reverseGeocode(pinDrop.lat, pinDrop.lng);
+    const loc = { name, address: "Pinned on map", lat: pinDrop.lat, lng: pinDrop.lng };
+    if (searchFor === "pickup") {
+      setPickup(loc);
+      setSearchFor("dropoff");
+    } else {
+      setDropoff(loc);
+    }
+    setPinDrop(null);
+    if (searchFor === "dropoff" || (searchFor === "pickup" && dropoff)) {
+      setView("confirm");
+    } else {
+      setView("home");
+    }
+  }, [pinDrop, searchFor, dropoff, reverseGeocode]);
+
+  const handleShareLocation = useCallback(async () => {
+    if (!currentTrip) return;
+    const shareText = `I'm on a GY Rides trip!\nFrom: ${currentTrip.pickupName}\nTo: ${currentTrip.dropoffName}\nTrack me: https://www.google.com/maps?q=${currentTrip.dropoffLat},${currentTrip.dropoffLng}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "My GY Rides Trip", text: shareText });
+      } catch {}
+    } else {
+      await navigator.clipboard.writeText(shareText);
+      toast({ title: "Link copied!", description: "Trip details copied to clipboard" });
+    }
+  }, [currentTrip, toast]);
+
+  const handleSharePickup = useCallback(async () => {
+    const loc = pickup || pinDrop;
+    if (!loc) return;
+    const text = `My pickup location:\nhttps://www.google.com/maps?q=${loc.lat},${loc.lng}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: "My Pickup Location", text }); } catch {}
+    } else {
+      await navigator.clipboard.writeText(text);
+      toast({ title: "Link copied!", description: "Pickup location copied to clipboard" });
+    }
+  }, [pickup, pinDrop, toast]);
 
   const iconForPlace = (icon: string | null) => {
     switch (icon) {
@@ -279,6 +341,22 @@ export default function RiderApp() {
           </div>
         </div>
         <div className="flex-1 overflow-auto">
+          {searchQuery === "" && (
+            <div className="px-4 pb-2">
+              <Button
+                variant="ghost"
+                className="w-full justify-start h-14 rounded-xl gap-3 text-base"
+                onClick={() => { setView("pickmap"); setPinDrop(null); }}
+                data-testid="btn-pin-on-map"
+              >
+                <div className="bg-indigo-100 p-2 rounded-lg"><Crosshair className="h-4 w-4 text-indigo-600" /></div>
+                <div className="text-left">
+                  <div className="font-medium">Pin location on map</div>
+                  <div className="text-xs text-gray-500">Tap the map to set your {searchFor === "pickup" ? "pickup" : "drop-off"}</div>
+                </div>
+              </Button>
+            </div>
+          )}
           {savedPlaces.length > 0 && searchQuery === "" && (
             <div className="px-4 pb-2">
               <p className="text-xs text-gray-500 uppercase font-bold mb-2 px-1">Saved Places</p>
@@ -313,6 +391,74 @@ export default function RiderApp() {
               </Button>
             ))}
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Pick on Map ──
+  if (view === "pickmap") {
+    return (
+      <div className="min-h-[100dvh] bg-gray-50 flex flex-col">
+        <div className="absolute top-0 left-0 right-0 z-20 p-4 flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => { setView("search"); setPinDrop(null); }} className="rounded-full bg-white shadow-md">
+            <ChevronLeft className="h-6 w-6" />
+          </Button>
+          <span className="font-bold text-lg bg-white/90 backdrop-blur px-3 py-1 rounded-full shadow-sm">
+            Tap to set {searchFor === "pickup" ? "pickup" : "drop-off"}
+          </span>
+        </div>
+
+        <div className="flex-1 relative">
+          <GiyaniMap
+            pickup={searchFor === "dropoff" ? pickup : null}
+            dropoff={searchFor === "pickup" ? dropoff : null}
+            className="h-full absolute inset-0"
+            showRoute={false}
+            interactive={true}
+            onPinDrop={handlePinDrop}
+            pinDropLocation={pinDrop}
+          />
+        </div>
+
+        <div className="bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.08)] p-6 space-y-3">
+          {pinDrop ? (
+            <>
+              <div className="flex items-center gap-3">
+                <div className="bg-indigo-100 p-2 rounded-lg">
+                  <Crosshair className="h-5 w-5 text-indigo-600" />
+                </div>
+                <div>
+                  <div className="font-medium text-sm">Pinned location</div>
+                  <div className="text-xs text-gray-500">{pinDrop.lat.toFixed(5)}, {pinDrop.lng.toFixed(5)}</div>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  className="flex-1 h-14 rounded-2xl bg-black text-white hover:bg-gray-900 font-bold text-base"
+                  onClick={handleConfirmPin}
+                  data-testid="btn-confirm-pin"
+                >
+                  Confirm {searchFor === "pickup" ? "Pickup" : "Drop-off"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-14 w-14 rounded-2xl"
+                  onClick={handleSharePickup}
+                  data-testid="btn-share-pin"
+                >
+                  <Share2 className="h-5 w-5" />
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-3 text-gray-500">
+              <Crosshair className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+              <p className="font-medium">Tap anywhere on the map</p>
+              <p className="text-sm">to pin your {searchFor === "pickup" ? "pickup" : "drop-off"} location</p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -483,9 +629,20 @@ export default function RiderApp() {
             </div>
           </div>
 
-          <Button className="w-full h-14 rounded-2xl bg-red-50 text-red-600 hover:bg-red-100 font-bold text-base" variant="ghost" onClick={handleCancelTrip} data-testid="btn-cancel-ride">
-            Cancel Ride
-          </Button>
+          <div className="flex gap-3">
+            <Button className="flex-1 h-14 rounded-2xl bg-red-50 text-red-600 hover:bg-red-100 font-bold text-base" variant="ghost" onClick={handleCancelTrip} data-testid="btn-cancel-ride">
+              Cancel Ride
+            </Button>
+            <Button
+              variant="outline"
+              className="h-14 px-5 rounded-2xl font-bold text-base gap-2"
+              onClick={handleShareLocation}
+              data-testid="btn-share-trip"
+            >
+              <Share2 className="h-5 w-5" />
+              Share
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -509,10 +666,25 @@ export default function RiderApp() {
         <p className="text-gray-500">Where are you heading?</p>
       </div>
 
-      <div className="px-6 mb-6">
+      <div className="px-6 mb-4 space-y-3">
         <button
           className="w-full bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-4 text-left"
-          onClick={() => { setSearchFor("dropoff"); setPickup(GIYANI_LOCATIONS[2]); setView("search"); }}
+          onClick={() => { setSearchFor("pickup"); setView("search"); }}
+          data-testid="btn-set-pickup"
+        >
+          <div className="bg-green-500 p-3 rounded-xl">
+            <Crosshair className="h-5 w-5 text-white" />
+          </div>
+          <div className="flex-1">
+            <div className="font-bold">{pickup ? pickup.name : "Set pickup"}</div>
+            <div className="text-sm text-gray-500">{pickup ? pickup.address : "Tap to choose or pin on map"}</div>
+          </div>
+          {pickup && <div className="w-2.5 h-2.5 bg-green-500 rounded-full" />}
+        </button>
+
+        <button
+          className="w-full bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-4 text-left"
+          onClick={() => { setSearchFor("dropoff"); if (!pickup) setPickup(GIYANI_LOCATIONS[2]); setView("search"); }}
           data-testid="btn-where-to"
         >
           <div className="bg-black p-3 rounded-xl">
