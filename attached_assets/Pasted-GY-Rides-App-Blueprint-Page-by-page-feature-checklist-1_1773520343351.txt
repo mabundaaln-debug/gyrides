@@ -1,0 +1,907 @@
+GY Rides App Blueprint
+
+Page-by-page feature checklist
+
+⸻
+
+1. Splash Screen
+
+Purpose
+
+First impression. Brand recognition.
+
+What should appear
+	•	GY Rides logo
+	•	App name
+	•	Short tagline:
+	•	“Your local ride, anytime.”
+	•	or “Transport made easy in Giyani.”
+	•	Loading animation
+
+Must-have features
+	•	Fast load
+	•	Clean branding
+	•	Auto-redirect after 2–3 seconds
+
+⸻
+
+2. Welcome / Onboarding Screen
+
+Purpose
+
+Explain what the app does in a few seconds.
+
+What should appear
+	•	Illustration or image of ride booking
+	•	Short slides:
+	•	Book private rides
+	•	Find taxi routes
+	•	Share rides
+	•	Send parcels
+	•	Book clinic transport
+	•	Buttons:
+	•	Get Started
+	•	Login
+
+Must-have features
+	•	Swipe onboarding cards
+	•	Skip button
+	•	Language option if possible:
+	•	English
+	•	Xitsonga
+
+⸻
+
+3. Sign Up Screen
+
+Purpose
+
+Allow new users to create accounts.
+
+What should appear
+	•	Full name
+	•	Phone number
+	•	Email
+	•	Password
+	•	Confirm password
+	•	User type:
+	•	Passenger
+	•	Driver
+	•	Sign up button
+	•	“Already have an account? Login”
+
+Must-have features
+	•	OTP verification for phone number
+	•	Error messages for invalid input
+	•	Password visibility toggle
+
+Unique extras
+	•	Sign up with Google
+	•	WhatsApp number verification
+
+⸻
+
+4. Login Screen
+
+Purpose
+
+Returning users sign in quickly.
+
+What should appear
+	•	Phone/email field
+	•	Password field
+	•	Forgot password
+	•	Login button
+	•	Sign up link
+
+Must-have features
+	•	Secure login
+	•	Remember me
+	•	OTP login option
+
+⸻
+
+5. Role Selection Screen
+
+Purpose
+
+Choose app mode.
+
+What should appear
+	•	Passenger
+	•	Driver
+	•	Fleet / Admin later if needed
+
+Must-have features
+	•	Simple large buttons/cards
+	•	Save last selected mode
+
+⸻
+
+6. Passenger Home Screen
+
+Purpose
+
+This is the main booking screen. It must feel powerful immediately.
+
+What should appear
+	•	Google Map full or half screen
+	•	Current location pin
+	•	Search bar:
+	•	“Where are you going?”
+	•	Pickup field
+	•	Destination field
+	•	Ride type options:
+	•	Private ride
+	•	Shared ride
+	•	Taxi route
+	•	Medical transport
+	•	Parcel delivery
+	•	Quick destination buttons:
+	•	Home
+	•	Work
+	•	Hospital
+	•	Masingita Mall
+	•	Taxi Rank
+	•	Bottom navigation bar
+
+Must-have features
+	•	Auto-detect location
+	•	Manual location selection
+	•	Map drag pin
+	•	Saved places
+	•	Fare estimate preview
+
+Unique extras
+	•	“Book on WhatsApp” button
+	•	“Low network mode”
+	•	Local landmarks instead of only formal addresses
+
+⸻
+
+7. Location Picker Screen
+
+Purpose
+
+Set pickup and dropoff accurately.
+
+What should appear
+	•	Full-screen map
+	•	Draggable pin
+	•	Search box
+	•	Confirm pickup button
+	•	Confirm destination button
+
+Must-have features
+	•	GPS current location
+	•	Search places
+	•	Tap on map to select point
+	•	Nearby landmark suggestions
+
+Unique extras
+	•	Popular village/section pickup presets
+	•	Voice-based place search later
+
+⸻
+
+8. Ride Options Screen
+
+Purpose
+
+After entering route, user chooses service type.
+
+What should appear
+
+For each option:
+	•	Vehicle/service icon
+	•	Name
+	•	Estimated fare
+	•	ETA
+	•	Passenger capacity
+
+Ride options to show
+	•	Private Ride
+	•	Shared Ride
+	•	Taxi Route
+	•	Medical Ride
+	•	Parcel Delivery
+
+Must-have features
+	•	Compare price by ride type
+	•	Estimated arrival time
+	•	Surge pricing if applicable
+	•	Promo code field
+
+Unique extras
+	•	“Cheapest option”
+	•	“Fastest option”
+	•	“Best for elderly”
+	•	“Best for luggage”
+
+⸻
+
+9. Booking Confirmation Screen
+
+Purpose
+
+Final check before request is sent.
+
+What should appear
+	•	Pickup location
+	•	Destination
+	•	Distance
+	•	Estimated duration
+	•	Fare
+	•	Selected ride type
+	•	Payment method
+	•	Confirm booking button
+
+Must-have features
+	•	Edit pickup/destination
+	•	Payment selection
+	•	Driver preference if applicable
+	•	Notes field:
+	•	“Call me when you arrive”
+	•	“I have luggage”
+	•	“Patient needs assistance”
+
+Unique extras
+	•	Option to schedule ride later
+	•	Add stop
+	•	Book for someone else
+
+⸻
+
+10. Searching for Driver Screen
+
+Purpose
+
+Show active matching process.
+
+What should appear
+	•	Animated searching indicator
+	•	Map with nearby drivers
+	•	Booking summary
+	•	Cancel ride button
+
+Must-have features
+	•	Real-time driver search
+	•	Retry logic
+	•	Timeout message if no driver found
+
+Unique extras
+	•	“Switch to shared ride”
+	•	“Switch to taxi route”
+	•	“Send via WhatsApp instead”
+
+⸻
+
+11. Driver Found Screen
+
+Purpose
+
+Build trust immediately.
+
+What should appear
+	•	Driver photo
+	•	Driver name
+	•	Vehicle make/model
+	•	Number plate
+	•	Driver rating
+	•	ETA
+	•	Call button
+	•	WhatsApp button
+	•	Live map tracking
+
+Must-have features
+	•	Share trip
+	•	Cancel ride
+	•	Emergency button
+	•	Trip PIN or verification code
+
+Unique extras
+	•	Driver language
+	•	Verified badge
+	•	“Frequent local driver” badge
+
+⸻
+
+12. Live Trip Screen
+
+Purpose
+
+Track the trip in real time.
+
+What should appear
+	•	Live map
+	•	Driver route
+	•	Estimated arrival
+	•	Pickup/dropoff status
+	•	Call/WhatsApp driver
+	•	Share trip
+	•	SOS button
+
+Must-have features
+	•	Real-time tracking
+	•	Ride status:
+	•	Driver on the way
+	•	Arrived
+	•	Trip started
+	•	Trip completed
+	•	Safety tools
+	•	Trip support button
+
+Unique extras
+	•	Family tracking link
+	•	Voice note to driver
+	•	“Wrong turn / route issue” report
+
+⸻
+
+13. Trip Completion Screen
+
+Purpose
+
+Close the ride cleanly.
+
+What should appear
+	•	Fare charged
+	•	Payment status
+	•	Distance traveled
+	•	Trip duration
+	•	Driver info
+	•	Rate driver button
+	•	Tip driver option
+
+Must-have features
+	•	Rate 1–5 stars
+	•	Leave review
+	•	Report problem
+	•	Download receipt
+
+Unique extras
+	•	Rebook same trip
+	•	Save destination as favorite
+	•	“Use this as a preset next time”
+
+⸻
+
+14. Payment Screen
+
+Purpose
+
+Handle all transaction options.
+
+What should appear
+	•	Total fare
+	•	Payment methods:
+	•	Cash
+	•	Card
+	•	EFT
+	•	Wallet
+	•	Confirm payment button
+
+Must-have features
+	•	Cash as primary option
+	•	Card support
+	•	Payment success/failure state
+	•	Receipt generation
+
+Unique extras
+	•	Upload EFT proof
+	•	Split payment later
+	•	Clinic/business account billing
+
+⸻
+
+15. Ride History Screen
+
+Purpose
+
+Users review past trips.
+
+What should appear
+	•	List of past rides
+	•	Date
+	•	Pickup
+	•	Destination
+	•	Amount
+	•	Driver name
+	•	Ride type
+
+Must-have features
+	•	Search rides
+	•	Repeat a past ride
+	•	Download receipts
+	•	Report issue on old ride
+
+Unique extras
+	•	Monthly spend summary
+	•	Most-used destinations
+	•	Favorite driver history
+
+⸻
+
+16. Saved Places Screen
+
+Purpose
+
+Speed up booking.
+
+What should appear
+	•	Home
+	•	Work
+	•	Hospital
+	•	Family
+	•	School
+	•	Custom saved places
+
+Must-have features
+	•	Add/edit/delete places
+	•	One-tap select
+
+Unique extras
+	•	Save village landmarks
+	•	Save patient transport locations
+
+⸻
+
+17. Taxi Routes Screen
+
+Purpose
+
+This is one of your most unique pages.
+
+What should appear
+	•	Route list
+	•	Pickup rank
+	•	Destination
+	•	Fare
+	•	Departure estimate
+	•	Seats left if possible
+
+Example routes
+	•	Taxi Rank → Section E
+	•	Taxi Rank → Masingita Mall
+	•	Taxi Rank → Hospital
+	•	Giyani → Elim
+	•	Giyani → Tzaneen
+
+Must-have features
+	•	Search route
+	•	Fare visibility
+	•	Daily active route list
+
+Unique extras
+	•	Queue status
+	•	“Leaves when full”
+	•	Peak-hour route alerts
+
+⸻
+
+18. Shared Ride Screen
+
+Purpose
+
+Offer cheaper ride options.
+
+What should appear
+	•	Shared ride fare
+	•	Number of available seats
+	•	Route direction
+	•	Estimated extra stop time
+
+Must-have features
+	•	Seat selection
+	•	Price per seat
+	•	Shared route matching
+
+Unique extras
+	•	Gender-preference option later
+	•	Same-direction match logic
+	•	Student/shared commuter rides
+
+⸻
+
+19. Medical Transport Screen
+
+Purpose
+
+A big differentiator.
+
+What should appear
+	•	Pickup point
+	•	Clinic/hospital destination
+	•	Patient name
+	•	Contact number
+	•	Special assistance notes
+	•	Return trip option
+
+Must-have features
+	•	Book for another person
+	•	Wheelchair/assistance option
+	•	Priority booking
+	•	Scheduled return ride
+
+Unique extras
+	•	Medicine pickup/delivery
+	•	Hospital discharge ride
+	•	Elderly transport mode
+
+⸻
+
+20. Parcel Delivery Screen
+
+Purpose
+
+Extra revenue stream.
+
+What should appear
+	•	Sender details
+	•	Receiver details
+	•	Pickup location
+	•	Delivery location
+	•	Parcel description
+	•	Fare estimate
+
+Must-have features
+	•	Small parcel only rules
+	•	Contact numbers
+	•	Live tracking
+	•	Delivery confirmation
+
+Unique extras
+	•	OTP on delivery
+	•	Photo proof of delivery
+	•	Same-day urgent parcel option
+
+⸻
+
+21. WhatsApp Booking Screen
+
+Purpose
+
+Backup booking channel.
+
+What should appear
+	•	Summary of ride request
+	•	WhatsApp button
+	•	Pre-filled message preview
+
+Example message
+
+“Hello GY Rides, I need a ride from Section E to Masingita Mall. My number is…”
+
+Must-have features
+	•	Auto-fill booking details
+	•	Open WhatsApp directly
+
+Unique extras
+	•	Offline fallback mode
+	•	Support line and dispatcher mode
+
+⸻
+
+22. Profile Screen
+
+Purpose
+
+User settings and account management.
+
+What should appear
+	•	Profile photo
+	•	Name
+	•	Phone number
+	•	Email
+	•	Saved places
+	•	Payment methods
+	•	Preferences
+
+Must-have features
+	•	Edit profile
+	•	Change password
+	•	Notification preferences
+	•	Delete account
+
+Unique extras
+	•	Preferred language
+	•	Accessibility options
+	•	Emergency contacts
+
+⸻
+
+23. Safety Screen
+
+Purpose
+
+Trust and safety hub.
+
+What should appear
+	•	SOS button
+	•	Emergency contacts
+	•	Share trip settings
+	•	Safety guidelines
+	•	Report unsafe driver/passenger
+
+Must-have features
+	•	One-tap SOS
+	•	Share live trip
+	•	Incident reporting
+
+Unique extras
+	•	Clinic/hospital emergency routing
+	•	Silent emergency alert
+	•	Ride PIN verification
+
+⸻
+
+24. Notifications Screen
+
+Purpose
+
+Keep user informed.
+
+What should appear
+	•	Ride updates
+	•	Driver arrival alerts
+	•	Promo alerts
+	•	Payment updates
+	•	Taxi route alerts
+
+Must-have features
+	•	Mark read/unread
+	•	Push notifications
+	•	SMS fallback later
+
+⸻
+
+25. Help / Support Screen
+
+Purpose
+
+Handle issues quickly.
+
+What should appear
+	•	FAQ
+	•	Contact support
+	•	Call support
+	•	WhatsApp support
+	•	Report trip issue
+
+Must-have features
+	•	In-app ticket submission
+	•	Ride issue selection
+	•	Lost item report
+
+Unique extras
+	•	Voice note support
+	•	Fast support for medical rides
+
+⸻
+
+26. Driver Registration Screen
+
+Purpose
+
+Onboard drivers properly.
+
+What should appear
+	•	Full name
+	•	Phone number
+	•	Email
+	•	ID number
+	•	Driver’s license upload
+	•	PDP upload if needed
+	•	Vehicle details
+	•	Number plate
+	•	Insurance details
+	•	Profile photo
+
+Must-have features
+	•	Document upload
+	•	Verification status
+	•	Approval pending message
+
+Unique extras
+	•	Local route knowledge test
+	•	Bank account setup
+	•	Taxi/owner-driver category
+
+⸻
+
+27. Driver Home Screen
+
+Purpose
+
+Main operational screen for drivers.
+
+What should appear
+	•	Online/offline toggle
+	•	Current map
+	•	Nearby requests
+	•	Today’s earnings
+	•	Trips completed
+	•	Navigation shortcut
+
+Must-have features
+	•	Availability toggle
+	•	Accept/decline ride
+	•	Incoming request sound
+	•	Status updates
+
+Unique extras
+	•	Heatmap of busy areas
+	•	Smart destination suggestions
+	•	Queue near taxi rank
+
+⸻
+
+28. Incoming Request Screen for Drivers
+
+Purpose
+
+Let drivers respond fast.
+
+What should appear
+	•	Pickup point
+	•	Destination
+	•	Fare
+	•	Estimated trip distance
+	•	Ride type
+	•	Accept / decline buttons
+
+Must-have features
+	•	Countdown timer
+	•	Quick response
+	•	Passenger note preview
+
+⸻
+
+29. Driver Trip Screen
+
+Purpose
+
+Manage active trip.
+
+What should appear
+	•	Passenger pickup
+	•	Call passenger
+	•	Navigate
+	•	Start trip
+	•	End trip
+	•	Fare info
+
+Must-have features
+	•	Navigation integration
+	•	Trip status buttons
+	•	Emergency support
+
+⸻
+
+30. Driver Earnings Screen
+
+Purpose
+
+Motivate and retain drivers.
+
+What should appear
+	•	Today’s earnings
+	•	Weekly earnings
+	•	Completed trips
+	•	Cash collected
+	•	Wallet balance
+
+Must-have features
+	•	Earnings breakdown
+	•	Trip-based summary
+	•	Withdrawal info
+
+Unique extras
+	•	Bonuses
+	•	Peak-hour incentives
+	•	Top driver badges
+
+⸻
+
+31. Admin Dashboard
+
+Purpose
+
+Control the whole platform.
+
+What should appear
+	•	Total users
+	•	Total drivers
+	•	Active rides
+	•	Earnings
+	•	Pending driver approvals
+	•	Complaints
+	•	Route analytics
+
+Must-have features
+	•	User management
+	•	Driver verification
+	•	Ride monitoring
+	•	Fare management
+	•	Promo management
+
+Unique extras
+	•	Taxi route management
+	•	Medical ride priority dispatch
+	•	City expansion controls
+
+⸻
+
+32. Bottom Navigation Bar
+
+Passenger tabs
+	•	Home
+	•	Routes
+	•	Activity
+	•	Wallet
+	•	Profile
+
+Driver tabs
+	•	Home
+	•	Trips
+	•	Earnings
+	•	Notifications
+	•	Profile
+
+⸻
+
+Core unique features you should prioritize first
+
+If you want the app to feel special quickly, build these first:
+
+Passenger side
+	•	Local destination presets
+	•	Taxi route page
+	•	Shared ride option
+	•	Medical transport page
+	•	WhatsApp fallback booking
+	•	Cash payment
+	•	SOS and trip sharing
+
+Driver side
+	•	Online/offline toggle
+	•	Instant ride requests
+	•	Live navigation
+	•	Earnings dashboard
+	•	Verification badge
+
+⸻
+
+Best MVP version to build first
+
+Don’t build all 32 pages at once. Start with:
+	1.	Splash
+	2.	Onboarding
+	3.	Login/Signup
+	4.	Passenger Home
+	5.	Location Picker
+	6.	Ride Options
+	7.	Booking Confirmation
+	8.	Searching Driver
+	9.	Driver Found
+	10.	Live Trip
+	11.	Payment
+	12.	Trip Completion
+	13.	Ride History
+	14.	Driver Registration
+	15.	Driver Home
+
+Then add:
+	•	Taxi routes
+	•	Shared rides
+	•	Medical transport
+	•	Parcel delivery
+	•	WhatsApp fallback
+
+⸻
+
+Best “unique” identity for GY Rides
+
+Your app should be known as:
+
+“The local transport app for rides, taxi routes, shared trips, parcels, and medical transport.”
