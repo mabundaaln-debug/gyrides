@@ -9,15 +9,27 @@ Local ride-hailing web app for Giyani, South Africa. Mobile-first UI with rider,
 - **Database**: PostgreSQL with Drizzle ORM
 - **Routing**: wouter (frontend), Express (backend API)
 - **State**: TanStack React Query + localStorage auth
+- **Map**: Leaflet + OpenStreetMap tiles, OSRM road routing, Nominatim reverse geocoding
+
+## Design System
+
+- **Palette**: Black (#000) primary, Yellow (#facc15 / bg-yellow-400) accent, white cards
+- **Typography**: Inter font, font-black for headings
+- **Layout**: Mobile-first (optimized for 400px width), rounded-2xl cards, bottom navigation bars
+- **Landing**: Black background with yellow CTAs
 
 ## Structure
 
 ```
 client/src/
-  pages/Home.tsx       - Landing page with login/register
-  pages/RiderApp.tsx   - Rider booking flow, trip history, profile
-  pages/DriverApp.tsx  - Driver dashboard, trip management, earnings
-  pages/AdminApp.tsx   - Admin panel with stats, driver/trip/pricing management
+  pages/Home.tsx       - Landing page with sign in/register, password toggle, forgot password
+  pages/RiderApp.tsx   - Full rider flow with bottom nav, quick destinations, map preview,
+                         trip PIN, SOS, call/WhatsApp driver, notes, promo code, star rating,
+                         receipt, rebook
+  pages/DriverApp.tsx  - Driver dashboard with bottom nav, countdown timer on requests,
+                         call/WhatsApp passenger, navigate button, earnings breakdown
+  pages/AdminApp.tsx   - Admin panel with pending approvals, completion rate, platform health
+  components/GiyaniMap.tsx - Leaflet map with OSRM routing, pin-on-map, driver markers
   lib/auth.tsx         - Auth context (localStorage-based)
   lib/api.ts           - API helper functions
 
@@ -33,9 +45,14 @@ shared/
 
 ## Key Features
 
-- **Rider**: Search Giyani locations, choose vehicle type, book ride, track driver, trip history, saved places, profile
-- **Driver**: Go online/offline, receive ride requests, accept/decline, navigate trip phases, earnings dashboard
-- **Admin**: Dashboard stats, driver management, trip list, vehicle types & pricing
+- **Rider**: Search Giyani locations, pin on map, quick destination chips, choose vehicle,
+  add notes/promo code, book ride, trip PIN verification, call/WhatsApp driver, SOS button,
+  ride status tracking, trip completion with star rating, receipt, rebook, bottom nav
+- **Driver**: Go online/offline, countdown timer on requests, accept/decline, navigate to
+  pickup/dropoff (Google Maps), call/WhatsApp passenger, trip phase progression, earnings
+  breakdown (today/weekly/cash), bottom nav with trips/earnings/profile tabs
+- **Admin**: Dashboard with revenue/active trips, driver/rider/online/trip counts, pending
+  driver approvals, completion rate, management for drivers/trips/vehicle pricing
 
 ## Demo Accounts
 
@@ -54,4 +71,5 @@ All prefixed with `/api`:
 - Saved Places: GET/POST/DELETE `/saved-places`
 - Vehicle Types: GET/POST/PATCH `/vehicle-types`
 - Admin: GET `/admin/stats`
+- Health: GET `/health`
 - Seed: POST `/seed`
