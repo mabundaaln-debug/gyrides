@@ -8,6 +8,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import RiderApp from "@/pages/RiderApp";
 import DriverApp from "@/pages/DriverApp";
+import DriverOnboarding from "@/pages/DriverOnboarding";
 import AdminApp from "@/pages/AdminApp";
 
 function Router() {
@@ -17,6 +18,7 @@ function Router() {
       <Route path="/login" component={Home} />
       <Route path="/rider/:rest*" component={RiderApp} />
       <Route path="/rider" component={RiderApp} />
+      <Route path="/driver/onboarding" component={DriverOnboarding} />
       <Route path="/driver/:rest*" component={DriverApp} />
       <Route path="/driver" component={DriverApp} />
       <Route path="/admin/:rest*" component={AdminApp} />

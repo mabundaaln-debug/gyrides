@@ -15,6 +15,7 @@ export interface IStorage {
   updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined>;
   getUsersByRole(role: string): Promise<User[]>;
   getOnlineDrivers(): Promise<User[]>;
+  getPendingDrivers(): Promise<User[]>;
 
   createTrip(trip: InsertTrip): Promise<Trip>;
   getTrip(id: string): Promise<Trip | undefined>;
@@ -62,7 +63,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getOnlineDrivers(): Promise<User[]> {
-    return db.select().from(users).where(and(eq(users.role, "driver"), eq(users.isOnline, true)));
+    return db.select().from(users).where(and(eq(users.role, "driver"), eq(users.isOnline, true), eq(users.approvalStatus, "approved")));
+  }
+
+  async getPendingDrivers(): Promise<User[]> {
+    return db.select().from(users).where(and(eq(users.role, "driver"), eq(users.onboardingComplete, true), eq(users.approvalStatus, "pending"))).orderBy(desc(users.createdAt));
   }
 
   async createTrip(trip: InsertTrip): Promise<Trip> {

@@ -26,6 +26,8 @@ export default function DriverApp() {
   useEffect(() => {
     if (!user || user.role !== "driver") {
       setLocation("/");
+    } else if (user.role === "driver" && user.approvalStatus !== "approved") {
+      setLocation("/driver/onboarding");
     }
   }, [user]);
 

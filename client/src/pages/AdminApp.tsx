@@ -1,18 +1,25 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { Users, Car, DollarSign, BarChart3, LogOut, ChevronRight, ChevronLeft, Star, MapPin, TrendingUp, Activity, AlertCircle, CheckCircle, Shield } from "lucide-react";
+import { Users, Car, DollarSign, LogOut, ChevronRight, ChevronLeft, Star, MapPin, TrendingUp, Activity, AlertCircle, CheckCircle, Shield, XCircle, FileText, Eye, User as UserIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
+import { approveDriver, rejectDriver } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 import type { User, Trip, VehicleType } from "@shared/schema";
 
 export default function AdminApp() {
   const { user, logout } = useAuth();
   const [, setLocation] = useLocation();
-  const [view, setView] = useState<"dashboard" | "drivers" | "trips" | "pricing">("dashboard");
+  const [view, setView] = useState<"dashboard" | "drivers" | "trips" | "pricing" | "approvals" | "review-driver">("dashboard");
+  const [reviewingDriver, setReviewingDriver] = useState<User | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [showRejectInput, setShowRejectInput] = useState(false);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!user || user.role !== "admin") {
@@ -30,6 +37,11 @@ export default function AdminApp() {
     queryFn: getQueryFn({ on401: "throw" }),
   });
 
+  const { data: pendingDrivers = [] } = useQuery<User[]>({
+    queryKey: ["/api/drivers/pending"],
+    queryFn: getQueryFn({ on401: "throw" }),
+  });
+
   const { data: allTrips = [] } = useQuery<Trip[]>({
     queryKey: ["/api/trips"],
     queryFn: getQueryFn({ on401: "throw" }),
@@ -44,7 +56,198 @@ export default function AdminApp() {
 
   const completedTrips = allTrips.filter(t => t.status === "completed");
   const cancelledTrips = allTrips.filter(t => t.status === "cancelled");
-  const pendingDrivers = drivers.filter(d => d.totalTrips === 0);
+
+  const handleApprove = async (driverId: string) => {
+    try {
+      await approveDriver(driverId);
+      toast({ title: "Driver Approved", description: "The driver can now start accepting rides" });
+      queryClient.invalidateQueries({ queryKey: ["/api/drivers/pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users/role/driver"] });
+      setReviewingDriver(null);
+      setView("approvals");
+    } catch {
+      toast({ title: "Failed to approve", variant: "destructive" });
+    }
+  };
+
+  const handleReject = async (driverId: string) => {
+    try {
+      await rejectDriver(driverId, rejectReason || "Application does not meet requirements");
+      toast({ title: "Driver Rejected", description: "The driver has been notified" });
+      queryClient.invalidateQueries({ queryKey: ["/api/drivers/pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users/role/driver"] });
+      setReviewingDriver(null);
+      setShowRejectInput(false);
+      setRejectReason("");
+      setView("approvals");
+    } catch {
+      toast({ title: "Failed to reject", variant: "destructive" });
+    }
+  };
+
+  // ── Review Driver Application ──
+  if (view === "review-driver" && reviewingDriver) {
+    const d = reviewingDriver;
+    return (
+      <div className="min-h-[100dvh] bg-gray-50 flex flex-col">
+        <div className="bg-white p-4 flex items-center gap-3 border-b sticky top-0 z-10">
+          <Button variant="ghost" size="icon" onClick={() => { setView("approvals"); setReviewingDriver(null); setShowRejectInput(false); }} className="rounded-full"><ChevronLeft className="h-6 w-6" /></Button>
+          <h1 className="text-xl font-bold">Review Application</h1>
+        </div>
+        <div className="flex-1 p-4 space-y-4 overflow-auto">
+          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 text-center">
+            <Avatar className="h-16 w-16 mx-auto mb-3 border-2 border-yellow-400">
+              <AvatarFallback className="bg-yellow-400 text-black text-xl font-bold">{d.fullName[0]}</AvatarFallback>
+            </Avatar>
+            <h2 className="text-lg font-bold">{d.fullName}</h2>
+            <p className="text-gray-500 text-sm">{d.phone}</p>
+            {d.email && <p className="text-gray-500 text-xs">{d.email}</p>}
+            <span className="inline-block mt-2 text-xs font-bold px-3 py-1 rounded-full bg-yellow-100 text-yellow-700">Pending Approval</span>
+          </div>
+
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-2">
+            <h3 className="font-bold text-sm text-gray-600 flex items-center gap-2"><UserIcon className="h-4 w-4" /> Personal Details</h3>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+              <span className="text-gray-500">ID Number</span><span className="font-medium">{d.idNumber || "—"}</span>
+              <span className="text-gray-500">Address</span><span className="font-medium">{d.address || "—"}</span>
+              <span className="text-gray-500">Phone</span><span className="font-medium">{d.phone}</span>
+              {d.email && <><span className="text-gray-500">Email</span><span className="font-medium">{d.email}</span></>}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-2">
+            <h3 className="font-bold text-sm text-gray-600 flex items-center gap-2"><Car className="h-4 w-4" /> Vehicle Details</h3>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+              <span className="text-gray-500">Make</span><span className="font-medium">{d.vehicleMake || "—"}</span>
+              <span className="text-gray-500">Model</span><span className="font-medium">{d.vehicleModel || "—"}</span>
+              <span className="text-gray-500">Color</span><span className="font-medium">{d.vehicleColor || "—"}</span>
+              <span className="text-gray-500">Year</span><span className="font-medium">{d.vehicleYear || "—"}</span>
+              <span className="text-gray-500">Plate</span><span className="font-medium">{d.licensePlate || "—"}</span>
+              <span className="text-gray-500">Reg. Number</span><span className="font-medium">{d.vehicleRegistrationNumber || "—"}</span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-2">
+            <h3 className="font-bold text-sm text-gray-600 flex items-center gap-2"><FileText className="h-4 w-4" /> License Info</h3>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+              <span className="text-gray-500">License No.</span><span className="font-medium">{d.driverLicenseNumber || "—"}</span>
+              <span className="text-gray-500">Code</span><span className="font-medium">{d.driverLicenseCode || "—"}</span>
+              <span className="text-gray-500">License Expiry</span><span className="font-medium">{d.driverLicenseExpiry || "—"}</span>
+              <span className="text-gray-500">Vehicle Disc Expiry</span><span className="font-medium">{d.vehicleLicenseExpiry || "—"}</span>
+              <span className="text-gray-500">Roadworthy Expiry</span><span className="font-medium">{d.roadworthyCertExpiry || "—"}</span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-3">
+            <h3 className="font-bold text-sm text-gray-600 flex items-center gap-2"><FileText className="h-4 w-4" /> Uploaded Documents</h3>
+            {[
+              { label: "Driver's License", doc: d.driverLicenseDoc },
+              { label: "Vehicle License Disc", doc: d.vehicleLicenseDoc },
+              { label: "Roadworthy Certificate", doc: d.roadworthyCertDoc },
+              { label: "Proof of Insurance", doc: d.proofOfInsuranceDoc },
+              { label: "Profile Photo", doc: d.profilePhotoDoc },
+            ].map(({ label, doc }) => (
+              <div key={label} className="flex items-center gap-3">
+                {doc ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
+                    <span className="text-sm flex-1">{label}</span>
+                    {doc.startsWith("data:image") && (
+                      <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 shrink-0">
+                        <img src={doc} alt={label} className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                    <button className="text-xs text-blue-600 font-medium" onClick={() => {
+                      if (doc.startsWith("data:")) {
+                        const win = window.open();
+                        if (win) { win.document.write(`<img src="${doc}" style="max-width:100%" />`); }
+                      }
+                    }}>
+                      <Eye className="h-3.5 w-3.5" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-4 w-4 text-gray-300 shrink-0" />
+                    <span className="text-sm text-gray-400 flex-1">{label} — not uploaded</span>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {showRejectInput && (
+            <div className="bg-red-50 rounded-xl p-4 border border-red-200 space-y-3">
+              <p className="text-sm font-bold text-red-700">Rejection Reason</p>
+              <textarea
+                value={rejectReason}
+                onChange={e => setRejectReason(e.target.value)}
+                placeholder="Explain why the application is rejected..."
+                className="w-full h-24 rounded-lg border border-red-200 p-3 text-sm resize-none"
+                data-testid="input-reject-reason"
+              />
+              <div className="flex gap-3">
+                <Button variant="outline" className="flex-1 rounded-xl h-11" onClick={() => { setShowRejectInput(false); setRejectReason(""); }}>Cancel</Button>
+                <Button className="flex-1 rounded-xl h-11 bg-red-600 hover:bg-red-700 text-white" onClick={() => handleReject(d.id)} data-testid="btn-confirm-reject">Confirm Reject</Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {!showRejectInput && (
+          <div className="bg-white border-t border-gray-100 p-4 flex gap-3">
+            <Button variant="outline" className="flex-1 h-14 rounded-2xl text-red-600 border-red-200" onClick={() => setShowRejectInput(true)} data-testid="btn-reject-driver">
+              <XCircle className="h-4 w-4 mr-2" /> Reject
+            </Button>
+            <Button className="flex-1 h-14 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-bold" onClick={() => handleApprove(d.id)} data-testid="btn-approve-driver">
+              <CheckCircle className="h-4 w-4 mr-2" /> Approve
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Pending Approvals ──
+  if (view === "approvals") {
+    return (
+      <div className="min-h-[100dvh] bg-gray-50 flex flex-col">
+        <div className="bg-white p-4 flex items-center gap-3 border-b sticky top-0 z-10">
+          <Button variant="ghost" size="icon" onClick={() => setView("dashboard")} className="rounded-full"><ChevronLeft className="h-6 w-6" /></Button>
+          <h1 className="text-xl font-bold">Pending Approvals ({pendingDrivers.length})</h1>
+        </div>
+        <div className="p-4 space-y-3 overflow-auto">
+          {pendingDrivers.length === 0 ? (
+            <div className="text-center py-16">
+              <CheckCircle className="h-12 w-12 text-green-300 mx-auto mb-4" />
+              <p className="font-medium text-gray-500">All caught up!</p>
+              <p className="text-sm text-gray-400">No pending driver applications</p>
+            </div>
+          ) : pendingDrivers.map(d => (
+            <button
+              key={d.id}
+              className="w-full text-left bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center gap-3"
+              onClick={() => { setReviewingDriver(d); setView("review-driver"); }}
+              data-testid={`pending-driver-${d.id}`}
+            >
+              <Avatar className="h-11 w-11 border-2 border-yellow-400">
+                <AvatarFallback className="bg-yellow-400 text-black font-bold">{d.fullName[0]}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-sm">{d.fullName}</div>
+                <div className="text-xs text-gray-500">{d.phone}</div>
+                <div className="text-[10px] text-gray-400">{d.vehicleColor} {d.vehicleMake} {d.vehicleModel} · {d.licensePlate}</div>
+              </div>
+              <div className="flex flex-col items-end gap-1">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">Pending</span>
+                <ChevronRight className="h-4 w-4 text-gray-400" />
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   // ── Drivers List ──
   if (view === "drivers") {
@@ -63,7 +266,7 @@ export default function AdminApp() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-sm">{d.fullName}</span>
-                  {d.totalTrips && d.totalTrips > 10 && <CheckCircle className="h-3.5 w-3.5 text-blue-500" />}
+                  {d.approvalStatus === "approved" && <CheckCircle className="h-3.5 w-3.5 text-green-500" />}
                 </div>
                 <div className="text-xs text-gray-500 flex items-center gap-1">
                   <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" /> {d.rating?.toFixed(1)} · {d.totalTrips} trips
@@ -71,8 +274,8 @@ export default function AdminApp() {
                 <div className="text-[10px] text-gray-400 mt-0.5">{d.vehicleColor} {d.vehicleMake} {d.vehicleModel} · {d.licensePlate}</div>
               </div>
               <div className="text-right shrink-0">
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${d.isOnline ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                  {d.isOnline ? "Online" : "Offline"}
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${d.approvalStatus === "approved" ? (d.isOnline ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500") : d.approvalStatus === "pending" ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"}`}>
+                  {d.approvalStatus === "approved" ? (d.isOnline ? "Online" : "Offline") : d.approvalStatus}
                 </span>
                 <div className="text-sm font-bold mt-1">R{(d.earnings ?? 0).toLocaleString()}</div>
               </div>
@@ -223,24 +426,44 @@ export default function AdminApp() {
         </div>
 
         {pendingDrivers.length > 0 && (
-          <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 flex items-center gap-3">
-            <AlertCircle className="h-5 w-5 text-orange-500 shrink-0" />
-            <div className="flex-1">
-              <div className="font-bold text-sm text-orange-800">{pendingDrivers.length} New Driver{pendingDrivers.length > 1 ? "s" : ""}</div>
-              <div className="text-[10px] text-orange-600">Pending verification</div>
+          <button
+            className="w-full bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-center gap-3 text-left"
+            onClick={() => setView("approvals")}
+            data-testid="btn-pending-approvals"
+          >
+            <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center shrink-0">
+              <AlertCircle className="h-5 w-5 text-orange-500" />
             </div>
-            <Button size="sm" variant="outline" className="text-orange-600 border-orange-300 rounded-lg text-xs h-8" onClick={() => setView("drivers")}>Review</Button>
-          </div>
+            <div className="flex-1">
+              <div className="font-bold text-sm text-orange-800">{pendingDrivers.length} Pending Driver Application{pendingDrivers.length > 1 ? "s" : ""}</div>
+              <div className="text-[10px] text-orange-600">Tap to review and approve or reject</div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-orange-400" />
+          </button>
         )}
 
         <h2 className="font-bold">Management</h2>
 
         <div className="space-y-2">
+          <Button variant="outline" className="w-full justify-between h-14 rounded-xl bg-white border-gray-100 shadow-sm px-4" onClick={() => setView("approvals")} data-testid="btn-manage-approvals">
+            <div className="flex items-center gap-3">
+              <div className="bg-yellow-50 p-2 rounded-lg text-yellow-600"><Shield className="h-4 w-4" /></div>
+              <div className="text-left">
+                <div className="font-bold text-sm">Driver Approvals</div>
+                <div className="text-[10px] text-gray-500">{pendingDrivers.length} pending</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {pendingDrivers.length > 0 && <span className="w-5 h-5 bg-orange-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{pendingDrivers.length}</span>}
+              <ChevronRight className="h-4 w-4 text-gray-400" />
+            </div>
+          </Button>
+
           <Button variant="outline" className="w-full justify-between h-14 rounded-xl bg-white border-gray-100 shadow-sm px-4" onClick={() => setView("drivers")} data-testid="btn-manage-drivers">
             <div className="flex items-center gap-3">
               <div className="bg-blue-50 p-2 rounded-lg text-blue-600"><Users className="h-4 w-4" /></div>
               <div className="text-left">
-                <div className="font-bold text-sm">Drivers</div>
+                <div className="font-bold text-sm">All Drivers</div>
                 <div className="text-[10px] text-gray-500">{stats?.onlineDrivers ?? 0} online now</div>
               </div>
             </div>

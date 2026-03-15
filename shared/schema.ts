@@ -6,6 +6,7 @@ import { z } from "zod";
 export const userRoleEnum = pgEnum("user_role", ["rider", "driver", "admin"]);
 export const tripStatusEnum = pgEnum("trip_status", ["requested", "accepted", "arriving", "in_progress", "completed", "cancelled"]);
 export const paymentMethodEnum = pgEnum("payment_method", ["cash", "card", "ewallet"]);
+export const approvalStatusEnum = pgEnum("approval_status", ["pending", "approved", "rejected"]);
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -21,8 +22,26 @@ export const users = pgTable("users", {
   vehicleMake: text("vehicle_make"),
   vehicleModel: text("vehicle_model"),
   vehicleColor: text("vehicle_color"),
+  vehicleYear: text("vehicle_year"),
   licensePlate: text("license_plate"),
   earnings: real("earnings").default(0),
+  approvalStatus: approvalStatusEnum("approval_status").default("pending"),
+  onboardingComplete: boolean("onboarding_complete").default(false),
+  idNumber: text("id_number"),
+  email: text("email"),
+  address: text("address"),
+  driverLicenseNumber: text("driver_license_number"),
+  driverLicenseExpiry: text("driver_license_expiry"),
+  driverLicenseCode: text("driver_license_code"),
+  vehicleRegistrationNumber: text("vehicle_registration_number"),
+  vehicleLicenseExpiry: text("vehicle_license_expiry"),
+  roadworthyCertExpiry: text("roadworthy_cert_expiry"),
+  driverLicenseDoc: text("driver_license_doc"),
+  vehicleLicenseDoc: text("vehicle_license_doc"),
+  roadworthyCertDoc: text("roadworthy_cert_doc"),
+  proofOfInsuranceDoc: text("proof_of_insurance_doc"),
+  profilePhotoDoc: text("profile_photo_doc"),
+  rejectionReason: text("rejection_reason"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

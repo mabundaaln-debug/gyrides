@@ -28,7 +28,10 @@ client/src/
                          receipt, rebook
   pages/DriverApp.tsx  - Driver dashboard with bottom nav, countdown timer on requests,
                          call/WhatsApp passenger, navigate button, earnings breakdown
-  pages/AdminApp.tsx   - Admin panel with pending approvals, completion rate, platform health
+  pages/DriverOnboarding.tsx - Multi-step driver registration (personal info, vehicle, licenses,
+                              document uploads, review). Shows pending/rejected status screens.
+  pages/AdminApp.tsx   - Admin panel with pending approvals, driver review flow (view docs,
+                         approve/reject with reason), completion rate, platform health
   components/GiyaniMap.tsx - Leaflet map with OSRM routing, pin-on-map, driver markers
   lib/auth.tsx         - Auth context (localStorage-based)
   lib/api.ts           - API helper functions
@@ -51,8 +54,12 @@ shared/
 - **Driver**: Go online/offline, countdown timer on requests, accept/decline, navigate to
   pickup/dropoff (Google Maps), call/WhatsApp passenger, trip phase progression, earnings
   breakdown (today/weekly/cash), bottom nav with trips/earnings/profile tabs
-- **Admin**: Dashboard with revenue/active trips, driver/rider/online/trip counts, pending
-  driver approvals, completion rate, management for drivers/trips/vehicle pricing
+- **Driver Onboarding**: 5-step registration form (personal info → vehicle → licenses →
+  document uploads → review & submit). Blocked from driving until approved. Shows pending
+  review screen or rejected screen with reason and re-submit option.
+- **Admin**: Dashboard with revenue/active trips, pending approval alerts, driver review flow
+  (view all submitted details & documents, approve or reject with reason), completion rate,
+  management for drivers/trips/vehicle pricing
 
 ## Demo Accounts
 
@@ -70,6 +77,7 @@ All prefixed with `/api`:
 - Trips: CRUD at `/trips`, plus `/trips/active`, `/trips/requested`, `/trips/rider/:id`, `/trips/driver/:id`
 - Saved Places: GET/POST/DELETE `/saved-places`
 - Vehicle Types: GET/POST/PATCH `/vehicle-types`
-- Admin: GET `/admin/stats`
+- Admin: GET `/admin/stats`, GET `/drivers/pending`, PATCH `/admin/drivers/:id/approve`, PATCH `/admin/drivers/:id/reject`
+- Onboarding: PATCH `/drivers/:id/onboarding`
 - Health: GET `/health`
 - Seed: POST `/seed`

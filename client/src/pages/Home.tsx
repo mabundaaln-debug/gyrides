@@ -41,7 +41,10 @@ export default function Home() {
       const u = await login(username, password);
       setUser(u);
       if (u.role === "rider") setLocation("/rider");
-      else if (u.role === "driver") setLocation("/driver");
+      else if (u.role === "driver") {
+        if (u.approvalStatus === "approved") setLocation("/driver");
+        else setLocation("/driver/onboarding");
+      }
       else setLocation("/admin");
     } catch {
       toast({ title: "Login failed", description: "Check your username and password", variant: "destructive" });
@@ -63,7 +66,7 @@ export default function Home() {
       const u = await register({ username, password, fullName, phone, role });
       setUser(u);
       if (u.role === "rider") setLocation("/rider");
-      else setLocation("/driver");
+      else setLocation("/driver/onboarding");
     } catch {
       toast({ title: "Registration failed", description: "Username may already be taken", variant: "destructive" });
     }

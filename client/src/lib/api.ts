@@ -31,6 +31,21 @@ export async function updateTrip(id: string, data: any): Promise<Trip> {
   return res.json();
 }
 
+export async function submitOnboarding(driverId: string, data: any): Promise<User> {
+  const res = await apiRequest("PATCH", `/api/drivers/${driverId}/onboarding`, data);
+  return res.json();
+}
+
+export async function approveDriver(driverId: string): Promise<User> {
+  const res = await apiRequest("PATCH", `/api/admin/drivers/${driverId}/approve`);
+  return res.json();
+}
+
+export async function rejectDriver(driverId: string, reason: string): Promise<User> {
+  const res = await apiRequest("PATCH", `/api/admin/drivers/${driverId}/reject`, { reason });
+  return res.json();
+}
+
 export async function seedData(): Promise<void> {
   await apiRequest("POST", "/api/seed");
 }

@@ -136,6 +136,38 @@ export async function registerRoutes(
     return res.json(vt);
   });
 
+  // ── Driver Onboarding ──
+  app.patch("/api/drivers/:id/onboarding", async (req, res) => {
+    const user = await storage.getUser(req.params.id);
+    if (!user || user.role !== "driver") return res.status(404).json({ message: "Driver not found" });
+    const updated = await storage.updateUser(req.params.id, {
+      ...req.body,
+      onboardingComplete: true,
+      approvalStatus: "pending",
+    });
+    return res.json(updated);
+  });
+
+  app.get("/api/drivers/pending", async (req, res) => {
+    const pending = await storage.getPendingDrivers();
+    return res.json(pending);
+  });
+
+  app.patch("/api/admin/drivers/:id/approve", async (req, res) => {
+    const user = await storage.getUser(req.params.id);
+    if (!user || user.role !== "driver") return res.status(404).json({ message: "Driver not found" });
+    const updated = await storage.updateUser(req.params.id, { approvalStatus: "approved", rejectionReason: null });
+    return res.json(updated);
+  });
+
+  app.patch("/api/admin/drivers/:id/reject", async (req, res) => {
+    const user = await storage.getUser(req.params.id);
+    if (!user || user.role !== "driver") return res.status(404).json({ message: "Driver not found" });
+    const { reason } = req.body;
+    const updated = await storage.updateUser(req.params.id, { approvalStatus: "rejected", rejectionReason: reason || "Application rejected" });
+    return res.json(updated);
+  });
+
   // ── Admin Stats ──
   app.get("/api/admin/stats", async (req, res) => {
     const stats = await storage.getStats();
@@ -157,10 +189,10 @@ export async function registerRoutes(
       ];
 
       const drivers = [
-        { username: "sipho", password: "demo", fullName: "Sipho Maluleke", phone: "074 567 8901", role: "driver" as const, rating: 4.9, totalTrips: 1240, isOnline: true, vehicleMake: "Toyota", vehicleModel: "Etios", vehicleColor: "White", licensePlate: "LGP 123 L", earnings: 45200, avatarUrl: null },
-        { username: "grace", password: "demo", fullName: "Grace Chauke", phone: "075 678 9012", role: "driver" as const, rating: 4.8, totalTrips: 890, isOnline: true, vehicleMake: "Volkswagen", vehicleModel: "Polo Vivo", vehicleColor: "Silver", licensePlate: "LGP 456 L", earnings: 32100, avatarUrl: null },
-        { username: "mandla", password: "demo", fullName: "Mandla Baloyi", phone: "076 789 0123", role: "driver" as const, rating: 4.7, totalTrips: 560, isOnline: false, vehicleMake: "Hyundai", vehicleModel: "Grand i10", vehicleColor: "Red", licensePlate: "LGP 789 L", earnings: 21500, avatarUrl: null },
-        { username: "nomsa", password: "demo", fullName: "Nomsa Rikhotso", phone: "077 890 1234", role: "driver" as const, rating: 4.6, totalTrips: 320, isOnline: true, vehicleMake: "Toyota", vehicleModel: "Avanza", vehicleColor: "Grey", licensePlate: "LGP 321 L", earnings: 15800, avatarUrl: null },
+        { username: "sipho", password: "demo", fullName: "Sipho Maluleke", phone: "074 567 8901", role: "driver" as const, rating: 4.9, totalTrips: 1240, isOnline: true, vehicleMake: "Toyota", vehicleModel: "Etios", vehicleColor: "White", licensePlate: "LGP 123 L", earnings: 45200, avatarUrl: null, approvalStatus: "approved" as const, onboardingComplete: true, driverLicenseNumber: "ML12345", driverLicenseExpiry: "2027-06-30", driverLicenseCode: "B" },
+        { username: "grace", password: "demo", fullName: "Grace Chauke", phone: "075 678 9012", role: "driver" as const, rating: 4.8, totalTrips: 890, isOnline: true, vehicleMake: "Volkswagen", vehicleModel: "Polo Vivo", vehicleColor: "Silver", licensePlate: "LGP 456 L", earnings: 32100, avatarUrl: null, approvalStatus: "approved" as const, onboardingComplete: true, driverLicenseNumber: "GC67890", driverLicenseExpiry: "2027-09-15", driverLicenseCode: "B" },
+        { username: "mandla", password: "demo", fullName: "Mandla Baloyi", phone: "076 789 0123", role: "driver" as const, rating: 4.7, totalTrips: 560, isOnline: false, vehicleMake: "Hyundai", vehicleModel: "Grand i10", vehicleColor: "Red", licensePlate: "LGP 789 L", earnings: 21500, avatarUrl: null, approvalStatus: "approved" as const, onboardingComplete: true, driverLicenseNumber: "MB34567", driverLicenseExpiry: "2026-12-01", driverLicenseCode: "B" },
+        { username: "nomsa", password: "demo", fullName: "Nomsa Rikhotso", phone: "077 890 1234", role: "driver" as const, rating: 4.6, totalTrips: 320, isOnline: true, vehicleMake: "Toyota", vehicleModel: "Avanza", vehicleColor: "Grey", licensePlate: "LGP 321 L", earnings: 15800, avatarUrl: null, approvalStatus: "approved" as const, onboardingComplete: true, driverLicenseNumber: "NR78901", driverLicenseExpiry: "2028-03-20", driverLicenseCode: "C1" },
       ];
 
       const admin = { username: "admin", password: "admin", fullName: "GY Admin", phone: "078 000 0000", role: "admin" as const, rating: 5.0, totalTrips: 0, avatarUrl: null };
