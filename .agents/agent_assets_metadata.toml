@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "8zZM02CruxVbp2l9L-NbS"
+uri = "file://GY_Rides_Source_Code.md"
+type = "text"
+title = "GY Rides — Complete Source Code"
