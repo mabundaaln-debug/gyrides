@@ -1,0 +1,103 @@
+1. Taxi + private ride in one app
+
+Most ride apps only think about private cars. Yours should let a user choose:
+	•	Private ride
+	•	Shared ride
+	•	Taxi route
+	•	Parcel delivery
+	•	Clinic/hospital transport
+
+That immediately makes it broader and more useful than a normal ride app.
+
+2. Route presets for local places
+
+Add one-tap popular destinations like:
+	•	Masingita Mall
+	•	Giyani CBD
+	•	Taxi Rank
+	•	Hospital
+	•	Schools
+	•	Villages around Giyani
+
+This reduces typing and makes the app feel local.
+
+3. WhatsApp fallback booking
+
+A lot of users trust WhatsApp more than apps, and some areas have weak connectivity. Add a “Book on WhatsApp” button that sends pickup, dropoff, and phone number to your team or driver pool. That can be a huge differentiator in smaller towns.
+
+4. Shared ride / seat booking
+
+Let users book a seat, not only a whole car. That makes transport cheaper and more realistic for local commuters.
+
+5. Cash-first design
+
+Most big apps assume cards. Your app should support:
+	•	cash
+	•	EFT proof upload
+	•	wallet balance later
+	•	card as an optional premium method
+
+That fits local user behavior better.
+
+6. Driver trust features
+
+Show things users care about most:
+	•	driver photo
+	•	rating
+	•	car type
+	•	number plate
+	•	verified badge
+	•	local language support
+
+Trust wins more rides than flashy design.
+
+7. Medical transport mode
+
+This is a real unfair advantage for you. Add a special mode for:
+	•	clinic pickup
+	•	hospital discharge transport
+	•	medication delivery
+	•	elderly patient ride requests
+
+Uber and Bolt don’t really own that lane locally.
+
+8. Taxi rank queue info
+
+A killer feature would be showing:
+	•	route
+	•	fare
+	•	seats left
+	•	estimated departure time
+
+That would make the app useful even when someone is not booking a private ride.
+
+9. Offline-lite behavior
+
+Even if the map needs data, the app should still allow:
+	•	saved home/work locations
+	•	manual pickup point selection
+	•	SMS/WhatsApp fallback
+
+That makes it usable in poor-network areas.
+
+10. Safety layer
+
+Add:
+	•	emergency SOS
+	•	share trip
+	•	trusted contacts
+	•	driver/passenger ratings
+	•	ride PIN before trip starts
+
+Those are table-stakes for trust.
+
+The best unique combo for your app
+
+If I were building this to stand out fast, I’d prioritize this mix:
+	1.	Local preset destinations
+	2.	Taxi + private ride in one app
+	3.	Shared rides
+	4.	WhatsApp backup booking
+	5.	Medical transport
+	6.	Cash payment
+	7.	Trip sharing + SOS
