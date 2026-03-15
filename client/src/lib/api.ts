@@ -1,5 +1,5 @@
 import { apiRequest } from "./queryClient";
-import type { User, Trip, SavedPlace, VehicleType } from "@shared/schema";
+import type { User, Trip, SavedPlace, VehicleType, TaxiRoute } from "@shared/schema";
 
 export async function login(username: string, password: string): Promise<User> {
   const res = await apiRequest("POST", "/api/auth/login", { username, password });

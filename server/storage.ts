@@ -1,11 +1,12 @@
 import { eq, desc, and, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
-  users, trips, savedPlaces, vehicleTypes,
+  users, trips, savedPlaces, vehicleTypes, taxiRoutes,
   type User, type InsertUser,
   type Trip, type InsertTrip,
   type SavedPlace, type InsertSavedPlace,
   type VehicleType, type InsertVehicleType,
+  type TaxiRoute, type InsertTaxiRoute,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -33,6 +34,10 @@ export interface IStorage {
   getVehicleTypes(): Promise<VehicleType[]>;
   createVehicleType(vt: InsertVehicleType): Promise<VehicleType>;
   updateVehicleType(id: string, data: Partial<InsertVehicleType>): Promise<VehicleType | undefined>;
+
+  getTaxiRoutes(): Promise<TaxiRoute[]>;
+  createTaxiRoute(route: InsertTaxiRoute): Promise<TaxiRoute>;
+  updateTaxiRoute(id: string, data: Partial<InsertTaxiRoute>): Promise<TaxiRoute | undefined>;
 
   getStats(): Promise<{ totalDrivers: number; totalRiders: number; totalTrips: number; totalRevenue: number; onlineDrivers: number; activeTrips: number }>;
 }
@@ -136,6 +141,20 @@ export class DatabaseStorage implements IStorage {
   async updateVehicleType(id: string, data: Partial<InsertVehicleType>): Promise<VehicleType | undefined> {
     const [v] = await db.update(vehicleTypes).set(data).where(eq(vehicleTypes.id, id)).returning();
     return v;
+  }
+
+  async getTaxiRoutes(): Promise<TaxiRoute[]> {
+    return db.select().from(taxiRoutes).where(eq(taxiRoutes.isActive, true));
+  }
+
+  async createTaxiRoute(route: InsertTaxiRoute): Promise<TaxiRoute> {
+    const [r] = await db.insert(taxiRoutes).values(route).returning();
+    return r;
+  }
+
+  async updateTaxiRoute(id: string, data: Partial<InsertTaxiRoute>): Promise<TaxiRoute | undefined> {
+    const [r] = await db.update(taxiRoutes).set(data).where(eq(taxiRoutes.id, id)).returning();
+    return r;
   }
 
   async getStats() {

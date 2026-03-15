@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
-import { MapPin, DollarSign, Star, Check, X, Menu, LogOut, Navigation, Car, Clock, TrendingUp, User, ChevronLeft, History, Phone, MessageCircle, AlertTriangle, Shield, ExternalLink } from "lucide-react";
+import { MapPin, DollarSign, Star, Check, X, Menu, LogOut, Navigation, Car, Clock, TrendingUp, User, ChevronLeft, History, Phone, MessageCircle, AlertTriangle, Shield, ExternalLink, BadgeCheck, Heart, Package, Users, Bus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth";
@@ -140,7 +140,10 @@ export default function DriverApp() {
               <AvatarFallback className="bg-yellow-400 text-black text-xl font-bold">{user.fullName[0]}</AvatarFallback>
             </Avatar>
             <div>
-              <h2 className="text-xl font-bold">{user.fullName}</h2>
+              <div className="flex items-center gap-1.5">
+                <h2 className="text-xl font-bold">{user.fullName}</h2>
+                {user.isVerified && <BadgeCheck className="h-5 w-5 text-blue-400" />}
+              </div>
               <div className="text-yellow-400 text-sm flex items-center gap-1">
                 <Star className="h-3 w-3 fill-current" /> {user.rating?.toFixed(1)} · {user.totalTrips} trips
               </div>
@@ -230,7 +233,12 @@ export default function DriverApp() {
           {myTrips.map(trip => (
             <div key={trip.id} className="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
               <div className="flex justify-between items-start mb-2">
-                <div className="text-xs text-gray-500">{trip.createdAt ? new Date(trip.createdAt).toLocaleDateString("en-ZA") : ""}</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500">{trip.createdAt ? new Date(trip.createdAt).toLocaleDateString("en-ZA") : ""}</span>
+                  {trip.rideType && trip.rideType !== "private" && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">{trip.rideType}</span>
+                  )}
+                </div>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${trip.status === "completed" ? "bg-green-100 text-green-700" : trip.status === "cancelled" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
                   {trip.status}
                 </span>
@@ -262,8 +270,16 @@ export default function DriverApp() {
             <Avatar className="h-20 w-20 mx-auto mb-3 border-2 border-yellow-400">
               <AvatarFallback className="bg-yellow-400 text-black text-2xl font-bold">{user.fullName[0]}</AvatarFallback>
             </Avatar>
-            <h2 className="text-xl font-bold">{user.fullName}</h2>
+            <div className="flex items-center justify-center gap-1.5">
+              <h2 className="text-xl font-bold">{user.fullName}</h2>
+              {user.isVerified && <BadgeCheck className="h-5 w-5 text-blue-500" />}
+            </div>
             <p className="text-gray-500 text-sm">{user.phone}</p>
+            {user.isVerified && (
+              <div className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full mt-1">
+                <BadgeCheck className="h-3 w-3" /> Verified Driver
+              </div>
+            )}
             <div className="flex items-center justify-center gap-1 mt-2 text-sm">
               <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" /> {user.rating?.toFixed(1)} · {user.totalTrips} trips
             </div>
@@ -297,7 +313,9 @@ export default function DriverApp() {
 
   // ── Active Trip ──
   if (view === "trip" && onTrip) {
-    const phaseLabel = tripPhase === "arriving" ? "Navigate to Pickup" : tripPhase === "pickup" ? "Passenger Pickup" : "Trip in Progress";
+    const isParcel = onTrip.rideType === "parcel";
+    const isMedical = onTrip.rideType === "medical";
+    const phaseLabel = tripPhase === "arriving" ? (isParcel ? "Navigate to Pickup" : "Navigate to Pickup") : tripPhase === "pickup" ? (isParcel ? "Collect Parcel" : "Passenger Pickup") : (isParcel ? "Delivering Parcel" : "Trip in Progress");
     const phaseColor = tripPhase === "arriving" ? "bg-blue-100 text-blue-700" : tripPhase === "pickup" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700";
 
     return (
@@ -306,6 +324,11 @@ export default function DriverApp() {
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => { setOnTrip(null); setView("home"); }} className="rounded-full bg-white shadow-md"><ChevronLeft className="h-6 w-6" /></Button>
             <span className={`text-xs font-bold px-3 py-1.5 rounded-full shadow-sm ${phaseColor}`}>{phaseLabel}</span>
+            {onTrip.rideType && onTrip.rideType !== "private" && (
+              <span className={`text-[10px] font-bold px-2 py-1 rounded-full shadow-sm ${
+                isMedical ? "bg-red-100 text-red-700" : isParcel ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
+              }`}>{onTrip.rideType}</span>
+            )}
           </div>
           <button onClick={openNavigation} className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center shadow-lg" data-testid="btn-navigate">
             <ExternalLink className="h-5 w-5 text-white" />
@@ -323,6 +346,19 @@ export default function DriverApp() {
         </div>
 
         <div className="bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.08)] p-5 space-y-4">
+          {onTrip.medicalNotes && (
+            <div className="bg-red-50 rounded-lg px-3 py-2 flex items-center gap-2">
+              <Heart className="h-3.5 w-3.5 text-red-500" />
+              <span className="text-xs text-red-700 font-medium">{onTrip.medicalNotes}</span>
+            </div>
+          )}
+          {onTrip.parcelDescription && (
+            <div className="bg-blue-50 rounded-lg px-3 py-2 flex items-center gap-2">
+              <Package className="h-3.5 w-3.5 text-blue-600" />
+              <span className="text-xs text-blue-700 font-medium">{onTrip.parcelDescription}</span>
+            </div>
+          )}
+
           {tripRider && (
             <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
               <Avatar className="h-11 w-11">
@@ -340,7 +376,7 @@ export default function DriverApp() {
               </div>
               <div className="text-right">
                 <div className="text-lg font-bold">R{onTrip.fare}</div>
-                <div className="text-[10px] text-gray-500">Cash</div>
+                <div className="text-[10px] text-gray-500 capitalize">{onTrip.paymentMethod}</div>
               </div>
             </div>
           )}
@@ -352,7 +388,7 @@ export default function DriverApp() {
           </div>
 
           <Button size="lg" className="w-full h-14 rounded-2xl text-lg font-bold bg-black text-white hover:bg-gray-900" onClick={advanceTrip} data-testid="btn-advance-trip">
-            {tripPhase === "arriving" ? "Arrived at Pickup" : tripPhase === "pickup" ? "Start Trip" : "Complete Trip"}
+            {tripPhase === "arriving" ? "Arrived at Pickup" : tripPhase === "pickup" ? (isParcel ? "Collected Parcel" : "Start Trip") : (isParcel ? "Delivered" : "Complete Trip")}
           </Button>
         </div>
       </div>
@@ -408,7 +444,12 @@ export default function DriverApp() {
           <div className="absolute inset-x-4 bottom-4 top-auto bg-white rounded-3xl overflow-hidden shadow-2xl text-black animate-in slide-in-from-bottom-8">
             <div className="bg-yellow-400 p-4 flex items-center justify-between">
               <div>
-                <h3 className="font-black text-lg">New Ride Request</h3>
+                <h3 className="font-black text-lg">
+                  {pendingRequest.rideType === "medical" ? "Medical Transport" :
+                   pendingRequest.rideType === "parcel" ? "Parcel Delivery" :
+                   pendingRequest.rideType === "shared" ? "Shared Ride" :
+                   "New Ride Request"}
+                </h3>
                 <p className="text-black/60 text-xs">{pendingRequest.vehicleType}</p>
               </div>
               <div className="w-12 h-12 bg-black rounded-full flex items-center justify-center">
@@ -421,7 +462,38 @@ export default function DriverApp() {
                   <div className="text-3xl font-black">R{pendingRequest.fare}</div>
                   <div className="text-gray-500 text-xs">{pendingRequest.paymentMethod} · {pendingRequest.duration || "?"} min · {pendingRequest.distance?.toFixed(1)} km</div>
                 </div>
+                {pendingRequest.rideType && pendingRequest.rideType !== "private" && (
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                    pendingRequest.rideType === "medical" ? "bg-red-100 text-red-700" :
+                    pendingRequest.rideType === "parcel" ? "bg-blue-100 text-blue-700" :
+                    pendingRequest.rideType === "shared" ? "bg-purple-100 text-purple-700" :
+                    "bg-yellow-100 text-yellow-700"
+                  }`} data-testid="text-ride-type">
+                    {pendingRequest.rideType === "medical" ? "🏥 Medical" :
+                     pendingRequest.rideType === "parcel" ? "📦 Parcel" :
+                     pendingRequest.rideType === "shared" ? `👥 ${pendingRequest.seatsBooked || 1} seat${(pendingRequest.seatsBooked || 1) > 1 ? "s" : ""}` :
+                     pendingRequest.rideType}
+                  </span>
+                )}
               </div>
+
+              {pendingRequest.medicalNotes && (
+                <div className="bg-red-50 rounded-lg px-3 py-2 mb-3 flex items-center gap-2">
+                  <Heart className="h-3.5 w-3.5 text-red-500" />
+                  <span className="text-xs text-red-700">{pendingRequest.medicalNotes}</span>
+                </div>
+              )}
+              {pendingRequest.parcelDescription && (
+                <div className="bg-blue-50 rounded-lg px-3 py-2 mb-3 flex items-center gap-2">
+                  <Package className="h-3.5 w-3.5 text-blue-600" />
+                  <span className="text-xs text-blue-700">{pendingRequest.parcelDescription}</span>
+                </div>
+              )}
+              {pendingRequest.rideNote && (
+                <div className="bg-gray-50 rounded-lg px-3 py-2 mb-3 text-xs text-gray-600">
+                  Note: {pendingRequest.rideNote}
+                </div>
+              )}
 
               <div className="space-y-3 mb-5 relative">
                 <div className="absolute left-3 top-5 bottom-5 w-0.5 bg-gray-200" />

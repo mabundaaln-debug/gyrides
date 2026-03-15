@@ -5,8 +5,9 @@ import { z } from "zod";
 
 export const userRoleEnum = pgEnum("user_role", ["rider", "driver", "admin"]);
 export const tripStatusEnum = pgEnum("trip_status", ["requested", "accepted", "arriving", "in_progress", "completed", "cancelled"]);
-export const paymentMethodEnum = pgEnum("payment_method", ["cash", "card", "ewallet"]);
+export const paymentMethodEnum = pgEnum("payment_method", ["cash", "card", "ewallet", "eft"]);
 export const approvalStatusEnum = pgEnum("approval_status", ["pending", "approved", "rejected"]);
+export const rideTypeEnum = pgEnum("ride_type", ["private", "shared", "taxi", "parcel", "medical"]);
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -42,6 +43,9 @@ export const users = pgTable("users", {
   proofOfInsuranceDoc: text("proof_of_insurance_doc"),
   profilePhotoDoc: text("profile_photo_doc"),
   rejectionReason: text("rejection_reason"),
+  isVerified: boolean("is_verified").default(false),
+  walletBalance: real("wallet_balance").default(0),
+  trustedContacts: text("trusted_contacts"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -49,6 +53,7 @@ export const trips = pgTable("trips", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   riderId: varchar("rider_id").notNull().references(() => users.id),
   driverId: varchar("driver_id").references(() => users.id),
+  rideType: rideTypeEnum("ride_type").notNull().default("private"),
   pickupName: text("pickup_name").notNull(),
   pickupLat: real("pickup_lat"),
   pickupLng: real("pickup_lng"),
@@ -62,6 +67,12 @@ export const trips = pgTable("trips", {
   paymentMethod: paymentMethodEnum("payment_method").notNull().default("cash"),
   vehicleType: text("vehicle_type").notNull().default("standard"),
   rating: integer("rating"),
+  seatsBooked: integer("seats_booked").default(1),
+  totalSeats: integer("total_seats").default(4),
+  medicalNotes: text("medical_notes"),
+  parcelDescription: text("parcel_description"),
+  eftProofUrl: text("eft_proof_url"),
+  rideNote: text("ride_note"),
   createdAt: timestamp("created_at").defaultNow(),
   completedAt: timestamp("completed_at"),
 });
@@ -87,10 +98,27 @@ export const vehicleTypes = pgTable("vehicle_types", {
   isActive: boolean("is_active").default(true),
 });
 
+export const taxiRoutes = pgTable("taxi_routes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  routeName: text("route_name").notNull(),
+  fromLocation: text("from_location").notNull(),
+  toLocation: text("to_location").notNull(),
+  fare: real("fare").notNull(),
+  totalSeats: integer("total_seats").notNull().default(15),
+  availableSeats: integer("available_seats").notNull().default(15),
+  estimatedDeparture: text("estimated_departure"),
+  isActive: boolean("is_active").default(true),
+  fromLat: real("from_lat"),
+  fromLng: real("from_lng"),
+  toLat: real("to_lat"),
+  toLng: real("to_lng"),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertTripSchema = createInsertSchema(trips).omit({ id: true, createdAt: true, completedAt: true });
 export const insertSavedPlaceSchema = createInsertSchema(savedPlaces).omit({ id: true });
 export const insertVehicleTypeSchema = createInsertSchema(vehicleTypes).omit({ id: true });
+export const insertTaxiRouteSchema = createInsertSchema(taxiRoutes).omit({ id: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -100,3 +128,5 @@ export type InsertSavedPlace = z.infer<typeof insertSavedPlaceSchema>;
 export type SavedPlace = typeof savedPlaces.$inferSelect;
 export type InsertVehicleType = z.infer<typeof insertVehicleTypeSchema>;
 export type VehicleType = typeof vehicleTypes.$inferSelect;
+export type InsertTaxiRoute = z.infer<typeof insertTaxiRouteSchema>;
+export type TaxiRoute = typeof taxiRoutes.$inferSelect;
