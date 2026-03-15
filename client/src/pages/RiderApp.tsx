@@ -638,7 +638,7 @@ export default function RiderApp() {
             </div>
           </div>
 
-          <Button size="lg" className="w-full h-14 rounded-2xl text-lg font-bold bg-black hover:bg-gray-900" disabled={!selectedVehicle} onClick={handleBookRide} data-testid="btn-confirm-ride">
+          <Button size="lg" className="w-full h-14 rounded-2xl text-lg font-bold bg-black text-white hover:bg-gray-900" disabled={!selectedVehicle} onClick={handleBookRide} data-testid="btn-confirm-ride">
             {selectedVehicle ? `Book ${selectedVehicle.name} · R${calcFare(selectedVehicle)}` : "Select a ride"}
           </Button>
         </div>

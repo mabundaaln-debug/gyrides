@@ -351,7 +351,7 @@ export default function DriverApp() {
             <div className="flex items-center gap-2 flex-1"><div className="w-2 h-2 bg-black rounded-full" /><span className="font-medium truncate">{onTrip.dropoffName}</span></div>
           </div>
 
-          <Button size="lg" className="w-full h-14 rounded-2xl text-lg font-bold bg-black hover:bg-gray-900" onClick={advanceTrip} data-testid="btn-advance-trip">
+          <Button size="lg" className="w-full h-14 rounded-2xl text-lg font-bold bg-black text-white hover:bg-gray-900" onClick={advanceTrip} data-testid="btn-advance-trip">
             {tripPhase === "arriving" ? "Arrived at Pickup" : tripPhase === "pickup" ? "Start Trip" : "Complete Trip"}
           </Button>
         </div>
