@@ -292,11 +292,11 @@ export async function registerRoutes(
       await storage.createUser(admin);
 
       const vTypes = [
-        { name: "GY Standard", description: "Affordable everyday rides", basePrice: 15, pricePerKm: 8, seats: 4, icon: "car", isActive: true },
-        { name: "GY Premium", description: "Comfortable newer vehicles", basePrice: 25, pricePerKm: 12, seats: 4, icon: "star", isActive: true },
-        { name: "GY XL", description: "Larger vehicles for groups", basePrice: 30, pricePerKm: 14, seats: 7, icon: "truck", isActive: true },
-        { name: "GY Medical", description: "Hospital & clinic transport", basePrice: 20, pricePerKm: 10, seats: 4, icon: "medical", isActive: true },
-        { name: "GY Parcel", description: "Same-day parcel delivery", basePrice: 20, pricePerKm: 6, seats: 1, icon: "package", isActive: true },
+        { name: "GY Standard", description: "Affordable everyday rides", basePrice: 10, pricePerKm: 8, pricePerMin: 1.5, minimumFare: 25, seats: 4, icon: "car", isActive: true },
+        { name: "GY Premium", description: "Comfortable newer vehicles", basePrice: 15, pricePerKm: 10, pricePerMin: 1.8, minimumFare: 35, seats: 4, icon: "star", isActive: true },
+        { name: "GY XL", description: "Larger vehicles for groups", basePrice: 15, pricePerKm: 11, pricePerMin: 1.8, minimumFare: 40, seats: 7, icon: "truck", isActive: true },
+        { name: "GY Health", description: "Hospital & clinic transport", basePrice: 10, pricePerKm: 8, pricePerMin: 1.2, minimumFare: 50, seats: 4, icon: "medical", isActive: true },
+        { name: "GY Parcel", description: "Same-day parcel delivery", basePrice: 10, pricePerKm: 7, pricePerMin: 1.0, minimumFare: 25, seats: 1, icon: "package", isActive: true },
       ];
       for (const v of vTypes) {
         await storage.createVehicleType(v);
@@ -322,7 +322,7 @@ export async function registerRoutes(
         { riderId: createdRiders[0].id, driverId: createdDrivers[0].id, rideType: "private" as const, pickupName: "Masingita Mall", dropoffName: "Section A", fare: 45, distance: 3.8, duration: 12, status: "completed" as const, paymentMethod: "cash" as const, vehicleType: "GY Standard", rating: 5 },
         { riderId: createdRiders[0].id, driverId: createdDrivers[1].id, rideType: "private" as const, pickupName: "Section A", dropoffName: "Giyani CBD", fare: 35, distance: 2.5, duration: 8, status: "completed" as const, paymentMethod: "cash" as const, vehicleType: "GY Standard", rating: 4 },
         { riderId: createdRiders[1].id, driverId: createdDrivers[0].id, rideType: "shared" as const, pickupName: "Section B", dropoffName: "Masingita Mall", fare: 25, distance: 4.2, duration: 15, status: "completed" as const, paymentMethod: "cash" as const, vehicleType: "GY Standard", rating: 5, seatsBooked: 1 },
-        { riderId: createdRiders[1].id, driverId: createdDrivers[2].id, rideType: "medical" as const, pickupName: "Giyani Hospital", dropoffName: "Section C", fare: 40, distance: 3.0, duration: 10, status: "completed" as const, paymentMethod: "cash" as const, vehicleType: "GY Medical", rating: 4, medicalNotes: "Hospital discharge transport" },
+        { riderId: createdRiders[1].id, driverId: createdDrivers[2].id, rideType: "medical" as const, pickupName: "Giyani Hospital", dropoffName: "Section C", fare: 40, distance: 3.0, duration: 10, status: "completed" as const, paymentMethod: "cash" as const, vehicleType: "GY Health", rating: 4, medicalNotes: "Hospital discharge transport" },
         { riderId: createdRiders[2].id, driverId: createdDrivers[1].id, rideType: "private" as const, pickupName: "Section D", dropoffName: "Giyani Plaza", fare: 55, distance: 5.0, duration: 18, status: "completed" as const, paymentMethod: "cash" as const, vehicleType: "GY Premium", rating: 5 },
         { riderId: createdRiders[0].id, driverId: createdDrivers[3].id, rideType: "parcel" as const, pickupName: "Section A", dropoffName: "Section B", fare: 30, distance: 2.0, duration: 7, status: "completed" as const, paymentMethod: "eft" as const, vehicleType: "GY Parcel", rating: 4, parcelDescription: "Small box - documents" },
       ];

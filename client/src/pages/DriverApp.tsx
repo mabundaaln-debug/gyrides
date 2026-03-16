@@ -183,9 +183,9 @@ export default function DriverApp() {
         </div>
         <div className="flex-1 p-5 pb-20 overflow-auto">
           <div className="bg-black rounded-3xl p-6 text-white text-center mb-5">
-            <p className="text-xs text-gray-400 mb-1">Total Earnings</p>
+            <p className="text-xs text-gray-400 mb-1">Total Earnings (85% of fares)</p>
             <p className="text-4xl font-black">R{(user.earnings ?? 0).toLocaleString()}</p>
-            <p className="text-xs text-gray-400 mt-2">{completedTrips.length} completed trips</p>
+            <p className="text-xs text-gray-400 mt-2">{completedTrips.length} completed trips · 15% platform fee</p>
           </div>
 
           <div className="grid grid-cols-3 gap-3 mb-5">
@@ -203,17 +203,67 @@ export default function DriverApp() {
             </div>
           </div>
 
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-5 space-y-3" data-testid="driver-bonus-section">
+            <h3 className="font-bold text-sm flex items-center gap-2">
+              <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" /> Driver Bonuses
+            </h3>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-medium">Daily Target</div>
+                  <div className="text-[10px] text-gray-500">Complete 20 rides today</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-bold text-yellow-700">+R100</div>
+                  <div className="text-[10px] text-gray-500">{Math.min(completedTrips.length, 20)}/20 trips</div>
+                </div>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-1.5">
+                <div className="bg-yellow-400 h-1.5 rounded-full transition-all" style={{ width: `${Math.min(100, (completedTrips.length / 20) * 100)}%` }} />
+              </div>
+              <div className="flex items-center justify-between pt-1">
+                <div>
+                  <div className="text-sm font-medium">Weekly Target</div>
+                  <div className="text-[10px] text-gray-500">Complete 100 rides this week</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-bold text-yellow-700">+R500</div>
+                  <div className="text-[10px] text-gray-500">{Math.min(completedTrips.length, 100)}/100 trips</div>
+                </div>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-1.5">
+                <div className="bg-yellow-400 h-1.5 rounded-full transition-all" style={{ width: `${Math.min(100, (completedTrips.length / 100) * 100)}%` }} />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 mb-5" data-testid="commission-info">
+            <h3 className="font-bold text-sm mb-2">How Your Earnings Work</h3>
+            <div className="space-y-1.5 text-[11px] text-gray-600">
+              <div className="flex justify-between"><span>Your share per trip</span><span className="font-bold text-green-600">85%</span></div>
+              <div className="flex justify-between"><span>GY Rides platform fee</span><span className="font-bold">15%</span></div>
+              <div className="flex justify-between"><span>Rural trip surcharge (you keep 100%)</span><span className="font-bold text-green-600">+R8</span></div>
+              <p className="text-[10px] text-gray-400 pt-1.5 border-t border-gray-100">GY Rides charges only 15% — less than Uber (25%) or Bolt (20%). You keep more of every fare.</p>
+            </div>
+          </div>
+
           <h3 className="font-bold mb-3 text-sm">Trip Breakdown</h3>
           <div className="space-y-2">
-            {completedTrips.slice(0, 8).map(trip => (
-              <div key={trip.id} className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 flex justify-between items-center">
-                <div>
-                  <div className="font-medium text-sm">{trip.pickupName} → {trip.dropoffName}</div>
-                  <div className="text-[10px] text-gray-500">{trip.createdAt ? new Date(trip.createdAt).toLocaleDateString("en-ZA") : ""} · {trip.distance?.toFixed(1)} km</div>
+            {completedTrips.slice(0, 8).map(trip => {
+              const driverEarnings = Math.round(trip.fare * 0.85);
+              return (
+                <div key={trip.id} className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 flex justify-between items-center">
+                  <div>
+                    <div className="font-medium text-sm">{trip.pickupName} → {trip.dropoffName}</div>
+                    <div className="text-[10px] text-gray-500">{trip.createdAt ? new Date(trip.createdAt).toLocaleDateString("en-ZA") : ""} · {trip.distance?.toFixed(1)} km</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold text-green-600">R{driverEarnings}</div>
+                    <div className="text-[9px] text-gray-400">of R{trip.fare}</div>
+                  </div>
                 </div>
-                <div className="font-bold text-green-600">R{trip.fare}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
         <BottomNav />

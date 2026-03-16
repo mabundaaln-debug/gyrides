@@ -13,20 +13,28 @@ import GiyaniMap from "@/components/GiyaniMap";
 import type { Trip, SavedPlace, VehicleType, User as UserType, TaxiRoute } from "@shared/schema";
 
 const GIYANI_LOCATIONS = [
-  { name: "Masingita Mall", address: "R81 Main Road, Giyani", lat: -23.2993, lng: 30.6844 },
-  { name: "Giyani CBD", address: "Central Business District, Giyani", lat: -23.3153, lng: 30.7256 },
-  { name: "Section A", address: "Giyani Section A", lat: -23.3060, lng: 30.7180 },
-  { name: "Section B", address: "Giyani Section B", lat: -23.3010, lng: 30.7310 },
-  { name: "Section C", address: "Giyani Section C", lat: -23.3200, lng: 30.7100 },
-  { name: "Section D", address: "Giyani Section D", lat: -23.2930, lng: 30.7390 },
-  { name: "Section E", address: "Giyani Section E", lat: -23.2870, lng: 30.7280 },
-  { name: "Giyani Hospital", address: "Hospital Road, Giyani", lat: -23.3180, lng: 30.7140 },
-  { name: "Giyani Plaza", address: "Main Street, Giyani", lat: -23.3096, lng: 30.6926 },
-  { name: "Giyani Stadium", address: "Stadium Road, Giyani", lat: -23.3222, lng: 30.7191 },
-  { name: "Giyani Taxi Rank", address: "Main Taxi Rank, CBD", lat: -23.3140, lng: 30.7230 },
-  { name: "Thohoyandou Road", address: "R81 Highway Exit", lat: -23.2750, lng: 30.7500 },
-  { name: "Giyani Clinic", address: "Section B Clinic, Giyani", lat: -23.3030, lng: 30.7340 },
-  { name: "Nkhensani Hospital", address: "Nkhensani Hospital Complex", lat: -23.3170, lng: 30.7170 },
+  { name: "Masingita Mall", address: "R81 Main Road, Giyani", lat: -23.2993, lng: 30.6844, rural: false },
+  { name: "Giyani CBD", address: "Central Business District, Giyani", lat: -23.3153, lng: 30.7256, rural: false },
+  { name: "Section A", address: "Giyani Section A", lat: -23.3060, lng: 30.7180, rural: false },
+  { name: "Section B", address: "Giyani Section B", lat: -23.3010, lng: 30.7310, rural: false },
+  { name: "Section C", address: "Giyani Section C", lat: -23.3200, lng: 30.7100, rural: false },
+  { name: "Section D", address: "Giyani Section D", lat: -23.2930, lng: 30.7390, rural: false },
+  { name: "Section E", address: "Giyani Section E", lat: -23.2870, lng: 30.7280, rural: true },
+  { name: "Giyani Hospital", address: "Hospital Road, Giyani", lat: -23.3180, lng: 30.7140, rural: false },
+  { name: "Giyani Plaza", address: "Main Street, Giyani", lat: -23.3096, lng: 30.6926, rural: false },
+  { name: "Giyani Stadium", address: "Stadium Road, Giyani", lat: -23.3222, lng: 30.7191, rural: false },
+  { name: "Giyani Taxi Rank", address: "Main Taxi Rank, CBD", lat: -23.3140, lng: 30.7230, rural: false },
+  { name: "Thohoyandou Road", address: "R81 Highway Exit", lat: -23.2750, lng: 30.7500, rural: false },
+  { name: "Giyani Clinic", address: "Section B Clinic, Giyani", lat: -23.3030, lng: 30.7340, rural: false },
+  { name: "Nkhensani Hospital", address: "Nkhensani Hospital Complex", lat: -23.3170, lng: 30.7170, rural: false },
+  { name: "Homu", address: "Homu Village, Greater Giyani", lat: -23.2600, lng: 30.6800, rural: true },
+  { name: "Dzumeri", address: "Dzumeri Village, Greater Giyani", lat: -23.3450, lng: 30.6700, rural: true },
+  { name: "Nkuri", address: "Nkuri Village, Greater Giyani", lat: -23.2700, lng: 30.7700, rural: true },
+  { name: "Ndhambi", address: "Ndhambi Village, Greater Giyani", lat: -23.3500, lng: 30.7500, rural: true },
+  { name: "Risinga", address: "Risinga Village, Greater Giyani", lat: -23.3300, lng: 30.6500, rural: true },
+  { name: "Muyexe", address: "Muyexe Village, Greater Giyani", lat: -23.3800, lng: 30.7800, rural: true },
+  { name: "Xikukwani", address: "Xikukwani Village, Greater Giyani", lat: -23.2500, lng: 30.7100, rural: true },
+  { name: "Gawula", address: "Gawula Village, Greater Giyani", lat: -23.3600, lng: 30.7100, rural: true },
 ];
 
 const QUICK_DESTINATIONS = [
@@ -104,7 +112,7 @@ export default function RiderApp() {
             address = parts.slice(0, 3).join(",").trim();
           }
         } catch {}
-        const loc = { name, address, lat: latitude, lng: longitude };
+        const loc = { name, address, lat: latitude, lng: longitude, rural: false };
         if (target === "pickup") {
           setPickup(loc);
           toast({ title: "Pickup set", description: name });
@@ -170,10 +178,11 @@ export default function RiderApp() {
   const trustedContacts: string[] = user.trustedContacts ? JSON.parse(user.trustedContacts) : [];
 
   const filteredVehicleTypes = vehicleTypes.filter(vt => {
-    if (rideType === "medical") return vt.name.toLowerCase().includes("medical") || vt.name.toLowerCase().includes("standard");
-    if (rideType === "parcel") return vt.name.toLowerCase().includes("parcel") || vt.name.toLowerCase().includes("standard");
-    if (rideType === "shared") return !vt.name.toLowerCase().includes("parcel") && !vt.name.toLowerCase().includes("medical");
-    return !vt.name.toLowerCase().includes("parcel") && !vt.name.toLowerCase().includes("medical");
+    const n = vt.name.toLowerCase();
+    if (rideType === "medical") return n.includes("health") || n.includes("medical") || n.includes("standard");
+    if (rideType === "parcel") return n.includes("parcel") || n.includes("standard");
+    if (rideType === "shared") return !n.includes("parcel") && !n.includes("health") && !n.includes("medical");
+    return !n.includes("parcel") && !n.includes("health") && !n.includes("medical");
   });
 
   const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number } | null>(null);
@@ -262,11 +271,37 @@ export default function RiderApp() {
     return haversineDistance(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
   };
 
-  const calcFare = (vt: VehicleType) => {
-    let fare = Math.round(vt.basePrice + vt.pricePerKm * calcDistance());
-    if (rideType === "shared") fare = Math.round(fare * 0.6 * sharedSeats);
-    return fare;
+  const PLATFORM_COMMISSION = 0.15;
+  const RURAL_SURCHARGE = 8;
+
+  const isRuralTrip = () => {
+    const pickupRural = pickup && GIYANI_LOCATIONS.find(l => l.name === pickup.name)?.rural;
+    const dropoffRural = dropoff && GIYANI_LOCATIONS.find(l => l.name === dropoff.name)?.rural;
+    return !!(pickupRural || dropoffRural);
   };
+
+  const calcFareBreakdown = (vt: VehicleType) => {
+    const dist = calcDistance();
+    const dur = calcDuration();
+    const baseFare = vt.basePrice;
+    const distFare = vt.pricePerKm * dist;
+    const timeFare = (vt.pricePerMin ?? 1.5) * dur;
+    let subtotal = Math.round(baseFare + distFare + timeFare);
+    const rural = isRuralTrip() ? RURAL_SURCHARGE : 0;
+    subtotal += rural;
+
+    if (rideType === "shared") {
+      const perSeat = Math.round(subtotal * 0.55);
+      subtotal = perSeat * sharedSeats;
+    }
+
+    const minFare = vt.minimumFare ?? 25;
+    const total = Math.max(subtotal, minFare);
+    const driverEarns = Math.round(total * (1 - PLATFORM_COMMISSION));
+    return { baseFare, distFare: Math.round(distFare), timeFare: Math.round(timeFare), rural, total, driverEarns, minApplied: subtotal < minFare };
+  };
+
+  const calcFare = (vt: VehicleType) => calcFareBreakdown(vt).total;
 
   const calcDuration = () => {
     if (routeInfo) return routeInfo.duration;
@@ -382,7 +417,7 @@ export default function RiderApp() {
   const handleConfirmPin = useCallback(async () => {
     if (!pinDrop) return;
     const name = await reverseGeocode(pinDrop.lat, pinDrop.lng);
-    const loc = { name, address: "Pinned on map", lat: pinDrop.lat, lng: pinDrop.lng };
+    const loc = { name, address: "Pinned on map", lat: pinDrop.lat, lng: pinDrop.lng, rural: false };
     if (searchFor === "pickup") { setPickup(loc); setSearchFor("dropoff"); }
     else { setDropoff(loc); }
     setPinDrop(null);
@@ -653,8 +688,8 @@ export default function RiderApp() {
                 className="w-full h-11 rounded-xl bg-yellow-400 text-black hover:bg-yellow-500 font-bold text-sm"
                 onClick={() => {
                   setRideType("taxi");
-                  setPickup({ name: route.fromLocation, address: route.routeName, lat: route.fromLat ?? -23.318, lng: route.fromLng ?? 30.718 });
-                  setDropoff({ name: route.toLocation, address: route.routeName, lat: route.toLat ?? -23.32, lng: route.toLng ?? 30.71 });
+                  setPickup({ name: route.fromLocation, address: route.routeName, lat: route.fromLat ?? -23.318, lng: route.fromLng ?? 30.718, rural: false });
+                  setDropoff({ name: route.toLocation, address: route.routeName, lat: route.toLat ?? -23.32, lng: route.toLng ?? 30.71, rural: false });
                   setView("confirm");
                 }}
                 data-testid={`btn-book-taxi-${route.id}`}
@@ -879,7 +914,7 @@ export default function RiderApp() {
               <p className="text-xs text-gray-500 uppercase font-bold mb-2 px-1">Saved Places</p>
               {savedPlaces.map((p) => (
                 <Button key={p.id} variant="ghost" className="w-full justify-start h-14 rounded-xl gap-3 text-base" onClick={() => {
-                  const loc = { name: p.name, address: p.address, lat: p.lat ?? -23.31, lng: p.lng ?? 30.72 };
+                  const loc = { name: p.name, address: p.address, lat: p.lat ?? -23.31, lng: p.lng ?? 30.72, rural: false };
                   if (searchFor === "pickup") setPickup(loc); else setDropoff(loc);
                   setView(pickup && searchFor === "dropoff" ? "confirm" : "home");
                   setSearchQuery("");
@@ -900,9 +935,9 @@ export default function RiderApp() {
                 if (searchFor === "pickup") { setPickup(loc); setSearchFor("dropoff"); setSearchQuery(""); }
                 else { setDropoff(loc); setView("confirm"); setSearchQuery(""); }
               }} data-testid={`location-${loc.name.replace(/\s+/g, '-').toLowerCase()}`}>
-                <div className="bg-gray-100 p-2 rounded-lg"><MapPin className="h-4 w-4" /></div>
-                <div className="text-left">
-                  <div className="font-medium">{loc.name}</div>
+                <div className={`p-2 rounded-lg ${loc.rural ? "bg-orange-100" : "bg-gray-100"}`}><MapPin className={`h-4 w-4 ${loc.rural ? "text-orange-600" : ""}`} /></div>
+                <div className="text-left flex-1">
+                  <div className="font-medium flex items-center gap-1.5">{loc.name}{loc.rural && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-600">Rural</span>}</div>
                   <div className="text-xs text-gray-500">{loc.address}</div>
                 </div>
               </Button>
@@ -1060,30 +1095,51 @@ export default function RiderApp() {
           )}
 
           <h3 className="font-bold text-base mb-2">Choose your ride</h3>
+          {isRuralTrip() && (
+            <div className="bg-orange-50 border border-orange-200 rounded-xl px-3 py-2 mb-3 flex items-center gap-2">
+              <MapPin className="h-3.5 w-3.5 text-orange-600 shrink-0" />
+              <span className="text-[11px] text-orange-700">Rural area — R{RURAL_SURCHARGE} surcharge applied for gravel road wear & fuel</span>
+            </div>
+          )}
           <div className="space-y-2 mb-4">
             {filteredVehicleTypes.map((vt, idx) => {
               const fare = calcFare(vt);
+              const breakdown = calcFareBreakdown(vt);
               const isSelected = selectedVehicle?.id === vt.id;
               const eta = routeInfo ? Math.max(2, Math.round(routeInfo.duration * 0.3 + idx + 1)) : (3 + idx);
               return (
-                <button key={vt.id} className={`w-full bg-white rounded-xl p-3 flex items-center justify-between border-2 transition-all ${isSelected ? "border-black shadow-md" : "border-gray-100 shadow-sm"}`}
-                  onClick={() => setSelectedVehicle(vt)} data-testid={`vehicle-${vt.name.replace(/\s+/g, '-').toLowerCase()}`}>
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isSelected ? "bg-black" : "bg-gray-100"}`}>
-                      {rideType === "medical" ? <Heart className={`h-5 w-5 ${isSelected ? "text-red-400" : "text-gray-600"}`} /> :
-                       rideType === "parcel" ? <Package className={`h-5 w-5 ${isSelected ? "text-yellow-400" : "text-gray-600"}`} /> :
-                       <Car className={`h-5 w-5 ${isSelected ? "text-yellow-400" : "text-gray-600"}`} />}
+                <div key={vt.id}>
+                  <button className={`w-full bg-white rounded-xl p-3 flex items-center justify-between border-2 transition-all ${isSelected ? "border-black shadow-md" : "border-gray-100 shadow-sm"}`}
+                    onClick={() => setSelectedVehicle(vt)} data-testid={`vehicle-${vt.name.replace(/\s+/g, '-').toLowerCase()}`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isSelected ? "bg-black" : "bg-gray-100"}`}>
+                        {rideType === "medical" ? <Heart className={`h-5 w-5 ${isSelected ? "text-red-400" : "text-gray-600"}`} /> :
+                         rideType === "parcel" ? <Package className={`h-5 w-5 ${isSelected ? "text-yellow-400" : "text-gray-600"}`} /> :
+                         <Car className={`h-5 w-5 ${isSelected ? "text-yellow-400" : "text-gray-600"}`} />}
+                      </div>
+                      <div className="text-left">
+                        <div className="font-bold text-sm">{vt.name}</div>
+                        <div className="text-[10px] text-gray-500">{rideType === "shared" ? `${vt.seats} seats available · ${eta} min` : `${vt.seats} seats · ${eta} min away`}</div>
+                      </div>
                     </div>
-                    <div className="text-left">
-                      <div className="font-bold text-sm">{vt.name}</div>
-                      <div className="text-[10px] text-gray-500">{rideType === "shared" ? `${vt.seats} seats available · ${eta} min` : `${vt.seats} seats · ${eta} min away`}</div>
+                    <div className="text-right">
+                      <div className="font-bold">R{fare}</div>
+                      {rideType === "shared" && <div className="text-[10px] text-green-600">per seat</div>}
+                      {breakdown.minApplied && <div className="text-[10px] text-orange-500">min fare</div>}
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-bold">R{fare}</div>
-                    {rideType === "shared" && <div className="text-[10px] text-green-600">per seat</div>}
-                  </div>
-                </button>
+                  </button>
+                  {isSelected && (
+                    <div className="bg-gray-50 rounded-b-xl border border-t-0 border-gray-200 px-4 py-2.5 -mt-1 space-y-1" data-testid="fare-breakdown">
+                      <div className="flex justify-between text-[11px] text-gray-500"><span>Base fare</span><span>R{breakdown.baseFare}</span></div>
+                      <div className="flex justify-between text-[11px] text-gray-500"><span>Distance ({calcDistance().toFixed(1)} km × R{vt.pricePerKm})</span><span>R{breakdown.distFare}</span></div>
+                      <div className="flex justify-between text-[11px] text-gray-500"><span>Time ({calcDuration()} min × R{(vt.pricePerMin ?? 1.5).toFixed(1)})</span><span>R{breakdown.timeFare}</span></div>
+                      {breakdown.rural > 0 && <div className="flex justify-between text-[11px] text-orange-600"><span>Rural surcharge</span><span>+R{breakdown.rural}</span></div>}
+                      {breakdown.minApplied && <div className="flex justify-between text-[11px] text-orange-500"><span>Minimum fare applied</span><span>R{vt.minimumFare ?? 25}</span></div>}
+                      <div className="flex justify-between text-xs font-bold pt-1 border-t border-gray-200"><span>Total</span><span>R{breakdown.total}</span></div>
+                      <div className="flex justify-between text-[10px] text-green-600"><span>Driver earns (85%)</span><span>R{breakdown.driverEarns}</span></div>
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -1411,7 +1467,7 @@ export default function RiderApp() {
               const matchedLocation = GIYANI_LOCATIONS.find(l => l.name.toLowerCase().includes(qd.name.toLowerCase()));
               return (
                 <button key={qd.name} className="bg-white rounded-xl px-3.5 py-2.5 shadow-sm border border-gray-100 flex items-center gap-2 shrink-0 text-sm" onClick={() => {
-                  const dest = matchedSaved ? { name: matchedSaved.name, address: matchedSaved.address, lat: matchedSaved.lat ?? -23.31, lng: matchedSaved.lng ?? 30.72 }
+                  const dest = matchedSaved ? { name: matchedSaved.name, address: matchedSaved.address, lat: matchedSaved.lat ?? -23.31, lng: matchedSaved.lng ?? 30.72, rural: false }
                     : matchedLocation || GIYANI_LOCATIONS[0];
                   setDropoff(dest);
                   if (!pickup) setPickup(GIYANI_LOCATIONS[2]);
@@ -1435,7 +1491,7 @@ export default function RiderApp() {
             <div className="flex gap-2 overflow-x-auto pb-1">
               {savedPlaces.map((p) => (
                 <button key={p.id} className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 flex-shrink-0 min-w-[120px] flex flex-col items-start gap-1.5" onClick={() => {
-                  setDropoff({ name: p.name, address: p.address, lat: p.lat ?? -23.31, lng: p.lng ?? 30.72 });
+                  setDropoff({ name: p.name, address: p.address, lat: p.lat ?? -23.31, lng: p.lng ?? 30.72, rural: false });
                   if (!pickup) setPickup(GIYANI_LOCATIONS[2]);
                   setView("confirm");
                 }}>

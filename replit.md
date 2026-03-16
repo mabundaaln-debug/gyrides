@@ -46,21 +46,33 @@ shared/
 
 ## Key Features
 
+### Pricing Structure (Giyani-optimized)
+- **Base fare**: R10 (Standard/Health/Parcel), R15 (Premium/XL)
+- **Per km**: R7-R11 depending on vehicle type
+- **Per minute**: R1.0-R1.8 depending on vehicle type
+- **Minimum fare**: R25 (Standard/Parcel), R35 (Premium), R40 (XL), R50 (Health)
+- **Rural surcharge**: +R8 for villages (Homu, Dzumeri, Nkuri, Ndhambi, Risinga, Muyexe, Xikukwani, Gawula, Section E)
+- **Shared rides**: 55% of full fare per seat
+- **Platform commission**: 15% (driver keeps 85%)
+- **Driver bonuses**: R100 for 20 rides/day, R500 for 100 rides/week
+- **Fare breakdown**: Shown on confirm screen (base + distance + time + rural surcharge)
+
 ### Ride Types (5 modes)
 - **Private**: Standard one-to-one rides
-- **Shared**: Share a ride, select 1-4 seats, 60% fare per seat
+- **Shared (GY Share)**: Share a ride, select 1-4 seats, 55% fare per seat
 - **Taxi**: Browse Giyani taxi routes with live queue info (seats/departure times)
 - **Parcel**: Same-day parcel delivery with description field
-- **Medical**: Hospital/clinic transport with medical notes dropdown
+- **Medical (GY Health)**: Hospital/clinic transport with medical notes, minimum R50
 
 ### Rider Features
-- Search Giyani locations, pin on map, quick destination chips
+- Search 22 locations (14 town + 8 rural villages with "Rural" badge)
 - Ride type selector tabs (private/shared/taxi/parcel/medical)
-- Choose vehicle type, add notes/promo code
+- Choose vehicle type with detailed fare breakdown (base/distance/time/surcharge)
 - Payment methods: Cash, eWallet (balance), EFT (bank details shown), Card
 - WhatsApp fallback booking (from home screen and confirm screen)
 - Trip PIN verification, SOS button, call/WhatsApp driver
-- Ride status tracking, trip completion with star rating, receipt, rebook
+- Live ETA tracking with countdown, simulated driver movement on map
+- Trip completion with star rating, receipt, rebook
 - Wallet view with balance and payment method selection
 - Safety Center with SOS, trusted contacts (add/remove), trip sharing
 - Taxi Routes browser with live queue data
@@ -74,7 +86,9 @@ shared/
 - Medical notes and parcel descriptions shown on trip cards
 - Phase-specific labels for parcel (Collect/Delivering/Delivered)
 - Navigate to pickup/dropoff (Google Maps), call/WhatsApp passenger
-- Earnings breakdown (today/weekly/cash), trip history with ride type badges
+- Earnings with 85% commission breakdown, trip-level driver earnings
+- Driver Bonus system: daily (20 rides → R100) and weekly (100 rides → R500) with progress bars
+- Commission info panel showing 15% vs Uber/Bolt comparison
 - Bottom nav with trips/earnings/profile tabs
 
 ### Driver Onboarding
@@ -99,7 +113,7 @@ Data auto-seeds on first visit via POST /api/seed.
 - `users`: role (rider/driver/admin), approval status, isVerified, walletBalance, trustedContacts (JSON)
 - `trips`: rideType (private/shared/taxi/parcel/medical), paymentMethod (cash/card/ewallet/eft), seatsBooked, medicalNotes, parcelDescription, rideNote, eftProofUrl
 - `savedPlaces`: user's saved locations with lat/lng
-- `vehicleTypes`: GY Standard, GY Premium, GY XL, GY Medical, GY Parcel
+- `vehicleTypes`: GY Standard, GY Premium, GY XL, GY Health, GY Parcel (with pricePerMin, minimumFare)
 - `taxiRoutes`: route name, from/to locations with lat/lng, fare, available/total seats, departure schedule
 
 ## API Routes

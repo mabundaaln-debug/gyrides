@@ -93,6 +93,8 @@ export const vehicleTypes = pgTable("vehicle_types", {
   description: text("description"),
   basePrice: real("base_price").notNull(),
   pricePerKm: real("price_per_km").notNull(),
+  pricePerMin: real("price_per_min").notNull().default(1.5),
+  minimumFare: real("minimum_fare").notNull().default(25),
   seats: integer("seats").notNull().default(4),
   icon: text("icon"),
   isActive: boolean("is_active").default(true),
