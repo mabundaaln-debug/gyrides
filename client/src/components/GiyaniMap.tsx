@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import {
   APIProvider,
   Map,
-  AdvancedMarker,
   useMap,
   useMapsLibrary,
 } from "@vis.gl/react-google-maps";
@@ -20,47 +19,104 @@ function useGoogleMapsKey() {
   return apiKey;
 }
 
-function PickupPin() {
-  return (
-    <div style={{ width: 36, height: 36, background: "#22c55e", border: "3px solid white", borderRadius: "50%", boxShadow: "0 2px 8px rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ width: 10, height: 10, background: "white", borderRadius: "50%" }} />
-    </div>
-  );
+function CustomMarkers({ pickup, dropoff, driverLocation, pinDropLocation }: {
+  pickup?: { lat: number; lng: number; name?: string } | null;
+  dropoff?: { lat: number; lng: number; name?: string } | null;
+  driverLocation?: { lat: number; lng: number } | null;
+  pinDropLocation?: { lat: number; lng: number } | null;
+}) {
+  const map = useMap();
+  const markersRef = useRef<google.maps.Marker[]>([]);
+
+  useEffect(() => {
+    if (!map) return;
+
+    markersRef.current.forEach((m) => m.setMap(null));
+    markersRef.current = [];
+
+    if (pickup) {
+      const marker = new google.maps.Marker({
+        position: { lat: pickup.lat, lng: pickup.lng },
+        map,
+        title: pickup.name || "Pickup point",
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 12,
+          fillColor: "#22c55e",
+          fillOpacity: 1,
+          strokeColor: "#ffffff",
+          strokeWeight: 3,
+        },
+      });
+      markersRef.current.push(marker);
+    }
+
+    if (dropoff) {
+      const marker = new google.maps.Marker({
+        position: { lat: dropoff.lat, lng: dropoff.lng },
+        map,
+        title: dropoff.name || "Drop-off point",
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 12,
+          fillColor: "#000000",
+          fillOpacity: 1,
+          strokeColor: "#ffffff",
+          strokeWeight: 3,
+        },
+      });
+      markersRef.current.push(marker);
+    }
+
+    if (driverLocation) {
+      const marker = new google.maps.Marker({
+        position: { lat: driverLocation.lat, lng: driverLocation.lng },
+        map,
+        title: "Driver location",
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 16,
+          fillColor: "#facc15",
+          fillOpacity: 1,
+          strokeColor: "#ffffff",
+          strokeWeight: 3,
+        },
+      });
+      markersRef.current.push(marker);
+    }
+
+    if (pinDropLocation) {
+      const marker = new google.maps.Marker({
+        position: { lat: pinDropLocation.lat, lng: pinDropLocation.lng },
+        map,
+        title: "Dropped pin",
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 10,
+          fillColor: "#6366f1",
+          fillOpacity: 1,
+          strokeColor: "#ffffff",
+          strokeWeight: 3,
+        },
+      });
+      markersRef.current.push(marker);
+    }
+
+    return () => {
+      markersRef.current.forEach((m) => m.setMap(null));
+      markersRef.current = [];
+    };
+  }, [map, pickup?.lat, pickup?.lng, dropoff?.lat, dropoff?.lng, driverLocation?.lat, driverLocation?.lng, pinDropLocation?.lat, pinDropLocation?.lng]);
+
+  return null;
 }
 
-function DropoffPin() {
-  return (
-    <div style={{ width: 36, height: 36, background: "#000", border: "3px solid white", borderRadius: "50%", boxShadow: "0 2px 8px rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-    </div>
-  );
-}
-
-function CarPin() {
-  return (
-    <div style={{ width: 44, height: 44, background: "#facc15", border: "3px solid white", borderRadius: "50%", boxShadow: "0 4px 14px rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2"/><circle cx="6.5" cy="16.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg>
-    </div>
-  );
-}
-
-function PinDropPin() {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-      <div style={{ width: 32, height: 32, background: "#6366f1", border: "3px solid white", borderRadius: "50%", boxShadow: "0 2px 8px rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ width: 10, height: 10, background: "white", borderRadius: "50%" }} />
-      </div>
-      <div style={{ width: 3, height: 10, background: "#6366f1", borderRadius: "0 0 2px 2px", marginTop: -2 }} />
-    </div>
-  );
-}
-
-function DirectionsRenderer({ origin, destination, color, weight, dashPattern }: {
+function DirectionsRenderer({ origin, destination, color, weight, dashed }: {
   origin: { lat: number; lng: number };
   destination: { lat: number; lng: number };
   color: string;
   weight: number;
-  dashPattern?: number[];
+  dashed?: boolean;
 }) {
   const map = useMap();
   const routesLib = useMapsLibrary("routes");
@@ -86,21 +142,25 @@ function DirectionsRenderer({ origin, destination, color, weight, dashPattern }:
         if (status === google.maps.DirectionsStatus.OK && result) {
           const path = result.routes[0]?.overview_path;
           if (path) {
-            const icons: google.maps.IconSequence[] = [];
-            if (dashPattern && dashPattern.length >= 2) {
-              icons.push({
-                icon: { path: "M 0,-1 0,1", strokeOpacity: 1, scale: weight / 2 },
-                offset: "0",
-                repeat: `${dashPattern[0] + dashPattern[1]}px`,
-              });
-            }
-
             polylineRef.current = new google.maps.Polyline({
               path,
               strokeColor: color,
               strokeWeight: weight,
-              strokeOpacity: dashPattern ? 0.0 : 0.8,
-              icons: dashPattern ? icons : undefined,
+              strokeOpacity: dashed ? 0 : 0.8,
+              icons: dashed
+                ? [
+                    {
+                      icon: {
+                        path: "M 0,-1 0,1",
+                        strokeOpacity: 1,
+                        strokeColor: color,
+                        scale: weight / 2,
+                      },
+                      offset: "0",
+                      repeat: "14px",
+                    },
+                  ]
+                : undefined,
               map,
             });
           }
@@ -215,36 +275,18 @@ export default function GiyaniMap({
           gestureHandling="greedy"
           disableDefaultUI={true}
           zoomControl={true}
-          mapId="gy-rides-map"
           style={{ width: "100%", height: "100%", borderRadius: "inherit" }}
         >
           {fitPoints.length > 0 && <FitBoundsInner points={fitPoints} />}
 
           {interactive && <ClickHandler onMapClick={handleMapClick} />}
 
-          {pickup && (
-            <AdvancedMarker position={{ lat: pickup.lat, lng: pickup.lng }} title={pickup.name || "Pickup point"}>
-              <PickupPin />
-            </AdvancedMarker>
-          )}
-
-          {dropoff && (
-            <AdvancedMarker position={{ lat: dropoff.lat, lng: dropoff.lng }} title={dropoff.name || "Drop-off point"}>
-              <DropoffPin />
-            </AdvancedMarker>
-          )}
-
-          {driverLocation && (
-            <AdvancedMarker position={{ lat: driverLocation.lat, lng: driverLocation.lng }} title="Driver location">
-              <CarPin />
-            </AdvancedMarker>
-          )}
-
-          {pinDropLocation && (
-            <AdvancedMarker position={{ lat: pinDropLocation.lat, lng: pinDropLocation.lng }} title="Dropped pin">
-              <PinDropPin />
-            </AdvancedMarker>
-          )}
+          <CustomMarkers
+            pickup={pickup}
+            dropoff={dropoff}
+            driverLocation={driverLocation}
+            pinDropLocation={pinDropLocation}
+          />
 
           {showRoute && pickup && dropoff && (
             <DirectionsRenderer
@@ -261,7 +303,7 @@ export default function GiyaniMap({
               destination={{ lat: pickup.lat, lng: pickup.lng }}
               color="#facc15"
               weight={4}
-              dashPattern={[8, 6]}
+              dashed
             />
           )}
         </Map>
