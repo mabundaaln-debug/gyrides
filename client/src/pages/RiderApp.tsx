@@ -364,7 +364,7 @@ export default function RiderApp() {
     const dropoffText = dropoff?.name || "Not set";
     const typeLabel = rideType === "medical" ? "Medical Transport" : rideType === "parcel" ? "Parcel Delivery" : rideType === "shared" ? `Shared Ride (${sharedSeats} seat${sharedSeats > 1 ? "s" : ""})` : "Private Ride";
     const msg = `Hi GY Rides! I'd like to book a ride:\n\nType: ${typeLabel}\nPickup: ${pickupText}\nDrop-off: ${dropoffText}\nPhone: ${user.phone}\nName: ${user.fullName}\nPayment: ${paymentMethod}${medicalNotes ? `\nMedical notes: ${medicalNotes}` : ""}${parcelDescription ? `\nParcel: ${parcelDescription}` : ""}`;
-    window.open(`https://wa.me/27780000000?text=${encodeURIComponent(msg)}`, "_blank");
+    window.open(`https://wa.me/27686427644?text=${encodeURIComponent(msg)}`, "_blank");
   };
 
   const handleCancelTrip = async () => {
@@ -718,7 +718,7 @@ export default function RiderApp() {
             <h4 className="font-bold text-sm text-green-800 mb-1">Can't find your route?</h4>
             <p className="text-xs text-green-700 mb-3">Book on WhatsApp and we'll find a taxi for you.</p>
             <Button className="w-full h-10 rounded-xl bg-green-600 text-white hover:bg-green-700 text-sm font-bold" onClick={() => {
-              window.open(`https://wa.me/27780000000?text=${encodeURIComponent("Hi GY Rides! I need a taxi from Giyani. Can you help?")}`, "_blank");
+              window.open(`https://wa.me/27686427644?text=${encodeURIComponent("Hi GY Rides! I need a taxi from Giyani. Can you help?")}`, "_blank");
             }} data-testid="btn-whatsapp-taxi">
               <MessageCircle className="h-4 w-4 mr-2" /> Book on WhatsApp
             </Button>
