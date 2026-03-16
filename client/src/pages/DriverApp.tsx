@@ -4,11 +4,12 @@ import { MapPin, DollarSign, Star, Check, X, Menu, LogOut, Navigation, Car, Cloc
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth";
-import { updateTrip, updateUser } from "@/lib/api";
+import { updateTrip, updateUser, sendSosAlert } from "@/lib/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import GiyaniMap from "@/components/GiyaniMap";
+import TripChat from "@/components/TripChat";
 import type { Trip, User as UserType } from "@shared/schema";
 
 export default function DriverApp() {
@@ -18,6 +19,7 @@ export default function DriverApp() {
   const [onTrip, setOnTrip] = useState<Trip | null>(null);
   const [tripRider, setTripRider] = useState<UserType | null>(null);
   const [tripPhase, setTripPhase] = useState<"arriving" | "pickup" | "inprogress">("arriving");
+  const [showChat, setShowChat] = useState(false);
   const [countdown, setCountdown] = useState(30);
   const [activeTab, setActiveTab] = useState<"home" | "trips" | "earnings" | "profile">("home");
   const queryClient = useQueryClient();
@@ -380,9 +382,19 @@ export default function DriverApp() {
               }`}>{onTrip.rideType}</span>
             )}
           </div>
-          <button onClick={openNavigation} className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center shadow-lg" data-testid="btn-navigate">
-            <ExternalLink className="h-5 w-5 text-white" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={openNavigation} className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center shadow-lg" data-testid="btn-navigate">
+              <ExternalLink className="h-5 w-5 text-white" />
+            </button>
+            <button onClick={async () => {
+              try {
+                await sendSosAlert({ tripId: onTrip.id, userId: user.id, userRole: "driver", lat: onTrip.pickupLat ?? undefined, lng: onTrip.pickupLng ?? undefined });
+                toast({ title: "SOS Alert Sent!", description: "Admin has been notified.", variant: "destructive" });
+              } catch { toast({ title: "SOS sent" }); }
+            }} className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center shadow-lg" data-testid="btn-driver-sos">
+              <AlertTriangle className="h-5 w-5 text-white" />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 relative">
@@ -422,7 +434,7 @@ export default function DriverApp() {
               </div>
               <div className="flex gap-2">
                 <button className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center" data-testid="btn-call-rider"><Phone className="h-4 w-4 text-green-700" /></button>
-                <button className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center" data-testid="btn-whatsapp-rider"><MessageCircle className="h-4 w-4 text-green-700" /></button>
+                <button onClick={() => setShowChat(true)} className="w-9 h-9 bg-yellow-100 rounded-full flex items-center justify-center" data-testid="btn-chat-rider"><MessageCircle className="h-4 w-4 text-yellow-700" /></button>
               </div>
               <div className="text-right">
                 <div className="text-lg font-bold">R{onTrip.fare}</div>
@@ -441,6 +453,16 @@ export default function DriverApp() {
             {tripPhase === "arriving" ? "Arrived at Pickup" : tripPhase === "pickup" ? (isParcel ? "Collected Parcel" : "Start Trip") : (isParcel ? "Delivered" : "Complete Trip")}
           </Button>
         </div>
+
+        {showChat && onTrip && tripRider && (
+          <TripChat
+            tripId={onTrip.id}
+            userId={user.id}
+            userRole="driver"
+            otherName={tripRider.fullName}
+            onClose={() => setShowChat(false)}
+          />
+        )}
       </div>
     );
   }

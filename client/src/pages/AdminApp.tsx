@@ -1,23 +1,24 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { Users, Car, DollarSign, LogOut, ChevronRight, ChevronLeft, Star, MapPin, TrendingUp, Activity, AlertCircle, CheckCircle, Shield, XCircle, FileText, Eye, User as UserIcon } from "lucide-react";
+import { Users, Car, DollarSign, LogOut, ChevronRight, ChevronLeft, Star, MapPin, TrendingUp, Activity, AlertCircle, CheckCircle, Shield, XCircle, FileText, Eye, User as UserIcon, AlertTriangle, Phone } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
-import { approveDriver, rejectDriver } from "@/lib/api";
+import { approveDriver, rejectDriver, updateSosAlert, getUser } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import type { User, Trip, VehicleType } from "@shared/schema";
+import type { User, Trip, VehicleType, SosAlert } from "@shared/schema";
 
 export default function AdminApp() {
   const { user, logout } = useAuth();
   const [, setLocation] = useLocation();
-  const [view, setView] = useState<"dashboard" | "drivers" | "trips" | "pricing" | "approvals" | "review-driver">("dashboard");
+  const [view, setView] = useState<"dashboard" | "drivers" | "trips" | "pricing" | "approvals" | "review-driver" | "sos">("dashboard");
   const [reviewingDriver, setReviewingDriver] = useState<User | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [showRejectInput, setShowRejectInput] = useState(false);
+  const [sosNotes, setSosNotes] = useState<Record<string, string>>({});
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -51,6 +52,14 @@ export default function AdminApp() {
     queryKey: ["/api/vehicle-types"],
     queryFn: getQueryFn({ on401: "throw" }),
   });
+
+  const { data: sosAlerts = [] } = useQuery<SosAlert[]>({
+    queryKey: ["/api/sos"],
+    queryFn: getQueryFn({ on401: "throw" }),
+    refetchInterval: 5000,
+  });
+
+  const activeSosAlerts = sosAlerts.filter(a => a.status === "active" || a.status === "acknowledged");
 
   if (!user) return null;
 
@@ -369,6 +378,103 @@ export default function AdminApp() {
     );
   }
 
+  // ── SOS Alerts ──
+  if (view === "sos") {
+    return (
+      <div className="min-h-[100dvh] bg-gray-50 flex flex-col">
+        <div className="bg-red-600 text-white p-4 flex items-center gap-3 sticky top-0 z-10">
+          <Button variant="ghost" size="icon" onClick={() => setView("dashboard")} className="rounded-full text-white hover:bg-white/20"><ChevronLeft className="h-6 w-6" /></Button>
+          <AlertTriangle className="h-5 w-5" />
+          <h1 className="text-xl font-bold">SOS Alerts ({sosAlerts.length})</h1>
+        </div>
+        <div className="p-3 flex gap-2 sticky top-14 bg-gray-50 z-10">
+          <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-1 rounded-full">{sosAlerts.filter(a => a.status === "active").length} active</span>
+          <span className="bg-yellow-100 text-yellow-700 text-[10px] font-bold px-2 py-1 rounded-full">{sosAlerts.filter(a => a.status === "acknowledged").length} acknowledged</span>
+          <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-full">{sosAlerts.filter(a => a.status === "resolved").length} resolved</span>
+        </div>
+        <div className="p-3 space-y-3 overflow-auto flex-1">
+          {sosAlerts.length === 0 ? (
+            <div className="text-center py-16">
+              <CheckCircle className="h-12 w-12 text-green-300 mx-auto mb-4" />
+              <p className="font-medium text-gray-500">No SOS alerts</p>
+              <p className="text-sm text-gray-400">All clear</p>
+            </div>
+          ) : sosAlerts.map(alert => (
+            <div key={alert.id} className={`rounded-xl p-4 shadow-sm border ${
+              alert.status === "active" ? "bg-red-50 border-red-200" : alert.status === "acknowledged" ? "bg-yellow-50 border-yellow-200" : "bg-white border-gray-100"
+            }`} data-testid={`sos-alert-${alert.id}`}>
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    alert.status === "active" ? "bg-red-500 animate-pulse" : alert.status === "acknowledged" ? "bg-yellow-500" : "bg-green-500"
+                  }`}>
+                    <AlertTriangle className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm">{alert.userRole === "rider" ? "Rider" : "Driver"} SOS</div>
+                    <div className="text-[10px] text-gray-500">{alert.createdAt ? new Date(alert.createdAt).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}</div>
+                  </div>
+                </div>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  alert.status === "active" ? "bg-red-100 text-red-700" : alert.status === "acknowledged" ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"
+                }`}>{alert.status}</span>
+              </div>
+
+              <div className="space-y-1.5 text-xs mb-3">
+                <div className="flex items-center gap-2"><span className="text-gray-500 w-16">User ID:</span><span className="font-mono text-gray-700 truncate">{alert.userId}</span></div>
+                {alert.tripId && <div className="flex items-center gap-2"><span className="text-gray-500 w-16">Trip ID:</span><span className="font-mono text-gray-700 truncate">{alert.tripId}</span></div>}
+                {alert.lat && alert.lng && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500 w-16">Location:</span>
+                    <a href={`https://www.google.com/maps?q=${alert.lat},${alert.lng}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex items-center gap-1">
+                      {alert.lat.toFixed(4)}, {alert.lng.toFixed(4)} <MapPin className="h-3 w-3" />
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              {alert.adminNotes && (
+                <div className="bg-white/80 rounded-lg px-3 py-2 mb-3 text-xs text-gray-700 border border-gray-100">
+                  <span className="font-bold text-gray-500">Notes: </span>{alert.adminNotes}
+                </div>
+              )}
+
+              {alert.status !== "resolved" && (
+                <div className="space-y-2">
+                  <textarea
+                    value={sosNotes[alert.id] || ""}
+                    onChange={e => setSosNotes(prev => ({ ...prev, [alert.id]: e.target.value }))}
+                    placeholder="Add notes..."
+                    className="w-full h-16 rounded-lg border border-gray-200 p-2 text-xs resize-none"
+                    data-testid={`input-sos-notes-${alert.id}`}
+                  />
+                  <div className="flex gap-2">
+                    {alert.status === "active" && (
+                      <Button size="sm" className="flex-1 rounded-lg bg-yellow-500 hover:bg-yellow-600 text-white text-xs h-9" onClick={async () => {
+                        await updateSosAlert(alert.id, { status: "acknowledged", adminNotes: sosNotes[alert.id] || undefined });
+                        queryClient.invalidateQueries({ queryKey: ["/api/sos"] });
+                        toast({ title: "Alert Acknowledged" });
+                      }} data-testid={`btn-ack-sos-${alert.id}`}>Acknowledge</Button>
+                    )}
+                    <Button size="sm" className="flex-1 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs h-9" onClick={async () => {
+                      await updateSosAlert(alert.id, { status: "resolved", adminNotes: sosNotes[alert.id] || undefined });
+                      queryClient.invalidateQueries({ queryKey: ["/api/sos"] });
+                      toast({ title: "Alert Resolved" });
+                    }} data-testid={`btn-resolve-sos-${alert.id}`}>Resolve</Button>
+                  </div>
+                </div>
+              )}
+
+              {alert.resolvedAt && (
+                <div className="text-[10px] text-gray-400 mt-2">Resolved: {new Date(alert.resolvedAt).toLocaleString("en-ZA")}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   // ── Dashboard ──
   return (
     <div className="min-h-[100dvh] bg-gray-50 flex flex-col">
@@ -425,6 +531,23 @@ export default function AdminApp() {
           </div>
         </div>
 
+        {activeSosAlerts.length > 0 && (
+          <button
+            className="w-full bg-red-50 border-2 border-red-300 rounded-xl p-4 flex items-center gap-3 text-left animate-pulse"
+            onClick={() => setView("sos")}
+            data-testid="btn-active-sos"
+          >
+            <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center shrink-0">
+              <AlertTriangle className="h-5 w-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <div className="font-bold text-sm text-red-800">{activeSosAlerts.length} Active SOS Alert{activeSosAlerts.length > 1 ? "s" : ""}!</div>
+              <div className="text-[10px] text-red-600">Immediate attention required</div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-red-400" />
+          </button>
+        )}
+
         {pendingDrivers.length > 0 && (
           <button
             className="w-full bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-center gap-3 text-left"
@@ -445,6 +568,20 @@ export default function AdminApp() {
         <h2 className="font-bold">Management</h2>
 
         <div className="space-y-2">
+          <Button variant="outline" className="w-full justify-between h-14 rounded-xl bg-white border-gray-100 shadow-sm px-4" onClick={() => setView("sos")} data-testid="btn-manage-sos">
+            <div className="flex items-center gap-3">
+              <div className="bg-red-50 p-2 rounded-lg text-red-600"><AlertTriangle className="h-4 w-4" /></div>
+              <div className="text-left">
+                <div className="font-bold text-sm">SOS Alerts</div>
+                <div className="text-[10px] text-gray-500">{activeSosAlerts.length} active</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {activeSosAlerts.length > 0 && <span className="w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{activeSosAlerts.length}</span>}
+              <ChevronRight className="h-4 w-4 text-gray-400" />
+            </div>
+          </Button>
+
           <Button variant="outline" className="w-full justify-between h-14 rounded-xl bg-white border-gray-100 shadow-sm px-4" onClick={() => setView("approvals")} data-testid="btn-manage-approvals">
             <div className="flex items-center gap-3">
               <div className="bg-yellow-50 p-2 rounded-lg text-yellow-600"><Shield className="h-4 w-4" /></div>

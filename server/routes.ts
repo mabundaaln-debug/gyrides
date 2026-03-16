@@ -258,6 +258,52 @@ export async function registerRoutes(
     return res.json(stats);
   });
 
+  // ── Messages ──
+  app.get("/api/messages/:tripId", async (req, res) => {
+    const msgs = await storage.getMessagesByTrip(req.params.tripId);
+    return res.json(msgs);
+  });
+
+  app.post("/api/messages", async (req, res) => {
+    const { tripId, senderId, senderRole, text } = req.body;
+    if (!tripId || !senderId || !senderRole || !text) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+    const msg = await storage.createMessage({ tripId, senderId, senderRole, text });
+    return res.json(msg);
+  });
+
+  // ── SOS Alerts ──
+  app.post("/api/sos", async (req, res) => {
+    const { tripId, userId, userRole, lat, lng } = req.body;
+    if (!userId || !userRole) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+    const alert = await storage.createSosAlert({ tripId: tripId || null, userId, userRole, lat: lat || null, lng: lng || null, status: "active" });
+    return res.json(alert);
+  });
+
+  app.get("/api/sos", async (_req, res) => {
+    const alerts = await storage.getSosAlerts();
+    return res.json(alerts);
+  });
+
+  app.get("/api/sos/active", async (_req, res) => {
+    const alerts = await storage.getActiveSosAlerts();
+    return res.json(alerts);
+  });
+
+  app.patch("/api/sos/:id", async (req, res) => {
+    const { status, adminNotes } = req.body;
+    const updateData: any = {};
+    if (status) updateData.status = status;
+    if (adminNotes !== undefined) updateData.adminNotes = adminNotes;
+    if (status === "resolved") updateData.resolvedAt = new Date();
+    const alert = await storage.updateSosAlert(req.params.id, updateData);
+    if (!alert) return res.status(404).json({ message: "SOS alert not found" });
+    return res.json(alert);
+  });
+
   // ── Seed Demo Data ──
   app.post("/api/seed", async (req, res) => {
     try {

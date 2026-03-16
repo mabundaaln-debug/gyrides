@@ -116,11 +116,37 @@ export const taxiRoutes = pgTable("taxi_routes", {
   toLng: real("to_lng"),
 });
 
+export const sosStatusEnum = pgEnum("sos_status", ["active", "acknowledged", "resolved"]);
+
+export const messages = pgTable("messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tripId: varchar("trip_id").notNull().references(() => trips.id),
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  senderRole: userRoleEnum("sender_role").notNull(),
+  text: text("text").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const sosAlerts = pgTable("sos_alerts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tripId: varchar("trip_id").references(() => trips.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  userRole: userRoleEnum("user_role").notNull(),
+  lat: real("lat"),
+  lng: real("lng"),
+  status: sosStatusEnum("status").notNull().default("active"),
+  adminNotes: text("admin_notes"),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertTripSchema = createInsertSchema(trips).omit({ id: true, createdAt: true, completedAt: true });
 export const insertSavedPlaceSchema = createInsertSchema(savedPlaces).omit({ id: true });
 export const insertVehicleTypeSchema = createInsertSchema(vehicleTypes).omit({ id: true });
 export const insertTaxiRouteSchema = createInsertSchema(taxiRoutes).omit({ id: true });
+export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
+export const insertSosAlertSchema = createInsertSchema(sosAlerts).omit({ id: true, createdAt: true, resolvedAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -132,3 +158,7 @@ export type InsertVehicleType = z.infer<typeof insertVehicleTypeSchema>;
 export type VehicleType = typeof vehicleTypes.$inferSelect;
 export type InsertTaxiRoute = z.infer<typeof insertTaxiRouteSchema>;
 export type TaxiRoute = typeof taxiRoutes.$inferSelect;
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type Message = typeof messages.$inferSelect;
+export type InsertSosAlert = z.infer<typeof insertSosAlertSchema>;
+export type SosAlert = typeof sosAlerts.$inferSelect;

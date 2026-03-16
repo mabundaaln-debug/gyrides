@@ -1,5 +1,5 @@
 import { apiRequest } from "./queryClient";
-import type { User, Trip, SavedPlace, VehicleType, TaxiRoute } from "@shared/schema";
+import type { User, Trip, SavedPlace, VehicleType, TaxiRoute, Message, SosAlert } from "@shared/schema";
 
 export async function login(username: string, password: string): Promise<User> {
   const res = await apiRequest("POST", "/api/auth/login", { username, password });
@@ -48,4 +48,24 @@ export async function rejectDriver(driverId: string, reason: string): Promise<Us
 
 export async function seedData(): Promise<void> {
   await apiRequest("POST", "/api/seed");
+}
+
+export async function getMessages(tripId: string): Promise<Message[]> {
+  const res = await fetch(`/api/messages/${tripId}`, { credentials: "include" });
+  return res.json();
+}
+
+export async function sendMessage(data: { tripId: string; senderId: string; senderRole: string; text: string }): Promise<Message> {
+  const res = await apiRequest("POST", "/api/messages", data);
+  return res.json();
+}
+
+export async function sendSosAlert(data: { tripId?: string; userId: string; userRole: string; lat?: number; lng?: number }): Promise<SosAlert> {
+  const res = await apiRequest("POST", "/api/sos", data);
+  return res.json();
+}
+
+export async function updateSosAlert(id: string, data: { status?: string; adminNotes?: string }): Promise<SosAlert> {
+  const res = await apiRequest("PATCH", `/api/sos/${id}`, data);
+  return res.json();
 }

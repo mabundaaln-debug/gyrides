@@ -1,12 +1,14 @@
 import { eq, desc, and, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
-  users, trips, savedPlaces, vehicleTypes, taxiRoutes,
+  users, trips, savedPlaces, vehicleTypes, taxiRoutes, messages, sosAlerts,
   type User, type InsertUser,
   type Trip, type InsertTrip,
   type SavedPlace, type InsertSavedPlace,
   type VehicleType, type InsertVehicleType,
   type TaxiRoute, type InsertTaxiRoute,
+  type Message, type InsertMessage,
+  type SosAlert, type InsertSosAlert,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -39,7 +41,15 @@ export interface IStorage {
   createTaxiRoute(route: InsertTaxiRoute): Promise<TaxiRoute>;
   updateTaxiRoute(id: string, data: Partial<InsertTaxiRoute>): Promise<TaxiRoute | undefined>;
 
-  getStats(): Promise<{ totalDrivers: number; totalRiders: number; totalTrips: number; totalRevenue: number; onlineDrivers: number; activeTrips: number }>;
+  getMessagesByTrip(tripId: string): Promise<Message[]>;
+  createMessage(msg: InsertMessage): Promise<Message>;
+
+  createSosAlert(alert: InsertSosAlert): Promise<SosAlert>;
+  getSosAlerts(): Promise<SosAlert[]>;
+  getActiveSosAlerts(): Promise<SosAlert[]>;
+  updateSosAlert(id: string, data: Partial<InsertSosAlert & { resolvedAt: Date }>): Promise<SosAlert | undefined>;
+
+  getStats(): Promise<{ totalDrivers: number; totalRiders: number; totalTrips: number; totalRevenue: number; onlineDrivers: number; activeTrips: number; activeSosAlerts: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -157,6 +167,33 @@ export class DatabaseStorage implements IStorage {
     return r;
   }
 
+  async getMessagesByTrip(tripId: string): Promise<Message[]> {
+    return db.select().from(messages).where(eq(messages.tripId, tripId)).orderBy(messages.createdAt);
+  }
+
+  async createMessage(msg: InsertMessage): Promise<Message> {
+    const [m] = await db.insert(messages).values(msg).returning();
+    return m;
+  }
+
+  async createSosAlert(alert: InsertSosAlert): Promise<SosAlert> {
+    const [a] = await db.insert(sosAlerts).values(alert).returning();
+    return a;
+  }
+
+  async getSosAlerts(): Promise<SosAlert[]> {
+    return db.select().from(sosAlerts).orderBy(desc(sosAlerts.createdAt));
+  }
+
+  async getActiveSosAlerts(): Promise<SosAlert[]> {
+    return db.select().from(sosAlerts).where(sql`${sosAlerts.status} IN ('active', 'acknowledged')`).orderBy(desc(sosAlerts.createdAt));
+  }
+
+  async updateSosAlert(id: string, data: Partial<InsertSosAlert & { resolvedAt: Date }>): Promise<SosAlert | undefined> {
+    const [a] = await db.update(sosAlerts).set(data).where(eq(sosAlerts.id, id)).returning();
+    return a;
+  }
+
   async getStats() {
     const [driverCount] = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(eq(users.role, "driver"));
     const [riderCount] = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(eq(users.role, "rider"));
@@ -164,6 +201,7 @@ export class DatabaseStorage implements IStorage {
     const [revenue] = await db.select({ total: sql<number>`coalesce(sum(${trips.fare}), 0)::real` }).from(trips).where(eq(trips.status, "completed"));
     const [onlineCount] = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(and(eq(users.role, "driver"), eq(users.isOnline, true)));
     const activeTrips = await this.getActiveTrips();
+    const activeSos = await this.getActiveSosAlerts();
 
     return {
       totalDrivers: driverCount.count,
@@ -172,6 +210,7 @@ export class DatabaseStorage implements IStorage {
       totalRevenue: revenue.total,
       onlineDrivers: onlineCount.count,
       activeTrips: activeTrips.length,
+      activeSosAlerts: activeSos.length,
     };
   }
 }

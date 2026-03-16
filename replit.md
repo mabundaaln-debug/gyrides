@@ -70,7 +70,7 @@ shared/
 - Choose vehicle type with detailed fare breakdown (base/distance/time/surcharge)
 - Payment methods: Cash, eWallet (balance), EFT (bank details shown), Card
 - WhatsApp fallback booking (from home screen and confirm screen)
-- Trip PIN verification, SOS button, call/WhatsApp driver
+- Trip PIN verification, SOS button (sends alert to admin), in-app chat with driver
 - Live ETA tracking with countdown, simulated driver movement on map
 - Trip completion with star rating, receipt, rebook
 - Wallet view with balance and payment method selection
@@ -85,7 +85,7 @@ shared/
 - Ride type indicators: Medical/Parcel/Shared badges on requests
 - Medical notes and parcel descriptions shown on trip cards
 - Phase-specific labels for parcel (Collect/Delivering/Delivered)
-- Navigate to pickup/dropoff (Google Maps), call/WhatsApp passenger
+- Navigate to pickup/dropoff (Google Maps), in-app chat with passenger, SOS button
 - Earnings with 85% commission breakdown, trip-level driver earnings
 - Driver Bonus system: daily (20 rides → R100) and weekly (100 rides → R500) with progress bars
 - Commission info panel showing 15% vs Uber/Bolt comparison
@@ -95,8 +95,14 @@ shared/
 - 5-step registration: personal info → vehicle → licenses → documents → review
 - Admin approval flow with verified badge on approval
 
+### Chat & SOS
+- **In-app chat**: Real-time messaging between rider and driver during active trips (3-second polling)
+- **SOS alerts**: Rider and driver can trigger SOS with GPS coordinates, sent to admin
+- **Admin SOS panel**: View active/acknowledged/resolved alerts, acknowledge or resolve with notes, Google Maps link to location
+
 ### Admin
-- Dashboard with revenue/active trips, pending approval alerts
+- Dashboard with revenue/active trips, SOS alert banner (pulsing red), pending approval alerts
+- SOS Alerts management with acknowledge/resolve workflow
 - Driver review flow with approve/reject
 - Management for drivers/trips/vehicle pricing
 
@@ -115,6 +121,8 @@ Data auto-seeds on first visit via POST /api/seed.
 - `savedPlaces`: user's saved locations with lat/lng
 - `vehicleTypes`: GY Standard, GY Premium, GY XL, GY Health, GY Parcel (with pricePerMin, minimumFare)
 - `taxiRoutes`: route name, from/to locations with lat/lng, fare, available/total seats, departure schedule
+- `messages`: in-trip chat messages with tripId, senderId, senderRole, text
+- `sosAlerts`: emergency alerts with userId, userRole, tripId, lat/lng, status (active/acknowledged/resolved), adminNotes
 
 ## API Routes
 
@@ -126,6 +134,8 @@ All prefixed with `/api`:
 - Vehicle Types: GET/POST/PATCH `/vehicle-types`
 - Taxi Routes: GET/POST/PATCH `/taxi-routes`
 - Wallet: POST `/wallet/topup`
+- Messages: GET `/messages/:tripId`, POST `/messages`
+- SOS: POST `/sos`, GET `/sos`, GET `/sos/active`, PATCH `/sos/:id`
 - Admin: GET `/admin/stats`, GET `/drivers/pending`, PATCH `/admin/drivers/:id/approve`, PATCH `/admin/drivers/:id/reject`
 - Onboarding: PATCH `/drivers/:id/onboarding`
 - Health: GET `/health`

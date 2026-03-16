@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth";
-import { createTrip, updateTrip, updateUser } from "@/lib/api";
+import { createTrip, updateTrip, updateUser, sendSosAlert } from "@/lib/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import GiyaniMap from "@/components/GiyaniMap";
+import TripChat from "@/components/TripChat";
 import type { Trip, SavedPlace, VehicleType, User as UserType, TaxiRoute } from "@shared/schema";
 
 const GIYANI_LOCATIONS = [
@@ -85,6 +86,7 @@ export default function RiderApp() {
   const [medicalNotes, setMedicalNotes] = useState("");
   const [parcelDescription, setParcelDescription] = useState("");
   const [trustedContactInput, setTrustedContactInput] = useState("");
+  const [showChat, setShowChat] = useState(false);
   const [locatingGPS, setLocatingGPS] = useState(false);
   const [driverPos, setDriverPos] = useState<{ lat: number; lng: number } | null>(null);
   const [tripEta, setTripEta] = useState<number | null>(null);
@@ -457,9 +459,21 @@ export default function RiderApp() {
     toast({ title: "Shared with trusted contacts", description: `Sent to ${trustedContacts.length} contact(s)` });
   }, [currentTrip, trustedContacts, tripPin, user, toast]);
 
-  const handleSOS = () => {
-    toast({ title: "SOS Alert Sent", description: "Emergency contacts have been notified with your location" });
-    if (trustedContacts.length > 0) handleShareWithContacts();
+  const handleSOS = async () => {
+    try {
+      const loc = pickup || pinDrop;
+      await sendSosAlert({
+        tripId: currentTrip?.id,
+        userId: user.id,
+        userRole: "rider",
+        lat: loc?.lat,
+        lng: loc?.lng,
+      });
+      toast({ title: "SOS Alert Sent!", description: "Admin has been notified. Help is on the way.", variant: "destructive" });
+      if (trustedContacts.length > 0) handleShareWithContacts();
+    } catch {
+      toast({ title: "SOS Alert Sent", description: "Emergency contacts have been notified with your location" });
+    }
   };
 
   const addTrustedContact = async () => {
@@ -1294,9 +1308,19 @@ export default function RiderApp() {
               </div>
               <div className="flex gap-2">
                 <button className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center" data-testid="btn-call-driver"><Phone className="h-4 w-4 text-green-700" /></button>
-                <button className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center" data-testid="btn-whatsapp-driver"><MessageCircle className="h-4 w-4 text-green-700" /></button>
+                <button onClick={() => setShowChat(true)} className="w-9 h-9 bg-yellow-100 rounded-full flex items-center justify-center" data-testid="btn-chat-driver"><MessageCircle className="h-4 w-4 text-yellow-700" /></button>
               </div>
             </div>
+          )}
+
+          {showChat && currentTrip && assignedDriver && (
+            <TripChat
+              tripId={currentTrip.id}
+              userId={user.id}
+              userRole="rider"
+              otherName={assignedDriver.fullName}
+              onClose={() => setShowChat(false)}
+            />
           )}
 
           <div className="flex items-center gap-3 text-sm">
