@@ -46,10 +46,6 @@ export async function rejectDriver(driverId: string, reason: string): Promise<Us
   return res.json();
 }
 
-export async function seedData(): Promise<void> {
-  await apiRequest("POST", "/api/seed");
-}
-
 export async function getMessages(tripId: string): Promise<Message[]> {
   const res = await fetch(`/api/messages/${tripId}`, { credentials: "include" });
   return res.json();

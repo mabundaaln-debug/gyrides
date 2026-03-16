@@ -4,7 +4,7 @@ import { Car, User, Settings, ArrowRight, LogIn, UserPlus, Eye, EyeOff, Download
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
-import { login, register, seedData, forgotPassword, resetPassword, googleAuth, getWebauthnLoginOptions, verifyWebauthnLogin } from "@/lib/api";
+import { login, register, forgotPassword, resetPassword, googleAuth, getWebauthnLoginOptions, verifyWebauthnLogin } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
@@ -21,7 +21,6 @@ export default function Home() {
   const [role, setRole] = useState<"rider" | "driver">("rider");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [seeded, setSeeded] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetStep, setResetStep] = useState<"verify" | "newPassword" | "success">("verify");
@@ -40,12 +39,6 @@ export default function Home() {
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  useEffect(() => {
-    if (!seeded) {
-      seedData().catch(() => {});
-      setSeeded(true);
-    }
-  }, [seeded]);
 
   const handleLogin = async () => {
     if (!username || !password) {
@@ -556,14 +549,6 @@ export default function Home() {
               )}
             </div>
 
-            {!isRegister && (
-              <div className="bg-white/5 rounded-2xl p-4 text-sm text-gray-400 border border-white/10">
-                <p className="font-bold mb-1 text-gray-300">Demo Accounts:</p>
-                <p>Rider: <span className="font-mono text-yellow-400">jane / demo</span></p>
-                <p>Driver: <span className="font-mono text-yellow-400">sipho / demo</span></p>
-                <p>Admin: <span className="font-mono text-yellow-400">admin / admin</span></p>
-              </div>
-            )}
 
             <button className="w-full text-gray-400 text-sm py-3" onClick={() => { setIsRegister(!isRegister); setConfirmPassword(""); }}>
               {isRegister ? "Already have an account? Sign In" : "New here? Create Account"}
