@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents 
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-const GIYANI_CENTER: [number, number] = [-23.31, 30.72];
+const GIYANI_CENTER: [number, number] = [-23.3153, 30.7256];
 
 const pickupIcon = new L.DivIcon({
   className: "",

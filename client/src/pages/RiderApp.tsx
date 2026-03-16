@@ -13,20 +13,20 @@ import GiyaniMap from "@/components/GiyaniMap";
 import type { Trip, SavedPlace, VehicleType, User as UserType, TaxiRoute } from "@shared/schema";
 
 const GIYANI_LOCATIONS = [
-  { name: "Masingita Mall", address: "Main Road, Giyani", lat: -23.30, lng: 30.73 },
-  { name: "Giyani CBD", address: "Central Business District", lat: -23.32, lng: 30.71 },
-  { name: "Section A", address: "Giyani Section A", lat: -23.31, lng: 30.72 },
-  { name: "Section B", address: "Giyani Section B", lat: -23.29, lng: 30.74 },
-  { name: "Section C", address: "Giyani Section C", lat: -23.33, lng: 30.70 },
-  { name: "Section D", address: "Giyani Section D", lat: -23.28, lng: 30.75 },
-  { name: "Section E", address: "Giyani Section E", lat: -23.295, lng: 30.735 },
-  { name: "Giyani Hospital", address: "Hospital Road", lat: -23.315, lng: 30.715 },
-  { name: "Giyani Plaza", address: "Plaza Street", lat: -23.325, lng: 30.725 },
-  { name: "Giyani Stadium", address: "Stadium Road", lat: -23.305, lng: 30.735 },
-  { name: "Giyani Taxi Rank", address: "Main Taxi Rank", lat: -23.318, lng: 30.718 },
-  { name: "Thohoyandou Road", address: "R81 Highway", lat: -23.27, lng: 30.76 },
-  { name: "Giyani Clinic", address: "Section B Clinic", lat: -23.295, lng: 30.74 },
-  { name: "Nkhensani Hospital", address: "Hospital Complex", lat: -23.312, lng: 30.712 },
+  { name: "Masingita Mall", address: "R81 Main Road, Giyani", lat: -23.2993, lng: 30.6844 },
+  { name: "Giyani CBD", address: "Central Business District, Giyani", lat: -23.3153, lng: 30.7256 },
+  { name: "Section A", address: "Giyani Section A", lat: -23.3060, lng: 30.7180 },
+  { name: "Section B", address: "Giyani Section B", lat: -23.3010, lng: 30.7310 },
+  { name: "Section C", address: "Giyani Section C", lat: -23.3200, lng: 30.7100 },
+  { name: "Section D", address: "Giyani Section D", lat: -23.2930, lng: 30.7390 },
+  { name: "Section E", address: "Giyani Section E", lat: -23.2870, lng: 30.7280 },
+  { name: "Giyani Hospital", address: "Hospital Road, Giyani", lat: -23.3180, lng: 30.7140 },
+  { name: "Giyani Plaza", address: "Main Street, Giyani", lat: -23.3096, lng: 30.6926 },
+  { name: "Giyani Stadium", address: "Stadium Road, Giyani", lat: -23.3222, lng: 30.7191 },
+  { name: "Giyani Taxi Rank", address: "Main Taxi Rank, CBD", lat: -23.3140, lng: 30.7230 },
+  { name: "Thohoyandou Road", address: "R81 Highway Exit", lat: -23.2750, lng: 30.7500 },
+  { name: "Giyani Clinic", address: "Section B Clinic, Giyani", lat: -23.3030, lng: 30.7340 },
+  { name: "Nkhensani Hospital", address: "Nkhensani Hospital Complex", lat: -23.3170, lng: 30.7170 },
 ];
 
 const QUICK_DESTINATIONS = [
@@ -78,6 +78,9 @@ export default function RiderApp() {
   const [parcelDescription, setParcelDescription] = useState("");
   const [trustedContactInput, setTrustedContactInput] = useState("");
   const [locatingGPS, setLocatingGPS] = useState(false);
+  const [driverPos, setDriverPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [tripEta, setTripEta] = useState<number | null>(null);
+  const [tripStartTime, setTripStartTime] = useState<number | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -173,9 +176,90 @@ export default function RiderApp() {
     return !vt.name.toLowerCase().includes("parcel") && !vt.name.toLowerCase().includes("medical");
   });
 
+  const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number } | null>(null);
+
+  useEffect(() => {
+    if (!pickup || !dropoff) { setRouteInfo(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/route-info?originLat=${pickup.lat}&originLng=${pickup.lng}&destLat=${dropoff.lat}&destLng=${dropoff.lng}`);
+        const data = await res.json();
+        if (!cancelled && data.distance > 0) {
+          setRouteInfo({ distance: data.distance, duration: data.duration });
+        }
+      } catch {
+        if (!cancelled) {
+          const d = haversineDistance(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
+          setRouteInfo({ distance: d, duration: Math.round(d * 2.5 + 3) });
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [pickup?.lat, pickup?.lng, dropoff?.lat, dropoff?.lng]);
+
+  useEffect(() => {
+    if (view !== "tracking" || !currentTrip || !assignedDriver) return;
+
+    const pLat = currentTrip.pickupLat ?? -23.306;
+    const pLng = currentTrip.pickupLng ?? 30.718;
+    const dLat = currentTrip.dropoffLat ?? -23.315;
+    const dLng = currentTrip.dropoffLng ?? 30.726;
+
+    let startLat: number, startLng: number, endLat: number, endLng: number;
+
+    if (rideStatus === "on_the_way") {
+      startLat = pLat + 0.008;
+      startLng = pLng - 0.006;
+      endLat = pLat;
+      endLng = pLng;
+      setTripEta(prev => prev ?? (currentTrip.duration ?? 5));
+    } else if (rideStatus === "in_progress") {
+      startLat = pLat;
+      startLng = pLng;
+      endLat = dLat;
+      endLng = dLng;
+      setTripStartTime(prev => prev ?? Date.now());
+    } else {
+      setDriverPos({ lat: pLat, lng: pLng });
+      return;
+    }
+
+    let step = 0;
+    const totalSteps = 40;
+    const interval = setInterval(() => {
+      step++;
+      const progress = Math.min(step / totalSteps, 1);
+      const eased = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+      const lat = startLat + (endLat - startLat) * eased;
+      const lng = startLng + (endLng - startLng) * eased;
+      setDriverPos({ lat, lng });
+
+      const totalDur = currentTrip.duration ?? 5;
+      if (rideStatus === "on_the_way") {
+        setTripEta(Math.max(1, Math.round(totalDur * (1 - progress) * 0.4)));
+      } else if (rideStatus === "in_progress") {
+        setTripEta(Math.max(1, Math.round(totalDur * (1 - progress))));
+      }
+
+      if (step >= totalSteps) clearInterval(interval);
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [view, rideStatus, currentTrip?.id, assignedDriver?.id]);
+
+  const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
+
   const calcDistance = () => {
+    if (routeInfo) return routeInfo.distance;
     if (!pickup || !dropoff) return 3;
-    return Math.sqrt(Math.pow((pickup.lat - dropoff.lat) * 111, 2) + Math.pow((pickup.lng - dropoff.lng) * 111 * Math.cos(pickup.lat * Math.PI / 180), 2));
+    return haversineDistance(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
   };
 
   const calcFare = (vt: VehicleType) => {
@@ -184,7 +268,10 @@ export default function RiderApp() {
     return fare;
   };
 
-  const calcDuration = () => Math.round(calcDistance() * 3 + 4);
+  const calcDuration = () => {
+    if (routeInfo) return routeInfo.duration;
+    return Math.round(calcDistance() * 2.5 + 3);
+  };
 
   const filteredLocations = GIYANI_LOCATIONS.filter(l => l.name.toLowerCase().includes(searchQuery.toLowerCase()) || l.address.toLowerCase().includes(searchQuery.toLowerCase()));
 
@@ -974,10 +1061,10 @@ export default function RiderApp() {
 
           <h3 className="font-bold text-base mb-2">Choose your ride</h3>
           <div className="space-y-2 mb-4">
-            {filteredVehicleTypes.map((vt) => {
+            {filteredVehicleTypes.map((vt, idx) => {
               const fare = calcFare(vt);
               const isSelected = selectedVehicle?.id === vt.id;
-              const eta = Math.round(Math.random() * 4 + 2);
+              const eta = routeInfo ? Math.max(2, Math.round(routeInfo.duration * 0.3 + idx + 1)) : (3 + idx);
               return (
                 <button key={vt.id} className={`w-full bg-white rounded-xl p-3 flex items-center justify-between border-2 transition-all ${isSelected ? "border-black shadow-md" : "border-gray-100 shadow-sm"}`}
                   onClick={() => setSelectedVehicle(vt)} data-testid={`vehicle-${vt.name.replace(/\s+/g, '-').toLowerCase()}`}>
@@ -1075,11 +1162,11 @@ export default function RiderApp() {
     );
   }
 
-  // ── Tracking ──
   if (view === "tracking") {
     const driver = assignedDriver;
     const statusLabel = rideStatus === "on_the_way" ? "Driver on the way" : rideStatus === "arrived" ? "Driver arrived" : rideStatus === "in_progress" ? "Trip in progress" : "Finding driver...";
     const statusColor = rideStatus === "on_the_way" ? "bg-blue-100 text-blue-700" : rideStatus === "arrived" ? "bg-green-100 text-green-700" : rideStatus === "in_progress" ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-700";
+    const etaText = tripEta ? `${tripEta} min` : `${currentTrip?.duration || calcDuration()} min`;
 
     return (
       <div className="min-h-[100dvh] bg-gray-50 flex flex-col">
@@ -1088,16 +1175,22 @@ export default function RiderApp() {
             <Button variant="ghost" size="icon" onClick={() => {}} className="rounded-full bg-white shadow-md"><ChevronLeft className="h-6 w-6" /></Button>
             <span className={`text-xs font-bold px-3 py-1.5 rounded-full shadow-sm ${statusColor}`} data-testid="text-ride-status">{statusLabel}</span>
           </div>
-          <button onClick={handleSOS} className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center shadow-lg" data-testid="btn-sos">
-            <AlertTriangle className="h-5 w-5 text-white" />
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="bg-white shadow-md rounded-full px-3 py-1.5 flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5 text-yellow-500" />
+              <span className="text-xs font-bold" data-testid="text-eta">ETA: {etaText}</span>
+            </div>
+            <button onClick={handleSOS} className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center shadow-lg" data-testid="btn-sos">
+              <AlertTriangle className="h-5 w-5 text-white" />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 relative">
           <GiyaniMap
-            pickup={currentTrip ? { lat: currentTrip.pickupLat ?? -23.31, lng: currentTrip.pickupLng ?? 30.72, name: currentTrip.pickupName } : null}
-            dropoff={currentTrip ? { lat: currentTrip.dropoffLat ?? -23.32, lng: currentTrip.dropoffLng ?? 30.71, name: currentTrip.dropoffName } : null}
-            driverLocation={assignedDriver ? { lat: (currentTrip?.pickupLat ?? -23.31) + 0.005, lng: (currentTrip?.pickupLng ?? 30.72) - 0.003 } : null}
+            pickup={currentTrip ? { lat: currentTrip.pickupLat ?? -23.306, lng: currentTrip.pickupLng ?? 30.718, name: currentTrip.pickupName } : null}
+            dropoff={currentTrip ? { lat: currentTrip.dropoffLat ?? -23.315, lng: currentTrip.dropoffLng ?? 30.726, name: currentTrip.dropoffName } : null}
+            driverLocation={driverPos}
             className="h-full absolute inset-0"
             showRoute={true}
           />
@@ -1110,6 +1203,22 @@ export default function RiderApp() {
               <span className="text-xl font-black tracking-widest text-black" data-testid="text-trip-pin">{tripPin}</span>
             </div>
           )}
+
+          <div className="bg-gray-50 rounded-xl p-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center">
+                <Navigation className="h-4 w-4 text-black" />
+              </div>
+              <div>
+                <div className="text-xs text-gray-500">{rideStatus === "in_progress" ? "Arriving in" : rideStatus === "arrived" ? "Driver is here" : "Driver arrives in"}</div>
+                <div className="text-lg font-black" data-testid="text-eta-large">{rideStatus === "arrived" ? "Now" : etaText}</div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-gray-500">Distance</div>
+              <div className="text-sm font-bold">{currentTrip?.distance?.toFixed(1)} km</div>
+            </div>
+          </div>
 
           {driver && (
             <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
@@ -1143,7 +1252,7 @@ export default function RiderApp() {
           <div className="flex justify-between items-center">
             <div>
               <div className="text-2xl font-bold">R{currentTrip?.fare}</div>
-              <div className="text-xs text-gray-500">{paymentLabel(paymentMethod)} · {currentTrip?.duration || calcDuration()} min</div>
+              <div className="text-xs text-gray-500">{paymentLabel(paymentMethod)} · {currentTrip?.duration || calcDuration()} min trip</div>
             </div>
             {currentTrip?.rideType && currentTrip.rideType !== "private" && (
               <span className="text-xs font-bold px-2 py-1 rounded-full bg-blue-100 text-blue-700">{currentTrip.rideType}</span>

@@ -16,6 +16,31 @@ export async function registerRoutes(
     res.json({ apiKey: process.env.GOOGLE_MAPS_API_KEY || "" });
   });
 
+  app.get("/api/route-info", async (req, res) => {
+    const { originLat, originLng, destLat, destLng } = req.query;
+    if (!originLat || !originLng || !destLat || !destLng) {
+      return res.json({ distance: 0, duration: 0 });
+    }
+    try {
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${originLng},${originLat};${destLng},${destLat}?overview=false`;
+      const response = await fetch(osrmUrl);
+      const data = await response.json();
+      if (data.routes && data.routes.length > 0) {
+        const route = data.routes[0];
+        return res.json({
+          distance: Math.round(route.distance / 100) / 10,
+          duration: Math.round(route.duration / 60),
+        });
+      }
+    } catch {}
+    const R = 6371;
+    const dLat = (Number(destLat) - Number(originLat)) * Math.PI / 180;
+    const dLon = (Number(destLng) - Number(originLng)) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(Number(originLat) * Math.PI / 180) * Math.cos(Number(destLat) * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+    const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return res.json({ distance: Math.round(dist * 10) / 10, duration: Math.round(dist * 2.5 + 3) });
+  });
+
   app.get("/api/directions", async (req, res) => {
     const { origin, destination } = req.query;
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
