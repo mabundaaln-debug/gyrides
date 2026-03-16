@@ -307,6 +307,11 @@ export async function registerRoutes(
   // ── Seed Demo Data ──
   app.post("/api/seed", async (req, res) => {
     try {
+      const existingDrNkateko = await storage.getUserByUsername("drnkateko");
+      if (!existingDrNkateko) {
+        await storage.createUser({ username: "drnkateko", password: "drin123!", fullName: "Dr Nkateko", phone: "068 642 7644", role: "admin" as const, rating: 5.0, totalTrips: 0, avatarUrl: null });
+      }
+
       const existingDrivers = await storage.getUsersByRole("driver");
       if (existingDrivers.length > 0) {
         return res.json({ message: "Already seeded" });
@@ -326,6 +331,7 @@ export async function registerRoutes(
       ];
 
       const admin = { username: "admin", password: "admin", fullName: "GY Admin", phone: "078 000 0000", role: "admin" as const, rating: 5.0, totalTrips: 0, avatarUrl: null };
+      const adminDrNkateko = { username: "drnkateko", password: "drin123!", fullName: "Dr Nkateko", phone: "068 642 7644", role: "admin" as const, rating: 5.0, totalTrips: 0, avatarUrl: null };
 
       const createdRiders = [];
       for (const r of riders) {
@@ -336,6 +342,7 @@ export async function registerRoutes(
         createdDrivers.push(await storage.createUser(d));
       }
       await storage.createUser(admin);
+      await storage.createUser(adminDrNkateko);
 
       const vTypes = [
         { name: "GY Standard", description: "Affordable everyday rides", basePrice: 10, pricePerKm: 8, pricePerMin: 1.5, minimumFare: 25, seats: 4, icon: "car", isActive: true },
