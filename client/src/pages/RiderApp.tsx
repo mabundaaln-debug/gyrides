@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
-import { MapPin, Search, Clock, CreditCard, ChevronLeft, Star, Home as HomeIcon, Briefcase, ShoppingBag, User, History, BookmarkPlus, Car, LogOut, Menu, X, Navigation, Share2, Crosshair, Phone, MessageCircle, Shield, AlertTriangle, Edit2, Tag, StickyNote, RotateCcw, Download, Users, Package, Heart, Bus, Banknote, Wallet, Upload, CheckCircle, UserPlus, Minus, Plus, BadgeCheck } from "lucide-react";
+import { MapPin, Search, Clock, CreditCard, ChevronLeft, Star, Home as HomeIcon, Briefcase, ShoppingBag, User, History, BookmarkPlus, Car, LogOut, Menu, X, Navigation, Share2, Crosshair, Phone, MessageCircle, Shield, AlertTriangle, Edit2, Tag, StickyNote, RotateCcw, Download, Users, Package, Heart, Bus, Banknote, Wallet, Upload, CheckCircle, UserPlus, Minus, Plus, BadgeCheck, LocateFixed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -77,8 +77,57 @@ export default function RiderApp() {
   const [medicalNotes, setMedicalNotes] = useState("");
   const [parcelDescription, setParcelDescription] = useState("");
   const [trustedContactInput, setTrustedContactInput] = useState("");
+  const [locatingGPS, setLocatingGPS] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  const useCurrentLocation = useCallback((target: "pickup" | "dropoff") => {
+    if (!navigator.geolocation) {
+      toast({ title: "Not supported", description: "GPS is not available on this device", variant: "destructive" });
+      return;
+    }
+    setLocatingGPS(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        let name = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+        let address = "Current location";
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`);
+          const data = await res.json();
+          if (data.display_name) {
+            const parts = data.display_name.split(",");
+            name = parts.slice(0, 2).join(",").trim();
+            address = parts.slice(0, 3).join(",").trim();
+          }
+        } catch {}
+        const loc = { name, address, lat: latitude, lng: longitude };
+        if (target === "pickup") {
+          setPickup(loc);
+          toast({ title: "Pickup set", description: name });
+        } else {
+          setDropoff(loc);
+          toast({ title: "Drop-off set", description: name });
+        }
+        setLocatingGPS(false);
+        if (target === "pickup" && view === "search") {
+          setSearchFor("dropoff");
+          setSearchQuery("");
+        } else if (target === "dropoff" && pickup) {
+          setView("confirm");
+        }
+      },
+      (error) => {
+        setLocatingGPS(false);
+        let msg = "Could not get your location";
+        if (error.code === 1) msg = "Location access denied. Please enable GPS in your browser settings.";
+        else if (error.code === 2) msg = "Location unavailable. Try again.";
+        else if (error.code === 3) msg = "Location request timed out. Try again.";
+        toast({ title: "Location error", description: msg, variant: "destructive" });
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  }, [pickup, view, toast]);
 
   useEffect(() => {
     if (!user || user.role !== "rider") {
@@ -721,7 +770,14 @@ export default function RiderApp() {
         </div>
         <div className="flex-1 overflow-auto">
           {searchQuery === "" && (
-            <div className="px-4 pb-2">
+            <div className="px-4 pb-2 space-y-1">
+              <Button variant="ghost" className="w-full justify-start h-14 rounded-xl gap-3 text-base" onClick={() => useCurrentLocation(searchFor)} disabled={locatingGPS} data-testid="btn-use-current-location">
+                <div className="bg-blue-100 p-2 rounded-lg"><LocateFixed className={`h-4 w-4 text-blue-600 ${locatingGPS ? "animate-pulse" : ""}`} /></div>
+                <div className="text-left">
+                  <div className="font-medium">{locatingGPS ? "Getting your location..." : "Use current location"}</div>
+                  <div className="text-xs text-gray-500">Use GPS to set your {searchFor === "pickup" ? "pickup" : "drop-off"}</div>
+                </div>
+              </Button>
               <Button variant="ghost" className="w-full justify-start h-14 rounded-xl gap-3 text-base" onClick={() => { setView("pickmap"); setPinDrop(null); }} data-testid="btn-pin-on-map">
                 <div className="bg-indigo-100 p-2 rounded-lg"><Crosshair className="h-4 w-4 text-indigo-600" /></div>
                 <div className="text-left">
@@ -1210,14 +1266,25 @@ export default function RiderApp() {
         </div>
 
         <div className="px-6 mb-4 space-y-2">
-          <button className="w-full bg-white rounded-2xl p-3.5 shadow-sm border border-gray-100 flex items-center gap-3 text-left" onClick={() => { setSearchFor("pickup"); setView("search"); }} data-testid="btn-set-pickup">
-            <div className="bg-green-500 p-2.5 rounded-xl"><Crosshair className="h-4 w-4 text-white" /></div>
-            <div className="flex-1 min-w-0">
-              <div className="font-bold text-sm">{pickup ? pickup.name : "Set pickup"}</div>
-              <div className="text-xs text-gray-500 truncate">{pickup ? pickup.address : "Tap to choose or pin on map"}</div>
-            </div>
-            {pickup && <div className="w-2.5 h-2.5 bg-green-500 rounded-full shrink-0" />}
-          </button>
+          <div className="flex gap-2">
+            <button className="flex-1 bg-white rounded-2xl p-3.5 shadow-sm border border-gray-100 flex items-center gap-3 text-left" onClick={() => { setSearchFor("pickup"); setView("search"); }} data-testid="btn-set-pickup">
+              <div className="bg-green-500 p-2.5 rounded-xl"><Crosshair className="h-4 w-4 text-white" /></div>
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-sm">{pickup ? pickup.name : "Set pickup"}</div>
+                <div className="text-xs text-gray-500 truncate">{pickup ? pickup.address : "Tap to choose location"}</div>
+              </div>
+              {pickup && <div className="w-2.5 h-2.5 bg-green-500 rounded-full shrink-0" />}
+            </button>
+            <button
+              className="bg-blue-500 hover:bg-blue-600 rounded-2xl p-3.5 shadow-sm flex items-center justify-center transition-colors disabled:opacity-50"
+              onClick={() => useCurrentLocation("pickup")}
+              disabled={locatingGPS}
+              data-testid="btn-gps-pickup"
+              title="Use GPS location"
+            >
+              <LocateFixed className={`h-5 w-5 text-white ${locatingGPS ? "animate-pulse" : ""}`} />
+            </button>
+          </div>
 
           <button className="w-full bg-white rounded-2xl p-3.5 shadow-sm border border-gray-100 flex items-center gap-3 text-left" onClick={() => { setSearchFor("dropoff"); if (!pickup) setPickup(GIYANI_LOCATIONS[2]); setView("search"); }} data-testid="btn-where-to">
             <div className="bg-black p-2.5 rounded-xl"><Search className="h-4 w-4 text-yellow-400" /></div>
