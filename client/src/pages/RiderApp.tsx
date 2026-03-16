@@ -14,7 +14,7 @@ import TripChat from "@/components/TripChat";
 import type { Trip, SavedPlace, VehicleType, User as UserType, TaxiRoute } from "@shared/schema";
 
 const GIYANI_LOCATIONS = [
-  { name: "Masingita Mall", address: "R81 Main Road, Giyani", lat: -23.2993, lng: 30.6844, rural: false },
+  { name: "Masingita Mall", address: "R81, Giyani", lat: -23.3096, lng: 30.6926, rural: false },
   { name: "Giyani CBD", address: "Central Business District, Giyani", lat: -23.3153, lng: 30.7256, rural: false },
   { name: "Section A", address: "Giyani Section A", lat: -23.3060, lng: 30.7180, rural: false },
   { name: "Section B", address: "Giyani Section B", lat: -23.3010, lng: 30.7310, rural: false },
@@ -23,17 +23,17 @@ const GIYANI_LOCATIONS = [
   { name: "Section E", address: "Giyani Section E", lat: -23.2870, lng: 30.7280, rural: true },
   { name: "Giyani Hospital", address: "Hospital Road, Giyani", lat: -23.3180, lng: 30.7140, rural: false },
   { name: "Giyani Plaza", address: "Main Street, Giyani", lat: -23.3096, lng: 30.6926, rural: false },
-  { name: "Giyani Stadium", address: "Stadium Road, Giyani", lat: -23.3222, lng: 30.7191, rural: false },
+  { name: "Giyani Stadium", address: "D3641, Giyani", lat: -23.3222, lng: 30.7191, rural: false },
   { name: "Giyani Taxi Rank", address: "Main Taxi Rank, CBD", lat: -23.3140, lng: 30.7230, rural: false },
   { name: "Thohoyandou Road", address: "R81 Highway Exit", lat: -23.2750, lng: 30.7500, rural: false },
   { name: "Giyani Clinic", address: "Section B Clinic, Giyani", lat: -23.3030, lng: 30.7340, rural: false },
   { name: "Nkhensani Hospital", address: "Nkhensani Hospital Complex", lat: -23.3170, lng: 30.7170, rural: false },
-  { name: "Homu", address: "Homu Village, Greater Giyani", lat: -23.2600, lng: 30.6800, rural: true },
-  { name: "Dzumeri", address: "Dzumeri Village, Greater Giyani", lat: -23.3450, lng: 30.6700, rural: true },
-  { name: "Nkuri", address: "Nkuri Village, Greater Giyani", lat: -23.2700, lng: 30.7700, rural: true },
+  { name: "Ka-Homu", address: "Ka-Homu, Greater Giyani", lat: -23.3319, lng: 30.7817, rural: true },
+  { name: "Ka-Dzumeri", address: "Ka-Dzumeri, Greater Giyani", lat: -23.5716, lng: 30.6973, rural: true },
+  { name: "Ka-Nkuri", address: "Ka-Nkuri, Greater Giyani", lat: -23.2528, lng: 30.5397, rural: true },
   { name: "Ndhambi", address: "Ndhambi Village, Greater Giyani", lat: -23.3500, lng: 30.7500, rural: true },
   { name: "Risinga", address: "Risinga Village, Greater Giyani", lat: -23.3300, lng: 30.6500, rural: true },
-  { name: "Muyexe", address: "Muyexe Village, Greater Giyani", lat: -23.3800, lng: 30.7800, rural: true },
+  { name: "Muyexe", address: "Muyexe, Greater Giyani", lat: -23.1976, lng: 30.9160, rural: true },
   { name: "Xikukwani", address: "Xikukwani Village, Greater Giyani", lat: -23.2500, lng: 30.7100, rural: true },
   { name: "Gawula", address: "Gawula Village, Greater Giyani", lat: -23.3600, lng: 30.7100, rural: true },
 ];
@@ -85,6 +85,8 @@ export default function RiderApp() {
   const [sharedSeats, setSharedSeats] = useState(1);
   const [medicalNotes, setMedicalNotes] = useState("");
   const [parcelDescription, setParcelDescription] = useState("");
+  const [liveSearchResults, setLiveSearchResults] = useState<{name: string; address: string; lat: number; lng: number}[]>([]);
+  const [searchingLive, setSearchingLive] = useState(false);
   const [trustedContactInput, setTrustedContactInput] = useState("");
   const [showChat, setShowChat] = useState(false);
   const [locatingGPS, setLocatingGPS] = useState(false);
@@ -106,12 +108,11 @@ export default function RiderApp() {
         let name = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
         let address = "Current location";
         try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`);
+          const res = await fetch(`/api/geocode/reverse?lat=${latitude}&lng=${longitude}`);
           const data = await res.json();
-          if (data.display_name) {
-            const parts = data.display_name.split(",");
-            name = parts.slice(0, 2).join(",").trim();
-            address = parts.slice(0, 3).join(",").trim();
+          if (data.name) {
+            name = data.name;
+            address = data.address;
           }
         } catch {}
         const loc = { name, address, lat: latitude, lng: longitude, rural: false };
@@ -312,6 +313,20 @@ export default function RiderApp() {
 
   const filteredLocations = GIYANI_LOCATIONS.filter(l => l.name.toLowerCase().includes(searchQuery.toLowerCase()) || l.address.toLowerCase().includes(searchQuery.toLowerCase()));
 
+  useEffect(() => {
+    if (searchQuery.length < 3) { setLiveSearchResults([]); return; }
+    const timer = setTimeout(async () => {
+      setSearchingLive(true);
+      try {
+        const res = await fetch(`/api/geocode/search?q=${encodeURIComponent(searchQuery + " Giyani")}`);
+        const data = await res.json();
+        setLiveSearchResults(data);
+      } catch { setLiveSearchResults([]); }
+      setSearchingLive(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const handleBookRide = async () => {
     if (!pickup || !dropoff || !selectedVehicle || !user) return;
     setView("searching");
@@ -434,21 +449,21 @@ export default function RiderApp() {
     toast({ title: "Trip completed!", description: "Thanks for riding with GY Rides" });
   };
 
-  const reverseGeocode = useCallback(async (lat: number, lng: number): Promise<string> => {
+  const reverseGeocode = useCallback(async (lat: number, lng: number): Promise<{name: string; address: string}> => {
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18`);
+      const res = await fetch(`/api/geocode/reverse?lat=${lat}&lng=${lng}`);
       const data = await res.json();
-      if (data.display_name) return data.display_name.split(",").slice(0, 3).join(",").trim();
+      if (data.name) return { name: data.name, address: data.address };
     } catch {}
-    return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    return { name: `${lat.toFixed(4)}, ${lng.toFixed(4)}`, address: "Giyani area" };
   }, []);
 
   const handlePinDrop = useCallback((lat: number, lng: number) => { setPinDrop({ lat, lng }); }, []);
 
   const handleConfirmPin = useCallback(async () => {
     if (!pinDrop) return;
-    const name = await reverseGeocode(pinDrop.lat, pinDrop.lng);
-    const loc = { name, address: "Pinned on map", lat: pinDrop.lat, lng: pinDrop.lng, rural: false };
+    const geo = await reverseGeocode(pinDrop.lat, pinDrop.lng);
+    const loc = { name: geo.name, address: geo.address, lat: pinDrop.lat, lng: pinDrop.lng, rural: false };
     if (searchFor === "pickup") { setPickup(loc); setSearchFor("dropoff"); }
     else { setDropoff(loc); }
     setPinDrop(null);
@@ -1049,7 +1064,7 @@ export default function RiderApp() {
             </div>
           )}
           <div className="px-4">
-            <p className="text-xs text-gray-500 uppercase font-bold mb-2 px-1">{searchQuery ? "Results" : "All Locations"}</p>
+            <p className="text-xs text-gray-500 uppercase font-bold mb-2 px-1">{searchQuery ? "Results" : "Popular Locations"}</p>
             {filteredLocations.map((loc, i) => (
               <Button key={i} variant="ghost" className="w-full justify-start h-14 rounded-xl gap-3 text-base" onClick={() => {
                 if (searchFor === "pickup") { setPickup(loc); setSearchFor("dropoff"); setSearchQuery(""); }
@@ -1062,6 +1077,33 @@ export default function RiderApp() {
                 </div>
               </Button>
             ))}
+
+            {searchQuery.length >= 3 && (
+              <>
+                {searchingLive && <p className="text-xs text-gray-400 text-center py-3">Searching nearby places...</p>}
+                {liveSearchResults.length > 0 && (
+                  <>
+                    <p className="text-xs text-gray-500 uppercase font-bold mb-2 px-1 mt-4">Nearby Places</p>
+                    {liveSearchResults.map((loc, i) => (
+                      <Button key={`live-${i}`} variant="ghost" className="w-full justify-start h-14 rounded-xl gap-3 text-base" onClick={() => {
+                        const l = { name: loc.name, address: loc.address, lat: loc.lat, lng: loc.lng, rural: false };
+                        if (searchFor === "pickup") { setPickup(l); setSearchFor("dropoff"); setSearchQuery(""); }
+                        else { setDropoff(l); setView("confirm"); setSearchQuery(""); }
+                      }} data-testid={`live-location-${i}`}>
+                        <div className="p-2 rounded-lg bg-blue-50"><Search className="h-4 w-4 text-blue-600" /></div>
+                        <div className="text-left flex-1">
+                          <div className="font-medium text-sm">{loc.name}</div>
+                          <div className="text-[10px] text-gray-500 truncate max-w-[250px]">{loc.address}</div>
+                        </div>
+                      </Button>
+                    ))}
+                  </>
+                )}
+                {!searchingLive && filteredLocations.length === 0 && liveSearchResults.length === 0 && (
+                  <p className="text-xs text-gray-400 text-center py-3">No locations found. Try a different search or drop a pin on the map.</p>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>

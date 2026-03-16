@@ -9,7 +9,7 @@ Local ride-hailing web app for Giyani, South Africa. Mobile-first UI with rider,
 - **Database**: PostgreSQL with Drizzle ORM
 - **Routing**: wouter (frontend), Express (backend API)
 - **State**: TanStack React Query + localStorage auth
-- **Map**: Leaflet with Google Maps tiles (auto-fallback to OpenStreetMap), Google Directions API (server-side proxy) with OSRM fallback, Nominatim reverse geocoding, OSRM real-road distance/ETA via `/api/route-info`
+- **Map**: Leaflet with Google Maps tiles (auto-fallback to OpenStreetMap), OSRM routing for accurate road-following polylines + real distance/duration via `/api/directions` and `/api/route-info`, Nominatim geocoding (`/api/geocode/search` and `/api/geocode/reverse`) for live place search and reverse geocoding
 - **PWA**: Service worker, manifest.json, installable on mobile devices
 
 ## Design System

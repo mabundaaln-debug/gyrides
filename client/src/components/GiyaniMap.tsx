@@ -77,18 +77,15 @@ function MapClickHandler({ onMapClick }: { onMapClick: (lat: number, lng: number
   return null;
 }
 
-async function fetchRoute(from: [number, number], to: [number, number], googleApiKey?: string): Promise<[number, number][]> {
-  if (googleApiKey) {
-    try {
-      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${from[0]},${from[1]}&destination=${to[0]},${to[1]}&key=${googleApiKey}`;
-      const res = await fetch(`/api/directions?origin=${from[0]},${from[1]}&destination=${to[0]},${to[1]}`);
-      const data = await res.json();
-      if (data.routes && data.routes.length > 0) {
-        return data.routes;
-      }
-    } catch (err) {
-      console.warn("Google Directions failed, trying OSRM", err);
+async function fetchRoute(from: [number, number], to: [number, number], _googleApiKey?: string): Promise<[number, number][]> {
+  try {
+    const res = await fetch(`/api/directions?origin=${from[0]},${from[1]}&destination=${to[0]},${to[1]}`);
+    const data = await res.json();
+    if (data.routes && data.routes.length > 0) {
+      return data.routes;
     }
+  } catch (err) {
+    console.warn("Server directions failed, trying OSRM directly", err);
   }
 
   try {

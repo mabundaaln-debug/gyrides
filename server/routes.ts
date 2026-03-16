@@ -75,27 +75,59 @@ export async function registerRoutes(
 
   app.get("/api/directions", async (req, res) => {
     const { origin, destination } = req.query;
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-    if (!apiKey || !origin || !destination) {
-      return res.json({ routes: [] });
+    if (!origin || !destination) {
+      return res.json({ routes: [], distance: 0, duration: 0 });
     }
+    const [oLat, oLng] = (origin as string).split(",").map(Number);
+    const [dLat, dLng] = (destination as string).split(",").map(Number);
+
     try {
-      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&key=${apiKey}`;
+      const url = `https://router.project-osrm.org/route/v1/driving/${oLng},${oLat};${dLng},${dLat}?overview=full&geometries=geojson`;
       const response = await fetch(url);
       const data = await response.json();
       if (data.routes && data.routes.length > 0) {
-        const points: [number, number][] = [];
-        for (const leg of data.routes[0].legs) {
-          for (const step of leg.steps) {
-            points.push([step.start_location.lat, step.start_location.lng]);
-            points.push([step.end_location.lat, step.end_location.lng]);
-          }
-        }
-        return res.json({ routes: points });
+        const coords = data.routes[0].geometry.coordinates;
+        const points: [number, number][] = coords.map((c: [number, number]) => [c[1], c[0]]);
+        const distKm = Math.round((data.routes[0].distance / 1000) * 10) / 10;
+        const durMin = Math.round(data.routes[0].duration / 60);
+        return res.json({ routes: points, distance: distKm, duration: durMin });
       }
-      return res.json({ routes: [] });
+      return res.json({ routes: [], distance: 0, duration: 0 });
     } catch {
-      return res.json({ routes: [] });
+      return res.json({ routes: [], distance: 0, duration: 0 });
+    }
+  });
+
+  app.get("/api/geocode/search", async (req, res) => {
+    const { q } = req.query;
+    if (!q) return res.json([]);
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q as string)}&countrycodes=za&viewbox=30.3,-23.0,31.1,-23.7&bounded=0&limit=8`;
+      const response = await fetch(url, { headers: { "User-Agent": "GYRides/1.0" } });
+      const data = await response.json();
+      const results = data.map((item: any) => ({
+        name: item.display_name.split(",")[0],
+        address: item.display_name,
+        lat: parseFloat(item.lat),
+        lng: parseFloat(item.lon),
+      }));
+      return res.json(results);
+    } catch {
+      return res.json([]);
+    }
+  });
+
+  app.get("/api/geocode/reverse", async (req, res) => {
+    const { lat, lng } = req.query;
+    if (!lat || !lng) return res.json({ name: "Unknown", address: "Unknown location" });
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18`;
+      const response = await fetch(url, { headers: { "User-Agent": "GYRides/1.0" } });
+      const data = await response.json();
+      const name = data.address?.road || data.address?.suburb || data.address?.village || data.address?.town || "Dropped Pin";
+      return res.json({ name, address: data.display_name || "Giyani area", lat: parseFloat(data.lat), lng: parseFloat(data.lon) });
+    } catch {
+      return res.json({ name: "Dropped Pin", address: "Giyani area", lat: parseFloat(lat as string), lng: parseFloat(lng as string) });
     }
   });
 
