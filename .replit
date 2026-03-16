@@ -48,3 +48,9 @@ outputType = "webview"
 [agent]
 stack = "MOCKUP_JS"
 mockupState = "FULLSTACK"
+
+[userenv]
+
+[userenv.shared]
+Google = "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"
+"Google maps AOrth" = "p3yx4lmkx5XO517OoYNGZ3dD3cLC"
