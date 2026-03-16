@@ -97,8 +97,9 @@ shared/
 
 ### Chat & SOS
 - **In-app chat**: Real-time messaging between rider and driver during active trips (3-second polling)
+- **Admin chat**: Admin can join any trip's chat from both the Trips list and SOS Alerts view; admin messages show with red "GY Admin" label and Shield icon
 - **SOS alerts**: Rider and driver can trigger SOS with GPS coordinates, sent to admin
-- **Admin SOS panel**: View active/acknowledged/resolved alerts, acknowledge or resolve with notes, Google Maps link to location
+- **Admin SOS panel**: View active/acknowledged/resolved alerts, acknowledge or resolve with notes, Google Maps link to location, direct chat with trip participants
 
 ### Admin
 - Dashboard with revenue/active trips, SOS alert banner (pulsing red), pending approval alerts

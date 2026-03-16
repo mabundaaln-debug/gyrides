@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { Users, Car, DollarSign, LogOut, ChevronRight, ChevronLeft, Star, MapPin, TrendingUp, Activity, AlertCircle, CheckCircle, Shield, XCircle, FileText, Eye, User as UserIcon, AlertTriangle, Phone } from "lucide-react";
+import { Users, Car, DollarSign, LogOut, ChevronRight, ChevronLeft, Star, MapPin, TrendingUp, Activity, AlertCircle, CheckCircle, Shield, XCircle, FileText, Eye, User as UserIcon, AlertTriangle, Phone, MessageCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -9,6 +9,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { approveDriver, rejectDriver, updateSosAlert, getUser } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import TripChat from "@/components/TripChat";
 import type { User, Trip, VehicleType, SosAlert } from "@shared/schema";
 
 export default function AdminApp() {
@@ -19,6 +20,8 @@ export default function AdminApp() {
   const [rejectReason, setRejectReason] = useState("");
   const [showRejectInput, setShowRejectInput] = useState(false);
   const [sosNotes, setSosNotes] = useState<Record<string, string>>({});
+  const [chatTripId, setChatTripId] = useState<string | null>(null);
+  const [chatLabel, setChatLabel] = useState("");
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -322,14 +325,26 @@ export default function AdminApp() {
                 <span className="text-gray-300">→</span>
                 <div className="w-2 h-2 bg-black rounded-full shrink-0" /><span className="truncate">{trip.dropoffName}</span>
               </div>
-              <div className="flex justify-between text-xs mt-2 pt-2 border-t border-gray-50">
+              <div className="flex justify-between items-center text-xs mt-2 pt-2 border-t border-gray-50">
                 <span className="text-gray-500">{trip.vehicleType} · {trip.distance?.toFixed(1)} km · {trip.paymentMethod}</span>
-                <span className="font-bold">R{trip.fare}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold">R{trip.fare}</span>
+                  <button
+                    onClick={() => { setChatTripId(trip.id); setChatLabel(`Trip: ${trip.pickupName} → ${trip.dropoffName}`); }}
+                    className="w-7 h-7 bg-red-100 rounded-full flex items-center justify-center shrink-0"
+                    data-testid={`btn-admin-chat-trip-${trip.id}`}
+                  >
+                    <MessageCircle className="h-3.5 w-3.5 text-red-600" />
+                  </button>
+                </div>
               </div>
             </div>
           ))}
           {allTrips.length === 0 && <div className="text-center py-16 text-gray-400 text-sm">No trips yet</div>}
         </div>
+        {chatTripId && user && (
+          <TripChat tripId={chatTripId} userId={user.id} userRole="admin" otherName={chatLabel} onClose={() => { setChatTripId(null); setChatLabel(""); }} />
+        )}
       </div>
     );
   }
@@ -439,6 +454,16 @@ export default function AdminApp() {
                 </div>
               )}
 
+              {alert.tripId && (
+                <button
+                  onClick={() => { setChatTripId(alert.tripId!); setChatLabel(`SOS: ${alert.userRole === "rider" ? "Rider" : "Driver"} Alert`); }}
+                  className="w-full mb-3 flex items-center justify-center gap-2 bg-red-600 text-white rounded-lg py-2 text-xs font-bold"
+                  data-testid={`btn-admin-chat-sos-${alert.id}`}
+                >
+                  <MessageCircle className="h-3.5 w-3.5" /> Chat with Trip Participants
+                </button>
+              )}
+
               {alert.status !== "resolved" && (
                 <div className="space-y-2">
                   <textarea
@@ -471,6 +496,9 @@ export default function AdminApp() {
             </div>
           ))}
         </div>
+        {chatTripId && user && (
+          <TripChat tripId={chatTripId} userId={user.id} userRole="admin" otherName={chatLabel} onClose={() => { setChatTripId(null); setChatLabel(""); }} />
+        )}
       </div>
     );
   }
@@ -650,6 +678,16 @@ export default function AdminApp() {
           </div>
         </div>
       </div>
+
+      {chatTripId && user && (
+        <TripChat
+          tripId={chatTripId}
+          userId={user.id}
+          userRole="admin"
+          otherName={chatLabel}
+          onClose={() => { setChatTripId(null); setChatLabel(""); }}
+        />
+      )}
     </div>
   );
 }
