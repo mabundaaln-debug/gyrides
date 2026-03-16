@@ -16,6 +16,32 @@ export async function registerRoutes(
     res.json({ apiKey: process.env.GOOGLE_MAPS_API_KEY || "" });
   });
 
+  app.get("/api/directions", async (req, res) => {
+    const { origin, destination } = req.query;
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey || !origin || !destination) {
+      return res.json({ routes: [] });
+    }
+    try {
+      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&key=${apiKey}`;
+      const response = await fetch(url);
+      const data = await response.json();
+      if (data.routes && data.routes.length > 0) {
+        const points: [number, number][] = [];
+        for (const leg of data.routes[0].legs) {
+          for (const step of leg.steps) {
+            points.push([step.start_location.lat, step.start_location.lng]);
+            points.push([step.end_location.lat, step.end_location.lng]);
+          }
+        }
+        return res.json({ routes: points });
+      }
+      return res.json({ routes: [] });
+    } catch {
+      return res.json({ routes: [] });
+    }
+  });
+
   // ── Auth / Users ──
   app.post("/api/auth/login", async (req, res) => {
     const { username, password } = req.body;
