@@ -90,14 +90,20 @@ export default function Home() {
     } else setLocation("/admin");
   };
 
+  const [googleReady, setGoogleReady] = useState(false);
+
   const handleGoogleSignIn = async () => {
-    if (!(window as any).google?.accounts?.id) {
-      toast({ title: "Google Sign-In not available", description: "Google Client ID has not been configured yet", variant: "destructive" });
+    if (!(window as any).google?.accounts?.id || !googleReady) {
+      toast({ title: "Google Sign-In not available", description: "Google Client ID has not been configured. Contact admin to set it up.", variant: "destructive" });
       return;
     }
     (window as any).google.accounts.id.prompt((notification: any) => {
       if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-        toast({ title: "Google Sign-In", description: "Please allow popups for Google Sign-In", variant: "destructive" });
+        (window as any).google.accounts.id.renderButton(
+          document.createElement("div"),
+          { theme: "outline", size: "large" }
+        );
+        toast({ title: "Google Sign-In", description: "Please allow popups or try a different browser", variant: "destructive" });
       }
     });
   };
@@ -136,36 +142,46 @@ export default function Home() {
   };
 
   useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://accounts.google.com/gsi/client";
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-      const clientId = (window as any).__GOOGLE_CLIENT_ID;
-      if (clientId && (window as any).google?.accounts?.id) {
-        (window as any).google.accounts.id.initialize({
-          client_id: clientId,
-          callback: async (response: any) => {
-            try {
-              const payload = JSON.parse(atob(response.credential.split(".")[1]));
-              const u = await googleAuth({
-                googleId: payload.sub,
-                email: payload.email,
-                fullName: payload.name,
-                avatarUrl: payload.picture,
-              });
-              setUser(u);
-              navigateByRole(u);
-              toast({ title: "Welcome!", description: `Signed in with Google as ${u.fullName}` });
-            } catch {
-              toast({ title: "Google Sign-In failed", variant: "destructive" });
-            }
-          },
-        });
-      }
-    };
-    document.head.appendChild(script);
-    return () => { script.remove(); };
+    let cancelled = false;
+    (async () => {
+      try {
+        const configRes = await fetch("/api/config/google");
+        const { clientId } = await configRes.json();
+        if (!clientId || cancelled) return;
+
+        const script = document.createElement("script");
+        script.src = "https://accounts.google.com/gsi/client";
+        script.async = true;
+        script.defer = true;
+        script.onload = () => {
+          if (cancelled) return;
+          if ((window as any).google?.accounts?.id) {
+            (window as any).google.accounts.id.initialize({
+              client_id: clientId,
+              callback: async (response: any) => {
+                try {
+                  const payload = JSON.parse(atob(response.credential.split(".")[1]));
+                  const u = await googleAuth({
+                    googleId: payload.sub,
+                    email: payload.email,
+                    fullName: payload.name,
+                    avatarUrl: payload.picture,
+                  });
+                  setUser(u);
+                  navigateByRole(u);
+                  toast({ title: "Welcome!", description: `Signed in with Google as ${u.fullName}` });
+                } catch {
+                  toast({ title: "Google Sign-In failed", variant: "destructive" });
+                }
+              },
+            });
+            setGoogleReady(true);
+          }
+        };
+        document.head.appendChild(script);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   if (user) {

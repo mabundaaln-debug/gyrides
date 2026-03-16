@@ -48,6 +48,10 @@ export async function registerRoutes(
     res.json({ apiKey: process.env.GOOGLE_MAPS_API_KEY || "" });
   });
 
+  app.get("/api/config/google", (_req, res) => {
+    res.json({ clientId: process.env.GOOGLE_CLIENT_ID || "" });
+  });
+
   app.get("/api/route-info", async (req, res) => {
     const { originLat, originLng, destLat, destLng } = req.query;
     if (!originLat || !originLng || !destLat || !destLng) {
