@@ -106,6 +106,15 @@ export async function getAllUsers(): Promise<User[]> {
   return res.json();
 }
 
+export async function createYocoCheckout(data: { amount: number; tripId?: string; riderId?: string; description?: string }): Promise<{ checkoutId: string; redirectUrl: string }> {
+  const res = await apiRequest("POST", "/api/payments/yoco/checkout", data);
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || "Failed to create payment");
+  }
+  return res.json();
+}
+
 export async function uploadProfilePicture(userId: string, file: File): Promise<{ avatarUrl: string; user: User }> {
   const formData = new FormData();
   formData.append("photo", file);

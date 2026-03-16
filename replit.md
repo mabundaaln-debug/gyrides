@@ -68,7 +68,7 @@ shared/
 - Search 22 locations (14 town + 8 rural villages with "Rural" badge)
 - Ride type selector tabs (private/shared/taxi/parcel/medical)
 - Choose vehicle type with detailed fare breakdown (base/distance/time/surcharge)
-- Payment methods: Cash, eWallet (balance), EFT (bank details shown), Card
+- Payment methods: Cash, eWallet (balance), EFT (bank details shown), Yoco (card via hosted checkout)
 - WhatsApp fallback booking (available after ride confirmation, creates tracked trip record)
 - Trip PIN verification, SOS button (sends alert to admin), in-app chat with driver
 - Live ETA tracking with countdown, simulated driver movement on map
@@ -111,13 +111,19 @@ shared/
 - Driver review flow with approve/reject
 - Management for drivers/trips/vehicle pricing
 
-## Demo Accounts
+### Yoco Online Payments
+- Riders can pay with card via Yoco hosted checkout
+- Flow: Select "Yoco" payment → book ride → redirected to Yoco payment page → return to `/payment/success`, `/payment/failure`, or `/payment/cancel`
+- Server creates checkout session via `POST https://payments.yoco.com/api/checkouts` with `YOCO_SECRET_KEY`
+- Webhook at `/api/payments/yoco/webhook` updates trip payment on success
+- Fallback: If Yoco fails, trip is automatically converted to cash payment
+- Amount in ZAR cents (e.g., R25.00 = 2500)
 
-- Rider: `jane` / `demo` (with wallet balance R150)
-- Driver: `sipho` / `demo` (verified, approved)
-- Admin: `admin` / `admin`
+## Admin Account
 
-Data auto-seeds on first visit via POST /api/seed.
+- Admin: `drnkateko` / `drin123!`
+
+Data auto-seeds vehicle types, taxi routes, and admin account on first visit via POST /api/seed.
 
 ## Database Schema
 
@@ -138,6 +144,7 @@ All prefixed with `/api`:
 - Saved Places: GET/POST/DELETE `/saved-places`
 - Vehicle Types: GET/POST/PATCH `/vehicle-types`
 - Taxi Routes: GET/POST/PATCH `/taxi-routes`
+- Payments: POST `/payments/yoco/checkout`, POST `/payments/yoco/webhook`
 - Wallet: POST `/wallet/topup`
 - Messages: GET `/messages/:tripId`, POST `/messages`
 - SOS: POST `/sos`, GET `/sos`, GET `/sos/active`, PATCH `/sos/:id`

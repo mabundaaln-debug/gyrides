@@ -135,6 +135,56 @@ export async function registerRoutes(
     }
   });
 
+  // ── Yoco Payments ──
+  app.post("/api/payments/yoco/checkout", async (req, res) => {
+    const yocoKey = process.env.YOCO_SECRET_KEY;
+    if (!yocoKey) {
+      return res.status(500).json({ message: "Yoco payments not configured" });
+    }
+    try {
+      const { amount, tripId, riderId, description } = req.body;
+      if (!amount || amount < 200) {
+        return res.status(400).json({ message: "Minimum payment is R2.00" });
+      }
+      const baseUrl = `https://${req.get("host")}`;
+      const response = await fetch("https://payments.yoco.com/api/checkouts", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${yocoKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount: Math.round(amount),
+          currency: "ZAR",
+          successUrl: `${baseUrl}/payment/success?tripId=${tripId || ""}`,
+          cancelUrl: `${baseUrl}/payment/cancel`,
+          failureUrl: `${baseUrl}/payment/failure`,
+          metadata: { tripId: tripId || "", riderId: riderId || "", description: description || "GY Rides trip" },
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return res.status(response.status).json({ message: data.message || "Failed to create checkout" });
+      }
+      return res.json({ checkoutId: data.id, redirectUrl: data.redirectUrl });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/payments/yoco/webhook", async (req, res) => {
+    try {
+      const event = req.body;
+      if (event.type === "payment.succeeded" && event.payload?.metadata?.tripId) {
+        const tripId = event.payload.metadata.tripId;
+        await storage.updateTrip(tripId, { paymentMethod: "card" as any });
+      }
+      return res.json({ received: true });
+    } catch {
+      return res.status(200).json({ received: true });
+    }
+  });
+
   // ── Auth / Users ──
   app.post("/api/auth/login", async (req, res) => {
     const { username, password } = req.body;

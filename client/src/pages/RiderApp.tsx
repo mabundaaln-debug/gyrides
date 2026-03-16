@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth";
-import { createTrip, updateTrip, updateUser, sendSosAlert, uploadProfilePicture, getWebauthnRegisterOptions, verifyWebauthnRegistration, getWebauthnCredentials, deleteWebauthnCredential } from "@/lib/api";
+import { createTrip, updateTrip, updateUser, sendSosAlert, uploadProfilePicture, getWebauthnRegisterOptions, verifyWebauthnRegistration, getWebauthnCredentials, deleteWebauthnCredential, createYocoCheckout } from "@/lib/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -337,6 +337,7 @@ export default function RiderApp() {
     try {
       const driver = onlineDrivers[0];
       const dist = calcDistance();
+      const fare = calcFare(selectedVehicle);
       const trip = await createTrip({
         riderId: user.id,
         driverId: driver?.id || null,
@@ -347,7 +348,7 @@ export default function RiderApp() {
         dropoffName: dropoff.name,
         dropoffLat: dropoff.lat,
         dropoffLng: dropoff.lng,
-        fare: calcFare(selectedVehicle),
+        fare,
         distance: dist,
         duration: calcDuration(),
         vehicleType: selectedVehicle.name,
@@ -360,6 +361,23 @@ export default function RiderApp() {
       });
       setCurrentTrip(trip);
       if (driver) setAssignedDriver(driver);
+
+      if (paymentMethod === "card") {
+        try {
+          const amountInCents = Math.round(fare * 100);
+          const checkout = await createYocoCheckout({
+            amount: amountInCents,
+            tripId: trip.id,
+            riderId: user.id,
+            description: `GY Rides: ${pickup.name} → ${dropoff.name}`,
+          });
+          window.location.href = checkout.redirectUrl;
+          return;
+        } catch (err: any) {
+          toast({ title: "Yoco payment failed", description: err.message || "Could not start payment. Ride booked with cash instead.", variant: "destructive" });
+          await updateTrip(trip.id, { paymentMethod: "cash" as any });
+        }
+      }
 
       setTimeout(async () => {
         if (driver) {
@@ -561,7 +579,7 @@ export default function RiderApp() {
       case "cash": return "Cash";
       case "eft": return "EFT";
       case "ewallet": return "Wallet";
-      case "card": return "Card";
+      case "card": return "Yoco";
     }
   };
 
@@ -678,7 +696,7 @@ export default function RiderApp() {
                     {m === "cash" ? "Pay driver directly" :
                      m === "ewallet" ? `Balance: R${(user.walletBalance ?? 0).toFixed(0)}` :
                      m === "eft" ? "Upload proof after transfer" :
-                     "Coming soon"}
+                     "Pay with card via Yoco"}
                   </div>
                 </div>
                 {paymentMethod === m && <CheckCircle className="h-5 w-5 text-yellow-500" />}
@@ -1310,7 +1328,7 @@ export default function RiderApp() {
             {(["cash", "ewallet", "eft", "card"] as PaymentMethod[]).map(m => (
               <button key={m} className={`shrink-0 px-3 py-2 rounded-xl text-xs font-bold border-2 flex items-center gap-1.5 ${paymentMethod === m ? "border-yellow-400 bg-yellow-50" : "border-gray-100 bg-white"}`}
                 onClick={() => setPaymentMethod(m)} data-testid={`pay-${m}`}>
-                {m === "cash" ? <Banknote className="h-3.5 w-3.5" /> : m === "ewallet" ? <Wallet className="h-3.5 w-3.5" /> : m === "eft" ? <Upload className="h-3.5 w-3.5" /> : <CreditCard className="h-3.5 w-3.5" />}
+                {m === "cash" ? <Banknote className="h-3.5 w-3.5" /> : m === "ewallet" ? <Wallet className="h-3.5 w-3.5" /> : m === "eft" ? <Upload className="h-3.5 w-3.5" /> : <CreditCard className="h-3.5 w-3.5 text-blue-600" />}
                 {paymentLabel(m)}
                 {m === "ewallet" && <span className="text-[10px] text-gray-500">R{(user.walletBalance ?? 0).toFixed(0)}</span>}
               </button>
