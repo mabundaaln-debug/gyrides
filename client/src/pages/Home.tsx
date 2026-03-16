@@ -77,9 +77,7 @@ export default function Home() {
     return (
       <div className="min-h-[100dvh] flex flex-col items-center justify-center p-6 bg-black">
         <div className="w-full max-w-sm mx-auto text-center">
-          <div className="w-20 h-20 bg-yellow-400 rounded-3xl flex items-center justify-center shadow-lg mb-6 mx-auto">
-            <Car size={40} className="text-black" />
-          </div>
+          <img src="/gy-logo.png" alt="GY Rides" className="w-24 h-24 object-contain mb-6 mx-auto drop-shadow-2xl" />
           <h1 className="text-3xl font-black mb-2 text-white">Welcome back, {user.fullName.split(" ")[0]}!</h1>
           <p className="text-gray-400 mb-8">Signed in as {user.role}</p>
 
@@ -112,9 +110,7 @@ export default function Home() {
     return (
       <div className="min-h-[100dvh] flex flex-col p-6 bg-black">
         <div className="w-full max-w-sm mx-auto flex-1 flex flex-col justify-center">
-          <div className="w-16 h-16 bg-yellow-400 rounded-2xl flex items-center justify-center shadow-lg mb-8 mx-auto">
-            <Car size={32} className="text-black" />
-          </div>
+          <img src="/gy-logo.png" alt="GY Rides" className="w-20 h-20 object-contain mb-8 mx-auto drop-shadow-2xl" />
           <h2 className="text-2xl font-black text-center mb-1 text-white">{isRegister ? "Create Account" : "Welcome Back"}</h2>
           <p className="text-gray-400 text-center mb-8">{isRegister ? "Join GY Rides today" : "Sign in to continue"}</p>
 
@@ -249,9 +245,7 @@ export default function Home() {
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center w-full max-w-sm mx-auto relative z-10">
-        <div className="w-24 h-24 bg-yellow-400 rounded-3xl flex items-center justify-center shadow-xl mb-6">
-          <Car size={48} className="text-black" />
-        </div>
+        <img src="/gy-logo.png" alt="GY Rides" className="w-32 h-32 object-contain mb-6 drop-shadow-2xl" />
 
         <h1 className="text-4xl font-black text-center mb-2 tracking-tight text-white">GY Rides</h1>
         <p className="text-yellow-400 text-center mb-2 text-lg font-medium">Your local ride, anytime.</p>

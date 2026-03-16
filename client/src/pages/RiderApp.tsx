@@ -1185,7 +1185,7 @@ export default function RiderApp() {
         <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setView("menu")} data-testid="btn-menu">
           <Menu className="h-6 w-6" />
         </Button>
-        <span className="font-black text-lg">GY Rides</span>
+        <img src="/gy-logo.png" alt="GY Rides" className="h-9 w-9 object-contain" />
         <Avatar className="h-10 w-10 border-2 border-yellow-400">
           <AvatarFallback className="bg-yellow-400 text-black font-bold">{user.fullName[0]}</AvatarFallback>
         </Avatar>
