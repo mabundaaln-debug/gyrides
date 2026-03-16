@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
-import { MapPin, DollarSign, Star, Check, X, Menu, LogOut, Navigation, Car, Clock, TrendingUp, User, ChevronLeft, History, Phone, MessageCircle, AlertTriangle, Shield, ExternalLink, BadgeCheck, Heart, Package, Users, Bus } from "lucide-react";
+import { MapPin, DollarSign, Star, Check, X, Menu, LogOut, Navigation, Car, Clock, TrendingUp, User, ChevronLeft, History, Phone, MessageCircle, AlertTriangle, Shield, ExternalLink, BadgeCheck, Heart, Package, Users, Bus, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth";
-import { updateTrip, updateUser, sendSosAlert } from "@/lib/api";
+import { updateTrip, updateUser, sendSosAlert, uploadProfilePicture, getWebauthnRegisterOptions, verifyWebauthnRegistration } from "@/lib/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -139,6 +139,7 @@ export default function DriverApp() {
           <Button variant="ghost" size="icon" className="text-white mb-4 -ml-2" onClick={() => setView("home")}><X className="h-6 w-6" /></Button>
           <div className="flex items-center gap-4">
             <Avatar className="h-16 w-16 border-2 border-yellow-400">
+              {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.fullName} />}
               <AvatarFallback className="bg-yellow-400 text-black text-xl font-bold">{user.fullName[0]}</AvatarFallback>
             </Avatar>
             <div>
@@ -311,6 +312,51 @@ export default function DriverApp() {
 
   // ── Profile ──
   if (view === "profile") {
+    const handleDriverPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        const result = await uploadProfilePicture(user.id, file);
+        setUser({ ...user, avatarUrl: result.avatarUrl });
+        toast({ title: "Photo updated!" });
+      } catch {
+        toast({ title: "Upload failed", variant: "destructive" });
+      }
+    };
+
+    const setupDriverBiometric = async () => {
+      try {
+        if (!window.PublicKeyCredential) {
+          toast({ title: "Not supported", description: "Biometric login is not available on this device", variant: "destructive" });
+          return;
+        }
+        const options = await getWebauthnRegisterOptions(user.id);
+        const credential = await navigator.credentials.create({
+          publicKey: {
+            challenge: Uint8Array.from(atob(options.challenge.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0)),
+            rp: options.rp,
+            user: {
+              id: Uint8Array.from(atob(options.user.id.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0)),
+              name: options.user.name,
+              displayName: options.user.displayName,
+            },
+            pubKeyCredParams: options.pubKeyCredParams,
+            authenticatorSelection: options.authenticatorSelection,
+            timeout: options.timeout,
+          },
+        }) as PublicKeyCredential;
+        if (!credential) return;
+        const rawId = Array.from(new Uint8Array(credential.rawId));
+        const credentialId = btoa(String.fromCharCode(...rawId)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+        const response = credential.response as AuthenticatorAttestationResponse;
+        const publicKey = btoa(String.fromCharCode(...new Uint8Array(response.getPublicKey?.() || new ArrayBuffer(0)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+        await verifyWebauthnRegistration({ userId: user.id, credentialId, publicKey, deviceName: "This device" });
+        toast({ title: "Biometric setup complete!", description: "You can now use fingerprint or face ID to sign in" });
+      } catch {
+        toast({ title: "Setup failed", variant: "destructive" });
+      }
+    };
+
     return (
       <div className="min-h-[100dvh] bg-gray-50 flex flex-col">
         <div className="bg-white p-4 flex items-center gap-3 border-b">
@@ -319,10 +365,17 @@ export default function DriverApp() {
         </div>
         <div className="flex-1 p-5 pb-20 overflow-auto">
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 text-center mb-5">
-            <Avatar className="h-20 w-20 mx-auto mb-3 border-2 border-yellow-400">
-              <AvatarFallback className="bg-yellow-400 text-black text-2xl font-bold">{user.fullName[0]}</AvatarFallback>
-            </Avatar>
-            <div className="flex items-center justify-center gap-1.5">
+            <div className="relative inline-block">
+              <Avatar className="h-20 w-20 mx-auto border-2 border-yellow-400">
+                {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.fullName} />}
+                <AvatarFallback className="bg-yellow-400 text-black text-2xl font-bold">{user.fullName[0]}</AvatarFallback>
+              </Avatar>
+              <label className="absolute bottom-0 right-0 bg-black text-white rounded-full p-1.5 cursor-pointer shadow-lg hover:bg-gray-800 transition-colors" data-testid="btn-driver-upload-photo">
+                <Upload className="h-3.5 w-3.5" />
+                <input type="file" accept="image/*" className="hidden" onChange={handleDriverPhotoUpload} />
+              </label>
+            </div>
+            <div className="flex items-center justify-center gap-1.5 mt-3">
               <h2 className="text-xl font-bold">{user.fullName}</h2>
               {user.isVerified && <BadgeCheck className="h-5 w-5 text-blue-500" />}
             </div>
@@ -343,7 +396,7 @@ export default function DriverApp() {
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-3 mb-5">
             <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 text-center">
               <div className="text-xl font-bold">{completedTrips.length}</div>
               <div className="text-[10px] text-gray-500">Trips</div>
@@ -357,6 +410,22 @@ export default function DriverApp() {
               <div className="text-[10px] text-gray-500">Earned</div>
             </div>
           </div>
+
+          <button
+            className="w-full bg-white rounded-xl p-4 flex items-center gap-3 shadow-sm border border-gray-100 text-left"
+            onClick={setupDriverBiometric}
+            data-testid="btn-driver-setup-biometric"
+          >
+            <div className="bg-blue-50 p-2 rounded-xl">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-blue-600">
+                <path d="M2 12C2 6.5 6.5 2 12 2a10 10 0 0 1 8 4" /><path d="M5 19.5C5.5 18 6 15 6 12c0-.7.12-1.37.34-2" /><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02" /><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4" /><path d="M8.65 22c.21-.66.45-1.32.57-2" /><path d="M14 13.12c0 2.38 0 6.38-1 8.88" /><path d="M2 16h.01" /><path d="M21.8 16c.2-2 .131-5.354 0-6" /><path d="M9 6.8a6 6 0 0 1 9 5.2c0 .47 0 1.17-.02 2" />
+              </svg>
+            </div>
+            <div>
+              <div className="font-medium text-sm">Set Up Biometric Login</div>
+              <div className="text-[10px] text-gray-500">Use fingerprint or face ID to sign in</div>
+            </div>
+          </button>
         </div>
         <BottomNav />
       </div>

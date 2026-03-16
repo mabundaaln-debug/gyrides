@@ -109,3 +109,46 @@ export async function getAllUsers(): Promise<User[]> {
   const res = await fetch("/api/users", { credentials: "include" });
   return res.json();
 }
+
+export async function uploadProfilePicture(userId: string, file: File): Promise<{ avatarUrl: string; user: User }> {
+  const formData = new FormData();
+  formData.append("photo", file);
+  formData.append("userId", userId);
+  const res = await fetch("/api/upload/profile-picture", { method: "POST", body: formData, credentials: "include" });
+  if (!res.ok) throw new Error("Upload failed");
+  return res.json();
+}
+
+export async function googleAuth(data: { googleId: string; email: string; fullName: string; avatarUrl?: string }): Promise<User> {
+  const res = await apiRequest("POST", "/api/auth/google", data);
+  return res.json();
+}
+
+export async function getWebauthnRegisterOptions(userId: string): Promise<any> {
+  const res = await apiRequest("POST", "/api/webauthn/register-options", { userId });
+  return res.json();
+}
+
+export async function verifyWebauthnRegistration(data: { userId: string; credentialId: string; publicKey: string; deviceName?: string }): Promise<any> {
+  const res = await apiRequest("POST", "/api/webauthn/register-verify", data);
+  return res.json();
+}
+
+export async function getWebauthnLoginOptions(username?: string): Promise<any> {
+  const res = await apiRequest("POST", "/api/webauthn/login-options", { username });
+  return res.json();
+}
+
+export async function verifyWebauthnLogin(data: { sessionId: string; credentialId: string }): Promise<User> {
+  const res = await apiRequest("POST", "/api/webauthn/login-verify", data);
+  return res.json();
+}
+
+export async function getWebauthnCredentials(userId: string): Promise<any[]> {
+  const res = await fetch(`/api/webauthn/credentials/${userId}`, { credentials: "include" });
+  return res.json();
+}
+
+export async function deleteWebauthnCredential(id: string): Promise<void> {
+  await apiRequest("DELETE", `/api/webauthn/credentials/${id}`);
+}

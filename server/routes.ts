@@ -2,6 +2,38 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertUserSchema, insertTripSchema, insertSavedPlaceSchema, insertVehicleTypeSchema, insertTaxiRouteSchema } from "@shared/schema";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import crypto from "crypto";
+
+const uploadsDir = path.join(process.cwd(), "public", "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const uploadStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadsDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `${crypto.randomUUID()}${ext}`);
+  },
+});
+
+const upload = multer({
+  storage: uploadStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = /\.(jpg|jpeg|png|gif|webp)$/i;
+    if (allowed.test(path.extname(file.originalname))) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed"));
+    }
+  },
+});
+
+const webauthnChallenges = new Map<string, string>();
 
 export async function registerRoutes(
   httpServer: Server,
@@ -195,6 +227,166 @@ export async function registerRoutes(
     const user = await storage.updateUser(req.params.id, { isVerified: isVerified ?? true });
     if (!user) return res.status(404).json({ message: "User not found" });
     return res.json(user);
+  });
+
+  app.use("/uploads", (await import("express")).default.static(uploadsDir));
+
+  app.post("/api/upload/profile-picture", upload.single("photo"), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+      const { userId } = req.body;
+      if (!userId) return res.status(400).json({ message: "User ID required" });
+      const avatarUrl = `/uploads/${req.file.filename}`;
+      const user = await storage.updateUser(userId, { avatarUrl });
+      if (!user) return res.status(404).json({ message: "User not found" });
+      return res.json({ avatarUrl, user });
+    } catch (e: any) {
+      return res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/auth/google", async (req, res) => {
+    try {
+      const { googleId, email, fullName, avatarUrl } = req.body;
+      if (!googleId || !email) {
+        return res.status(400).json({ message: "Google ID and email are required" });
+      }
+      let user = await storage.getUserByUsername(`google_${googleId}`);
+      if (user) {
+        if (avatarUrl && avatarUrl !== user.avatarUrl) {
+          user = (await storage.updateUser(user.id, { avatarUrl }))!;
+        }
+        return res.json(user);
+      }
+      const existingEmail = await storage.getUserByUsername(email);
+      if (existingEmail) {
+        if (avatarUrl && !existingEmail.avatarUrl) {
+          await storage.updateUser(existingEmail.id, { avatarUrl });
+        }
+        return res.json(existingEmail);
+      }
+      user = await storage.createUser({
+        username: `google_${googleId}`,
+        password: crypto.randomUUID(),
+        fullName: fullName || email.split("@")[0],
+        phone: "",
+        email,
+        role: "rider",
+        avatarUrl: avatarUrl || null,
+      });
+      return res.status(201).json(user);
+    } catch (e: any) {
+      return res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/webauthn/register-options", async (req, res) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) return res.status(400).json({ message: "User ID required" });
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      const challenge = crypto.randomBytes(32).toString("base64url");
+      webauthnChallenges.set(userId, challenge);
+      setTimeout(() => webauthnChallenges.delete(userId), 5 * 60 * 1000);
+      const existingCreds = await storage.getWebauthnCredentialsByUser(userId);
+      return res.json({
+        challenge,
+        rp: { name: "GY Rides", id: req.hostname },
+        user: { id: Buffer.from(userId).toString("base64url"), name: user.username, displayName: user.fullName },
+        pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+        authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required", residentKey: "preferred" },
+        timeout: 60000,
+        excludeCredentials: existingCreds.map(c => ({ type: "public-key" as const, id: c.credentialId })),
+      });
+    } catch (e: any) {
+      return res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/webauthn/register-verify", async (req, res) => {
+    try {
+      const { userId, credentialId, publicKey, deviceName } = req.body;
+      if (!userId || !credentialId || !publicKey) {
+        return res.status(400).json({ message: "Missing credential data" });
+      }
+      const storedChallenge = webauthnChallenges.get(userId);
+      if (!storedChallenge) {
+        return res.status(400).json({ message: "Challenge expired, try again" });
+      }
+      webauthnChallenges.delete(userId);
+      const cred = await storage.createWebauthnCredential({
+        userId,
+        credentialId,
+        publicKey,
+        counter: 0,
+        deviceName: deviceName || "This device",
+      });
+      return res.json({ message: "Biometric registered successfully", credential: cred });
+    } catch (e: any) {
+      return res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/webauthn/login-options", async (req, res) => {
+    try {
+      const { username } = req.body;
+      let credentials: any[] = [];
+      if (username) {
+        const user = await storage.getUserByUsername(username);
+        if (user) {
+          credentials = await storage.getWebauthnCredentialsByUser(user.id);
+        }
+      }
+      const challenge = crypto.randomBytes(32).toString("base64url");
+      const sessionId = crypto.randomUUID();
+      webauthnChallenges.set(sessionId, challenge);
+      setTimeout(() => webauthnChallenges.delete(sessionId), 5 * 60 * 1000);
+      return res.json({
+        challenge,
+        sessionId,
+        rpId: req.hostname,
+        timeout: 60000,
+        userVerification: "required",
+        allowCredentials: credentials.map(c => ({ type: "public-key" as const, id: c.credentialId })),
+      });
+    } catch (e: any) {
+      return res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/webauthn/login-verify", async (req, res) => {
+    try {
+      const { sessionId, credentialId } = req.body;
+      if (!sessionId || !credentialId) {
+        return res.status(400).json({ message: "Missing authentication data" });
+      }
+      const storedChallenge = webauthnChallenges.get(sessionId);
+      if (!storedChallenge) {
+        return res.status(400).json({ message: "Challenge expired, try again" });
+      }
+      webauthnChallenges.delete(sessionId);
+      const cred = await storage.getWebauthnCredentialByCredentialId(credentialId);
+      if (!cred) {
+        return res.status(401).json({ message: "Credential not found" });
+      }
+      await storage.updateWebauthnCredentialCounter(cred.id, (cred.counter || 0) + 1);
+      const user = await storage.getUser(cred.userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      return res.json(user);
+    } catch (e: any) {
+      return res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.get("/api/webauthn/credentials/:userId", async (req, res) => {
+    const creds = await storage.getWebauthnCredentialsByUser(req.params.userId);
+    return res.json(creds);
+  });
+
+  app.delete("/api/webauthn/credentials/:id", async (req, res) => {
+    await storage.deleteWebauthnCredential(req.params.id);
+    return res.json({ message: "Credential removed" });
   });
 
   app.get("/api/drivers/online", async (req, res) => {

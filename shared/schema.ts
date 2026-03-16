@@ -141,6 +141,20 @@ export const sosAlerts = pgTable("sos_alerts", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const webauthnCredentials = pgTable("webauthn_credentials", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  credentialId: text("credential_id").notNull().unique(),
+  publicKey: text("public_key").notNull(),
+  counter: integer("counter").notNull().default(0),
+  deviceName: text("device_name"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertWebauthnCredentialSchema = createInsertSchema(webauthnCredentials).omit({ id: true, createdAt: true });
+export type InsertWebauthnCredential = z.infer<typeof insertWebauthnCredentialSchema>;
+export type WebauthnCredential = typeof webauthnCredentials.$inferSelect;
+
 export const resetRequestStatusEnum = pgEnum("reset_request_status", ["pending", "approved", "rejected"]);
 
 export const passwordResetRequests = pgTable("password_reset_requests", {
