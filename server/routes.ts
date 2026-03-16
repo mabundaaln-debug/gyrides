@@ -12,6 +12,10 @@ export async function registerRoutes(
     res.json({ status: "ok", timestamp: Date.now() });
   });
 
+  app.get("/api/config/maps", (_req, res) => {
+    res.json({ apiKey: process.env.GOOGLE_MAPS_API_KEY || "" });
+  });
+
   // ── Auth / Users ──
   app.post("/api/auth/login", async (req, res) => {
     const { username, password } = req.body;
