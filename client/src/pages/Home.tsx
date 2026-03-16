@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { Car, User, Settings, ArrowRight, LogIn, UserPlus, Eye, EyeOff } from "lucide-react";
+import { Car, User, Settings, ArrowRight, LogIn, UserPlus, Eye, EyeOff, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
@@ -22,7 +22,17 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [seeded, setSeeded] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
 
   useEffect(() => {
     if (!seeded) {
@@ -278,7 +288,25 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="mt-8 text-sm text-gray-600 text-center relative z-10">
+      {installPrompt && (
+        <button
+          className="mb-4 flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/10 border border-white/20 text-white font-semibold text-sm transition-all hover:bg-yellow-400 hover:text-black hover:border-yellow-400 relative z-10"
+          onClick={async () => {
+            installPrompt.prompt();
+            const result = await installPrompt.userChoice;
+            if (result.outcome === "accepted") {
+              setInstallPrompt(null);
+              toast({ title: "App installed!", description: "GY Rides has been added to your home screen" });
+            }
+          }}
+          data-testid="btn-install-app"
+        >
+          <Download size={18} />
+          Install GY Rides App
+        </button>
+      )}
+
+      <div className="mt-4 text-sm text-gray-600 text-center relative z-10">
         Giyani, Limpopo, South Africa
       </div>
     </div>
