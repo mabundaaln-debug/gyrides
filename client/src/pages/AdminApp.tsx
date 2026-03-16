@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { Users, Car, DollarSign, LogOut, ChevronRight, ChevronLeft, Star, MapPin, TrendingUp, Activity, AlertCircle, CheckCircle, Shield, XCircle, FileText, Eye, User as UserIcon, AlertTriangle, Phone, MessageCircle } from "lucide-react";
+import { Users, Car, DollarSign, LogOut, ChevronRight, ChevronLeft, Star, MapPin, TrendingUp, Activity, AlertCircle, CheckCircle, Shield, XCircle, FileText, Eye, User as UserIcon, AlertTriangle, Phone, MessageCircle, KeyRound, ShieldCheck, ShieldX, Lock, EyeOff } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
-import { approveDriver, rejectDriver, updateSosAlert, getUser } from "@/lib/api";
+import { approveDriver, rejectDriver, updateSosAlert, getUser, adminResetUserPassword, verifyUser, getPendingPasswordResetRequests, updatePasswordResetRequest } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import TripChat from "@/components/TripChat";
 import type { User, Trip, VehicleType, SosAlert } from "@shared/schema";
@@ -15,13 +15,17 @@ import type { User, Trip, VehicleType, SosAlert } from "@shared/schema";
 export default function AdminApp() {
   const { user, logout } = useAuth();
   const [, setLocation] = useLocation();
-  const [view, setView] = useState<"dashboard" | "drivers" | "trips" | "pricing" | "approvals" | "review-driver" | "sos">("dashboard");
+  const [view, setView] = useState<"dashboard" | "drivers" | "trips" | "pricing" | "approvals" | "review-driver" | "sos" | "users">("dashboard");
   const [reviewingDriver, setReviewingDriver] = useState<User | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [showRejectInput, setShowRejectInput] = useState(false);
   const [sosNotes, setSosNotes] = useState<Record<string, string>>({});
   const [chatTripId, setChatTripId] = useState<string | null>(null);
   const [chatLabel, setChatLabel] = useState("");
+  const [resetPasswordUserId, setResetPasswordUserId] = useState<string | null>(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState("");
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -60,6 +64,17 @@ export default function AdminApp() {
     queryKey: ["/api/sos"],
     queryFn: getQueryFn({ on401: "throw" }),
     refetchInterval: 5000,
+  });
+
+  const { data: allUsers = [] } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+    queryFn: getQueryFn({ on401: "throw" }),
+  });
+
+  const { data: pendingResetRequests = [] } = useQuery<any[]>({
+    queryKey: ["/api/password-reset-requests/pending"],
+    queryFn: getQueryFn({ on401: "throw" }),
+    refetchInterval: 10000,
   });
 
   const activeSosAlerts = sosAlerts.filter(a => a.status === "active" || a.status === "acknowledged");
@@ -356,6 +371,212 @@ export default function AdminApp() {
   }
 
   // ── Pricing ──
+  if (view === "users") {
+    const nonAdminUsers = allUsers.filter(u => u.role !== "admin");
+    const riders = nonAdminUsers.filter(u => u.role === "rider");
+    const driverUsers = nonAdminUsers.filter(u => u.role === "driver");
+    const verifiedCount = nonAdminUsers.filter(u => u.isVerified).length;
+
+    return (
+      <div className="min-h-[100dvh] bg-gray-50 flex flex-col">
+        <div className="bg-white p-4 flex items-center gap-3 border-b sticky top-0 z-10">
+          <Button variant="ghost" size="icon" onClick={() => setView("dashboard")} className="rounded-full"><ChevronLeft className="h-6 w-6" /></Button>
+          <h1 className="text-xl font-bold">Users & Accounts</h1>
+        </div>
+
+        <div className="p-4 space-y-4">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-white rounded-xl p-3 text-center shadow-sm border border-gray-100">
+              <div className="text-lg font-bold text-blue-600">{riders.length}</div>
+              <div className="text-[10px] text-gray-500">Riders</div>
+            </div>
+            <div className="bg-white rounded-xl p-3 text-center shadow-sm border border-gray-100">
+              <div className="text-lg font-bold text-green-600">{driverUsers.length}</div>
+              <div className="text-[10px] text-gray-500">Drivers</div>
+            </div>
+            <div className="bg-white rounded-xl p-3 text-center shadow-sm border border-gray-100">
+              <div className="text-lg font-bold text-violet-600">{verifiedCount}</div>
+              <div className="text-[10px] text-gray-500">Verified</div>
+            </div>
+          </div>
+
+          {pendingResetRequests.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="font-bold text-sm flex items-center gap-2">
+                <KeyRound className="h-4 w-4 text-violet-500" />
+                Password Reset Requests
+              </h3>
+              {pendingResetRequests.map((req: any) => (
+                <div key={req.id} className="bg-white rounded-xl p-4 shadow-sm border border-violet-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-violet-100 p-1.5 rounded-full">
+                        <Lock className="h-3.5 w-3.5 text-violet-600" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-sm">{req.username}</div>
+                        <div className="text-[10px] text-gray-500">{req.phone}</div>
+                      </div>
+                    </div>
+                    <span className="bg-yellow-100 text-yellow-700 text-[10px] font-bold px-2 py-0.5 rounded-full">Pending</span>
+                  </div>
+                  <div className="text-[10px] text-gray-400 mb-3">Requested {new Date(req.createdAt).toLocaleString()}</div>
+                  <div className="flex gap-2">
+                    <button
+                      className="flex-1 h-9 rounded-lg text-xs font-bold bg-violet-500 text-white hover:bg-violet-600 transition-colors"
+                      onClick={async () => {
+                        const tempPassword = "Reset" + Math.floor(1000 + Math.random() * 9000);
+                        try {
+                          await adminResetUserPassword(req.userId, tempPassword);
+                          await updatePasswordResetRequest(req.id, { status: "approved", adminNotes: `Reset to: ${tempPassword}`, resolvedAt: new Date() });
+                          queryClient.invalidateQueries({ queryKey: ["/api/password-reset-requests/pending"] });
+                          toast({ title: "Password reset", description: `New password for ${req.username}: ${tempPassword}` });
+                        } catch {
+                          toast({ title: "Error", description: "Failed to reset password", variant: "destructive" });
+                        }
+                      }}
+                      data-testid={`btn-approve-reset-${req.id}`}
+                    >
+                      Reset & Generate Password
+                    </button>
+                    <button
+                      className="h-9 px-3 rounded-lg text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                      onClick={async () => {
+                        try {
+                          await updatePasswordResetRequest(req.id, { status: "rejected", resolvedAt: new Date() });
+                          queryClient.invalidateQueries({ queryKey: ["/api/password-reset-requests/pending"] });
+                          toast({ title: "Request dismissed" });
+                        } catch {
+                          toast({ title: "Error", variant: "destructive" });
+                        }
+                      }}
+                      data-testid={`btn-dismiss-reset-${req.id}`}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <h3 className="font-bold text-sm">All Users</h3>
+          <div className="space-y-2">
+            {nonAdminUsers.map(u => (
+              <div key={u.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100" data-testid={`user-card-${u.id}`}>
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback className={u.role === "driver" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}>
+                      {u.fullName.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm truncate">{u.fullName}</span>
+                      {u.isVerified && <ShieldCheck className="h-3.5 w-3.5 text-green-500 shrink-0" />}
+                    </div>
+                    <div className="text-[10px] text-gray-500">@{u.username} · {u.phone}</div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${u.role === "driver" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}`}>
+                        {u.role === "driver" ? "Driver" : "Rider"}
+                      </span>
+                      {u.role === "driver" && (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${u.approvalStatus === "approved" ? "bg-green-100 text-green-700" : u.approvalStatus === "rejected" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
+                          {u.approvalStatus}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 mt-3">
+                  <button
+                    className={`flex-1 h-8 rounded-lg text-[11px] font-bold transition-colors ${u.isVerified ? "bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600" : "bg-green-50 text-green-600 hover:bg-green-100"}`}
+                    onClick={async () => {
+                      try {
+                        await verifyUser(u.id, !u.isVerified);
+                        queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+                        toast({ title: u.isVerified ? "Verification removed" : "Account verified", description: u.fullName });
+                      } catch {
+                        toast({ title: "Error", variant: "destructive" });
+                      }
+                    }}
+                    data-testid={`btn-verify-${u.id}`}
+                  >
+                    {u.isVerified ? (
+                      <><ShieldX className="inline h-3 w-3 mr-1" />Unverify</>
+                    ) : (
+                      <><ShieldCheck className="inline h-3 w-3 mr-1" />Verify</>
+                    )}
+                  </button>
+                  <button
+                    className="flex-1 h-8 rounded-lg text-[11px] font-bold bg-violet-50 text-violet-600 hover:bg-violet-100 transition-colors"
+                    onClick={() => {
+                      setResetPasswordUserId(u.id);
+                      setResetPasswordValue("");
+                      setShowResetPassword(true);
+                    }}
+                    data-testid={`btn-admin-reset-${u.id}`}
+                  >
+                    <KeyRound className="inline h-3 w-3 mr-1" />Reset Password
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {showResetPassword && resetPasswordUserId && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center" onClick={() => setShowResetPassword(false)}>
+            <div className="bg-white w-full max-w-md rounded-t-3xl p-6 space-y-4" onClick={e => e.stopPropagation()}>
+              <h3 className="font-bold text-lg">Reset Password</h3>
+              <p className="text-sm text-gray-500">Set a new password for {allUsers.find(u => u.id === resetPasswordUserId)?.fullName}</p>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  className="w-full h-12 rounded-xl border border-gray-200 px-4 pr-12 text-sm"
+                  placeholder="New password (min 4 characters)"
+                  value={resetPasswordValue}
+                  onChange={e => setResetPasswordValue(e.target.value)}
+                  data-testid="input-admin-new-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              <button
+                className="w-full h-12 rounded-xl font-bold bg-violet-500 text-white hover:bg-violet-600 transition-colors disabled:opacity-50"
+                disabled={resetPasswordValue.length < 4}
+                onClick={async () => {
+                  try {
+                    await adminResetUserPassword(resetPasswordUserId, resetPasswordValue);
+                    setShowResetPassword(false);
+                    toast({ title: "Password reset", description: `Password updated for ${allUsers.find(u => u.id === resetPasswordUserId)?.fullName}` });
+                  } catch {
+                    toast({ title: "Error", description: "Failed to reset password", variant: "destructive" });
+                  }
+                }}
+                data-testid="btn-confirm-admin-reset"
+              >
+                Reset Password
+              </button>
+              <button
+                className="w-full h-10 rounded-xl text-sm text-gray-500"
+                onClick={() => setShowResetPassword(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (view === "pricing") {
     return (
       <div className="min-h-[100dvh] bg-gray-50 flex flex-col">
@@ -599,6 +820,23 @@ export default function AdminApp() {
           </button>
         )}
 
+        {pendingResetRequests.length > 0 && (
+          <button
+            className="w-full bg-violet-50 border border-violet-200 rounded-xl p-4 flex items-center gap-3 text-left"
+            onClick={() => setView("users")}
+            data-testid="btn-pending-resets"
+          >
+            <div className="w-10 h-10 bg-violet-500 rounded-full flex items-center justify-center shrink-0">
+              <KeyRound className="h-5 w-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <div className="font-bold text-sm text-violet-800">{pendingResetRequests.length} Password Reset Request{pendingResetRequests.length > 1 ? "s" : ""}</div>
+              <div className="text-[10px] text-violet-600">Users need help accessing their accounts</div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-violet-400" />
+          </button>
+        )}
+
         {pendingDrivers.length > 0 && (
           <button
             className="w-full bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-center gap-3 text-left"
@@ -678,6 +916,22 @@ export default function AdminApp() {
               </div>
             </div>
             <ChevronRight className="h-4 w-4 text-gray-400" />
+          </Button>
+
+          <Button variant="outline" className="w-full justify-between h-14 rounded-xl bg-white border-gray-100 shadow-sm px-4" onClick={() => setView("users")} data-testid="btn-manage-users">
+            <div className="flex items-center gap-3">
+              <div className="bg-violet-50 p-2 rounded-lg text-violet-600"><KeyRound className="h-4 w-4" /></div>
+              <div className="text-left">
+                <div className="font-bold text-sm">Users & Accounts</div>
+                <div className="text-[10px] text-gray-500">{allUsers.filter(u => u.role !== "admin").length} users · {pendingResetRequests.length} reset requests</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              {pendingResetRequests.length > 0 && (
+                <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{pendingResetRequests.length}</span>
+              )}
+              <ChevronRight className="h-4 w-4 text-gray-400" />
+            </div>
           </Button>
         </div>
 

@@ -77,6 +77,8 @@ shared/
 - Safety Center with SOS, trusted contacts (add/remove), trip sharing
 - Taxi Routes browser with live queue data
 - Verified driver badge visible on tracking and completion screens
+- Password reset via phone number verification (username + phone match)
+- WhatsApp support link for account recovery
 - Bottom navigation (Home/Activity/Profile)
 
 ### Driver Features
@@ -102,7 +104,9 @@ shared/
 - **Admin SOS panel**: View active/acknowledged/resolved alerts, acknowledge or resolve with notes, Google Maps link to location, direct chat with trip participants
 
 ### Admin
-- Dashboard with revenue/active trips, SOS alert banner (pulsing red), pending approval alerts
+- Users & Accounts management (verify/unverify accounts, reset user passwords, review password reset requests)
+- Password reset requests panel with auto-generate temp password or custom reset
+- Dashboard with revenue/active trips, SOS alert banner (pulsing red), pending approval alerts, password reset request alerts
 - SOS Alerts management with acknowledge/resolve workflow
 - Driver review flow with approve/reject
 - Management for drivers/trips/vehicle pricing

@@ -1,7 +1,7 @@
 import { eq, desc, and, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
-  users, trips, savedPlaces, vehicleTypes, taxiRoutes, messages, sosAlerts,
+  users, trips, savedPlaces, vehicleTypes, taxiRoutes, messages, sosAlerts, passwordResetRequests,
   type User, type InsertUser,
   type Trip, type InsertTrip,
   type SavedPlace, type InsertSavedPlace,
@@ -9,6 +9,7 @@ import {
   type TaxiRoute, type InsertTaxiRoute,
   type Message, type InsertMessage,
   type SosAlert, type InsertSosAlert,
+  type PasswordResetRequest, type InsertPasswordResetRequest,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -48,6 +49,14 @@ export interface IStorage {
   getSosAlerts(): Promise<SosAlert[]>;
   getActiveSosAlerts(): Promise<SosAlert[]>;
   updateSosAlert(id: string, data: Partial<InsertSosAlert & { resolvedAt: Date }>): Promise<SosAlert | undefined>;
+
+  getUserByPhone(phone: string): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
+
+  createPasswordResetRequest(req: InsertPasswordResetRequest): Promise<PasswordResetRequest>;
+  getPasswordResetRequests(): Promise<PasswordResetRequest[]>;
+  getPendingPasswordResetRequests(): Promise<PasswordResetRequest[]>;
+  updatePasswordResetRequest(id: string, data: Partial<InsertPasswordResetRequest & { resolvedAt: Date }>): Promise<PasswordResetRequest | undefined>;
 
   getStats(): Promise<{ totalDrivers: number; totalRiders: number; totalTrips: number; totalRevenue: number; onlineDrivers: number; activeTrips: number; activeSosAlerts: number }>;
 }
@@ -192,6 +201,33 @@ export class DatabaseStorage implements IStorage {
   async updateSosAlert(id: string, data: Partial<InsertSosAlert & { resolvedAt: Date }>): Promise<SosAlert | undefined> {
     const [a] = await db.update(sosAlerts).set(data).where(eq(sosAlerts.id, id)).returning();
     return a;
+  }
+
+  async getUserByPhone(phone: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.phone, phone));
+    return user;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return db.select().from(users).orderBy(desc(users.createdAt));
+  }
+
+  async createPasswordResetRequest(req: InsertPasswordResetRequest): Promise<PasswordResetRequest> {
+    const [r] = await db.insert(passwordResetRequests).values(req).returning();
+    return r;
+  }
+
+  async getPasswordResetRequests(): Promise<PasswordResetRequest[]> {
+    return db.select().from(passwordResetRequests).orderBy(desc(passwordResetRequests.createdAt));
+  }
+
+  async getPendingPasswordResetRequests(): Promise<PasswordResetRequest[]> {
+    return db.select().from(passwordResetRequests).where(eq(passwordResetRequests.status, "pending")).orderBy(desc(passwordResetRequests.createdAt));
+  }
+
+  async updatePasswordResetRequest(id: string, data: Partial<InsertPasswordResetRequest & { resolvedAt: Date }>): Promise<PasswordResetRequest | undefined> {
+    const [r] = await db.update(passwordResetRequests).set(data).where(eq(passwordResetRequests.id, id)).returning();
+    return r;
   }
 
   async getStats() {

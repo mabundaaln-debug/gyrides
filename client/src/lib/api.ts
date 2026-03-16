@@ -69,3 +69,43 @@ export async function updateSosAlert(id: string, data: { status?: string; adminN
   const res = await apiRequest("PATCH", `/api/sos/${id}`, data);
   return res.json();
 }
+
+export async function forgotPassword(username: string, phone: string): Promise<{ message: string; requestId?: string }> {
+  const res = await apiRequest("POST", "/api/auth/forgot-password", { username, phone });
+  return res.json();
+}
+
+export async function resetPassword(username: string, phone: string, newPassword: string): Promise<{ message: string }> {
+  const res = await apiRequest("POST", "/api/auth/reset-password", { username, phone, newPassword });
+  return res.json();
+}
+
+export async function getPasswordResetRequests(): Promise<any[]> {
+  const res = await fetch("/api/password-reset-requests", { credentials: "include" });
+  return res.json();
+}
+
+export async function getPendingPasswordResetRequests(): Promise<any[]> {
+  const res = await fetch("/api/password-reset-requests/pending", { credentials: "include" });
+  return res.json();
+}
+
+export async function updatePasswordResetRequest(id: string, data: any): Promise<any> {
+  const res = await apiRequest("PATCH", `/api/password-reset-requests/${id}`, data);
+  return res.json();
+}
+
+export async function adminResetUserPassword(userId: string, newPassword: string): Promise<{ message: string }> {
+  const res = await apiRequest("POST", "/api/admin/reset-user-password", { userId, newPassword });
+  return res.json();
+}
+
+export async function verifyUser(userId: string, isVerified: boolean): Promise<User> {
+  const res = await apiRequest("PATCH", `/api/admin/users/${userId}/verify`, { isVerified });
+  return res.json();
+}
+
+export async function getAllUsers(): Promise<User[]> {
+  const res = await fetch("/api/users", { credentials: "include" });
+  return res.json();
+}

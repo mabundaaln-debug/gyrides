@@ -141,6 +141,23 @@ export const sosAlerts = pgTable("sos_alerts", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const resetRequestStatusEnum = pgEnum("reset_request_status", ["pending", "approved", "rejected"]);
+
+export const passwordResetRequests = pgTable("password_reset_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  username: text("username").notNull(),
+  phone: text("phone").notNull(),
+  status: resetRequestStatusEnum("status").notNull().default("pending"),
+  adminNotes: text("admin_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
+});
+
+export const insertPasswordResetRequestSchema = createInsertSchema(passwordResetRequests).omit({ id: true, createdAt: true, resolvedAt: true });
+export type InsertPasswordResetRequest = z.infer<typeof insertPasswordResetRequestSchema>;
+export type PasswordResetRequest = typeof passwordResetRequests.$inferSelect;
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertTripSchema = createInsertSchema(trips).omit({ id: true, createdAt: true, completedAt: true });
 export const insertSavedPlaceSchema = createInsertSchema(savedPlaces).omit({ id: true });

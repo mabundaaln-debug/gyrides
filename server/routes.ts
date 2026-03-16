@@ -103,6 +103,100 @@ export async function registerRoutes(
     return res.json(users);
   });
 
+  app.get("/api/users", async (req, res) => {
+    const users = await storage.getAllUsers();
+    return res.json(users);
+  });
+
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { username, phone } = req.body;
+      if (!username || !phone) {
+        return res.status(400).json({ message: "Username and phone number are required" });
+      }
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(404).json({ message: "No account found with that username" });
+      }
+      const normalizedInputPhone = phone.replace(/\s+/g, "").replace(/-/g, "");
+      const normalizedUserPhone = user.phone.replace(/\s+/g, "").replace(/-/g, "");
+      if (normalizedInputPhone !== normalizedUserPhone) {
+        return res.status(400).json({ message: "Phone number does not match our records" });
+      }
+      const request = await storage.createPasswordResetRequest({
+        userId: user.id,
+        username: user.username,
+        phone: user.phone,
+        status: "pending",
+      });
+      return res.json({ message: "Password reset request submitted. An admin will review and reset your password.", requestId: request.id });
+    } catch (e: any) {
+      return res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { username, phone, newPassword } = req.body;
+      if (!username || !phone || !newPassword) {
+        return res.status(400).json({ message: "Username, phone, and new password are required" });
+      }
+      if (newPassword.length < 4) {
+        return res.status(400).json({ message: "Password must be at least 4 characters" });
+      }
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(404).json({ message: "No account found with that username" });
+      }
+      const normalizedInputPhone = phone.replace(/\s+/g, "").replace(/-/g, "");
+      const normalizedUserPhone = user.phone.replace(/\s+/g, "").replace(/-/g, "");
+      if (normalizedInputPhone !== normalizedUserPhone) {
+        return res.status(400).json({ message: "Phone number does not match our records" });
+      }
+      await storage.updateUser(user.id, { password: newPassword });
+      return res.json({ message: "Password has been reset successfully. You can now sign in." });
+    } catch (e: any) {
+      return res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.get("/api/password-reset-requests", async (req, res) => {
+    const requests = await storage.getPasswordResetRequests();
+    return res.json(requests);
+  });
+
+  app.get("/api/password-reset-requests/pending", async (req, res) => {
+    const requests = await storage.getPendingPasswordResetRequests();
+    return res.json(requests);
+  });
+
+  app.patch("/api/password-reset-requests/:id", async (req, res) => {
+    const request = await storage.updatePasswordResetRequest(req.params.id, req.body);
+    if (!request) return res.status(404).json({ message: "Request not found" });
+    return res.json(request);
+  });
+
+  app.post("/api/admin/reset-user-password", async (req, res) => {
+    try {
+      const { userId, newPassword } = req.body;
+      if (!userId || !newPassword) {
+        return res.status(400).json({ message: "User ID and new password are required" });
+      }
+      const user = await storage.updateUser(userId, { password: newPassword });
+      if (!user) return res.status(404).json({ message: "User not found" });
+      return res.json({ message: `Password reset for ${user.fullName}` });
+    } catch (e: any) {
+      return res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.patch("/api/admin/users/:id/verify", async (req, res) => {
+    const { isVerified } = req.body;
+    const user = await storage.updateUser(req.params.id, { isVerified: isVerified ?? true });
+    if (!user) return res.status(404).json({ message: "User not found" });
+    return res.json(user);
+  });
+
   app.get("/api/drivers/online", async (req, res) => {
     const drivers = await storage.getOnlineDrivers();
     return res.json(drivers);
