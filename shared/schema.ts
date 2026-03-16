@@ -73,6 +73,7 @@ export const trips = pgTable("trips", {
   parcelDescription: text("parcel_description"),
   eftProofUrl: text("eft_proof_url"),
   rideNote: text("ride_note"),
+  bookingChannel: text("booking_channel").default("app"),
   createdAt: timestamp("created_at").defaultNow(),
   completedAt: timestamp("completed_at"),
 });

@@ -68,6 +68,8 @@ export default function AdminApp() {
 
   const completedTrips = allTrips.filter(t => t.status === "completed");
   const cancelledTrips = allTrips.filter(t => t.status === "cancelled");
+  const whatsappTrips = allTrips.filter(t => t.bookingChannel === "whatsapp");
+  const activeWhatsappTrips = whatsappTrips.filter(t => t.status !== "completed" && t.status !== "cancelled");
 
   const handleApprove = async (driverId: string) => {
     try {
@@ -306,16 +308,20 @@ export default function AdminApp() {
           <Button variant="ghost" size="icon" onClick={() => setView("dashboard")} className="rounded-full"><ChevronLeft className="h-6 w-6" /></Button>
           <h1 className="text-xl font-bold">All Trips ({allTrips.length})</h1>
         </div>
-        <div className="p-3 flex gap-2 sticky top-14 bg-gray-50 z-10">
+        <div className="p-3 flex gap-2 flex-wrap sticky top-14 bg-gray-50 z-10">
           <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-full">{completedTrips.length} completed</span>
           <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-1 rounded-full">{cancelledTrips.length} cancelled</span>
           <span className="bg-yellow-100 text-yellow-700 text-[10px] font-bold px-2 py-1 rounded-full">{allTrips.length - completedTrips.length - cancelledTrips.length} active</span>
+          {whatsappTrips.length > 0 && <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-full" data-testid="badge-whatsapp-trips">{whatsappTrips.length} WhatsApp</span>}
         </div>
         <div className="p-3 space-y-2 overflow-auto">
           {allTrips.map(trip => (
             <div key={trip.id} className="bg-white rounded-xl p-3 shadow-sm border border-gray-100" data-testid={`admin-trip-${trip.id}`}>
               <div className="flex justify-between items-start mb-2">
-                <div className="text-[10px] text-gray-500">{trip.createdAt ? new Date(trip.createdAt).toLocaleDateString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}</div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-gray-500">{trip.createdAt ? new Date(trip.createdAt).toLocaleDateString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}</span>
+                  {trip.bookingChannel === "whatsapp" && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700" data-testid={`badge-wa-${trip.id}`}>WhatsApp</span>}
+                </div>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${trip.status === "completed" ? "bg-green-100 text-green-700" : trip.status === "cancelled" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
                   {trip.status}
                 </span>
@@ -558,6 +564,23 @@ export default function AdminApp() {
             <div className="text-[10px] text-gray-500">Trips</div>
           </div>
         </div>
+
+        {activeWhatsappTrips.length > 0 && (
+          <button
+            className="w-full bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3 text-left"
+            onClick={() => setView("trips")}
+            data-testid="btn-whatsapp-bookings"
+          >
+            <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center shrink-0">
+              <MessageCircle className="h-5 w-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <div className="font-bold text-sm text-emerald-800">{activeWhatsappTrips.length} WhatsApp Booking{activeWhatsappTrips.length > 1 ? "s" : ""} Pending</div>
+              <div className="text-[10px] text-emerald-600">Tap to view and assign drivers</div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-emerald-400" />
+          </button>
+        )}
 
         {activeSosAlerts.length > 0 && (
           <button

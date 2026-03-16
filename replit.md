@@ -69,7 +69,7 @@ shared/
 - Ride type selector tabs (private/shared/taxi/parcel/medical)
 - Choose vehicle type with detailed fare breakdown (base/distance/time/surcharge)
 - Payment methods: Cash, eWallet (balance), EFT (bank details shown), Card
-- WhatsApp fallback booking (from home screen and confirm screen)
+- WhatsApp fallback booking (available after ride confirmation, creates tracked trip record)
 - Trip PIN verification, SOS button (sends alert to admin), in-app chat with driver
 - Live ETA tracking with countdown, simulated driver movement on map
 - Trip completion with star rating, receipt, rebook
@@ -118,7 +118,7 @@ Data auto-seeds on first visit via POST /api/seed.
 ## Database Schema
 
 - `users`: role (rider/driver/admin), approval status, isVerified, walletBalance, trustedContacts (JSON)
-- `trips`: rideType (private/shared/taxi/parcel/medical), paymentMethod (cash/card/ewallet/eft), seatsBooked, medicalNotes, parcelDescription, rideNote, eftProofUrl
+- `trips`: rideType (private/shared/taxi/parcel/medical), paymentMethod (cash/card/ewallet/eft), seatsBooked, medicalNotes, parcelDescription, rideNote, eftProofUrl, bookingChannel (app/whatsapp)
 - `savedPlaces`: user's saved locations with lat/lng
 - `vehicleTypes`: GY Standard, GY Premium, GY XL, GY Health, GY Parcel (with pricePerMin, minimumFare)
 - `taxiRoutes`: route name, from/to locations with lat/lng, fare, available/total seats, departure schedule

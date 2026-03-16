@@ -359,12 +359,41 @@ export default function RiderApp() {
     }
   };
 
-  const handleWhatsAppBooking = () => {
+  const handleWhatsAppBooking = async () => {
     const pickupText = pickup?.name || "My location";
     const dropoffText = dropoff?.name || "Not set";
     const typeLabel = rideType === "medical" ? "Medical Transport" : rideType === "parcel" ? "Parcel Delivery" : rideType === "shared" ? `Shared Ride (${sharedSeats} seat${sharedSeats > 1 ? "s" : ""})` : "Private Ride";
-    const msg = `Hi GY Rides! I'd like to book a ride:\n\nType: ${typeLabel}\nPickup: ${pickupText}\nDrop-off: ${dropoffText}\nPhone: ${user.phone}\nName: ${user.fullName}\nPayment: ${paymentMethod}${medicalNotes ? `\nMedical notes: ${medicalNotes}` : ""}${parcelDescription ? `\nParcel: ${parcelDescription}` : ""}`;
+
+    try {
+      const tripData: any = {
+        riderId: user.id,
+        rideType,
+        pickupName: pickupText,
+        pickupLat: pickup?.lat ?? null,
+        pickupLng: pickup?.lng ?? null,
+        dropoffName: dropoffText,
+        dropoffLat: dropoff?.lat ?? null,
+        dropoffLng: dropoff?.lng ?? null,
+        status: "requested",
+        fare: selectedVehicle ? calcFare(selectedVehicle) : 0,
+        distance: currentTrip?.distance ?? null,
+        duration: currentTrip?.duration ?? null,
+        paymentMethod,
+        vehicleType: selectedVehicle?.name ?? "GY Standard",
+        seatsBooked: rideType === "shared" ? sharedSeats : 1,
+        medicalNotes: medicalNotes || null,
+        parcelDescription: parcelDescription || null,
+        bookingChannel: "whatsapp",
+      };
+      const trip = await createTrip(tripData);
+      setCurrentTrip(trip);
+      queryClient.invalidateQueries({ queryKey: ["/api/trips"] });
+    } catch {}
+
+    const fareText = selectedVehicle ? `R${calcFare(selectedVehicle)}` : "";
+    const msg = `Hi GY Rides! I'd like to book a ride:\n\nType: ${typeLabel}\nPickup: ${pickupText}\nDrop-off: ${dropoffText}\nFare: ${fareText}\nPhone: ${user.phone}\nName: ${user.fullName}\nPayment: ${paymentMethod}${medicalNotes ? `\nMedical notes: ${medicalNotes}` : ""}${parcelDescription ? `\nParcel: ${parcelDescription}` : ""}`;
     window.open(`https://wa.me/27686427644?text=${encodeURIComponent(msg)}`, "_blank");
+    toast({ title: "WhatsApp Booking Sent", description: "Your booking has been logged. We'll confirm via WhatsApp." });
   };
 
   const handleCancelTrip = async () => {
@@ -1184,10 +1213,6 @@ export default function RiderApp() {
           <Button size="lg" className="w-full h-14 rounded-2xl text-lg font-bold bg-black text-white hover:bg-gray-900" disabled={!selectedVehicle} onClick={handleBookRide} data-testid="btn-confirm-ride">
             {selectedVehicle ? `Book ${selectedVehicle.name} · R${calcFare(selectedVehicle)}` : "Select a ride"}
           </Button>
-
-          <button onClick={handleWhatsAppBooking} className="w-full mt-3 h-12 rounded-2xl bg-green-600 text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-green-700 transition-colors" data-testid="btn-whatsapp-book">
-            <MessageCircle className="h-4 w-4" /> Book on WhatsApp instead
-          </button>
         </div>
       </div>
     );
@@ -1227,6 +1252,9 @@ export default function RiderApp() {
             </div>
           </div>
           <Button variant="outline" className="w-full rounded-2xl h-12 text-red-500 border-red-200" onClick={handleCancelTrip} data-testid="btn-cancel-search">Cancel</Button>
+          <button onClick={handleWhatsAppBooking} className="w-full h-11 rounded-2xl bg-green-600 text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-green-700 transition-colors" data-testid="btn-whatsapp-book">
+            <MessageCircle className="h-4 w-4" /> Complete via WhatsApp
+          </button>
         </div>
       </div>
     );
@@ -1530,17 +1558,6 @@ export default function RiderApp() {
           </div>
         )}
 
-        <div className="px-6 mb-5">
-          <button onClick={handleWhatsAppBooking} className="w-full bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center gap-3 text-left" data-testid="btn-whatsapp-home">
-            <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center shrink-0">
-              <MessageCircle className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <div className="font-bold text-sm text-green-800">Book on WhatsApp</div>
-              <div className="text-[10px] text-green-600">Weak signal? Book your ride via WhatsApp</div>
-            </div>
-          </button>
-        </div>
 
         {onlineDrivers.length > 0 && (
           <div className="px-6 mb-5">
