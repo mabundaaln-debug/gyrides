@@ -640,6 +640,9 @@ export default function Home() {
       <div className="mt-4 text-sm text-gray-600 text-center relative z-10">
         Giyani, Limpopo, South Africa
       </div>
+      <div className="mt-3 text-[10px] text-gray-500 text-center relative z-10 leading-tight">
+        © {new Date().getFullYear()} Mpfuno Medical Services & Dr NI Mabunda. All rights reserved.
+      </div>
     </div>
   );
 }

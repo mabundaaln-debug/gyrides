@@ -1023,6 +1023,9 @@ export default function RiderApp() {
               <div className="text-xs text-gray-500">Total Spent</div>
             </div>
           </div>
+          <div className="mt-6 text-[10px] text-gray-400 text-center leading-tight">
+            © {new Date().getFullYear()} Mpfuno Medical Services & Dr NI Mabunda. All rights reserved.
+          </div>
         </div>
         <BottomNav />
       </div>

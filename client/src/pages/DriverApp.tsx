@@ -426,6 +426,9 @@ export default function DriverApp() {
               <div className="text-[10px] text-gray-500">Use fingerprint or face ID to sign in</div>
             </div>
           </button>
+          <div className="mt-6 text-[10px] text-gray-400 text-center leading-tight">
+            © {new Date().getFullYear()} Mpfuno Medical Services & Dr NI Mabunda. All rights reserved.
+          </div>
         </div>
         <BottomNav />
       </div>
