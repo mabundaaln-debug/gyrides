@@ -60,6 +60,7 @@ export default function DriverApp() {
   }, [pendingRequest?.id]);
 
   if (!user) return null;
+  if (user.role !== "driver" || user.approvalStatus !== "approved") return null;
 
   const isOnline = user.isOnline ?? false;
   const completedTrips = myTrips.filter(t => t.status === "completed");

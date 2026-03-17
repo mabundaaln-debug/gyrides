@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { Users, Car, DollarSign, LogOut, ChevronRight, ChevronLeft, Star, MapPin, TrendingUp, Activity, AlertCircle, CheckCircle, Shield, XCircle, FileText, Eye, User as UserIcon, AlertTriangle, Phone, MessageCircle, KeyRound, ShieldCheck, ShieldX, Lock, EyeOff } from "lucide-react";
+import { Users, Car, DollarSign, LogOut, ChevronRight, ChevronLeft, Star, MapPin, TrendingUp, Activity, AlertCircle, CheckCircle, Shield, XCircle, FileText, Eye, User as UserIcon, AlertTriangle, Phone, MessageCircle, KeyRound, ShieldCheck, ShieldX, Lock, EyeOff, Clock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -480,13 +480,18 @@ export default function AdminApp() {
                       {u.isVerified && <ShieldCheck className="h-3.5 w-3.5 text-green-500 shrink-0" />}
                     </div>
                     <div className="text-[10px] text-gray-500">@{u.username} · {u.phone}</div>
-                    <div className="flex items-center gap-2 mt-0.5">
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${u.role === "driver" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}`}>
                         {u.role === "driver" ? "Driver" : "Rider"}
                       </span>
                       {u.role === "driver" && (
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${u.approvalStatus === "approved" ? "bg-green-100 text-green-700" : u.approvalStatus === "rejected" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
-                          {u.approvalStatus}
+                          {u.approvalStatus === "approved" ? "Approved" : u.approvalStatus === "rejected" ? "Rejected" : "Pending"}
+                        </span>
+                      )}
+                      {u.role === "driver" && !u.onboardingComplete && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                          Onboarding incomplete
                         </span>
                       )}
                     </div>
@@ -494,25 +499,39 @@ export default function AdminApp() {
                 </div>
 
                 <div className="flex gap-2 mt-3">
-                  <button
-                    className={`flex-1 h-8 rounded-lg text-[11px] font-bold transition-colors ${u.isVerified ? "bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600" : "bg-green-50 text-green-600 hover:bg-green-100"}`}
-                    onClick={async () => {
-                      try {
-                        await verifyUser(u.id, !u.isVerified);
-                        queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-                        toast({ title: u.isVerified ? "Verification removed" : "Account verified", description: u.fullName });
-                      } catch {
-                        toast({ title: "Error", variant: "destructive" });
-                      }
-                    }}
-                    data-testid={`btn-verify-${u.id}`}
-                  >
-                    {u.isVerified ? (
-                      <><ShieldX className="inline h-3 w-3 mr-1" />Unverify</>
-                    ) : (
-                      <><ShieldCheck className="inline h-3 w-3 mr-1" />Verify</>
-                    )}
-                  </button>
+                  {u.role === "driver" && !u.onboardingComplete ? (
+                    <div className="flex-1 h-8 rounded-lg text-[11px] font-bold bg-orange-50 text-orange-600 flex items-center justify-center">
+                      <Clock className="inline h-3 w-3 mr-1" />Awaiting documents
+                    </div>
+                  ) : u.role === "driver" && u.approvalStatus !== "approved" ? (
+                    <button
+                      className="flex-1 h-8 rounded-lg text-[11px] font-bold bg-yellow-50 text-yellow-700 hover:bg-yellow-100 transition-colors"
+                      onClick={() => { setReviewingDriver(u); setView("review-driver"); }}
+                      data-testid={`btn-review-${u.id}`}
+                    >
+                      <Eye className="inline h-3 w-3 mr-1" />Review Application
+                    </button>
+                  ) : (
+                    <button
+                      className={`flex-1 h-8 rounded-lg text-[11px] font-bold transition-colors ${u.isVerified ? "bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600" : "bg-green-50 text-green-600 hover:bg-green-100"}`}
+                      onClick={async () => {
+                        try {
+                          await verifyUser(u.id, !u.isVerified);
+                          queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+                          toast({ title: u.isVerified ? "Verification removed" : "Account verified", description: u.fullName });
+                        } catch {
+                          toast({ title: "Error", variant: "destructive" });
+                        }
+                      }}
+                      data-testid={`btn-verify-${u.id}`}
+                    >
+                      {u.isVerified ? (
+                        <><ShieldX className="inline h-3 w-3 mr-1" />Unverify</>
+                      ) : (
+                        <><ShieldCheck className="inline h-3 w-3 mr-1" />Verify</>
+                      )}
+                    </button>
+                  )}
                   <button
                     className="flex-1 h-8 rounded-lg text-[11px] font-bold bg-violet-50 text-violet-600 hover:bg-violet-100 transition-colors"
                     onClick={() => {
