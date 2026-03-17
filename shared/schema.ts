@@ -30,6 +30,7 @@ export const users = pgTable("users", {
   onboardingComplete: boolean("onboarding_complete").default(false),
   idNumber: text("id_number"),
   email: text("email"),
+  googleId: text("google_id"),
   address: text("address"),
   driverLicenseNumber: text("driver_license_number"),
   driverLicenseExpiry: text("driver_license_expiry"),

@@ -195,6 +195,39 @@ export async function registerRoutes(
     return res.json(user);
   });
 
+  app.post("/api/auth/google", async (req, res) => {
+    try {
+      const { googleId, email, fullName, avatarUrl } = req.body;
+      if (!googleId || !email) {
+        return res.status(400).json({ message: "Missing Google account info" });
+      }
+      let user = await storage.getUserByGoogleId(googleId);
+      if (user) return res.json(user);
+
+      user = await storage.getUserByEmail(email);
+      if (user) {
+        const updated = await storage.updateUser(user.id, { googleId, avatarUrl: avatarUrl || user.avatarUrl });
+        return res.json(updated);
+      }
+
+      const username = email.split("@")[0] + "_g" + googleId.slice(-4);
+      const randomPass = crypto.randomBytes(16).toString("hex");
+      user = await storage.createUser({
+        username,
+        password: randomPass,
+        fullName: fullName || email.split("@")[0],
+        phone: "",
+        email,
+        googleId,
+        avatarUrl: avatarUrl || null,
+        role: "rider",
+      });
+      return res.status(201).json(user);
+    } catch (e: any) {
+      return res.status(500).json({ message: e.message });
+    }
+  });
+
   app.post("/api/auth/register", async (req, res) => {
     const parsed = insertUserSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
