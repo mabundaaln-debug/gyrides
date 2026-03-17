@@ -43,16 +43,19 @@ export default function AdminApp() {
   const { data: drivers = [] } = useQuery<User[]>({
     queryKey: ["/api/users/role/driver"],
     queryFn: getQueryFn({ on401: "throw" }),
+    refetchInterval: 10000,
   });
 
   const { data: pendingDrivers = [] } = useQuery<User[]>({
     queryKey: ["/api/drivers/pending"],
     queryFn: getQueryFn({ on401: "throw" }),
+    refetchInterval: 10000,
   });
 
   const { data: allTrips = [] } = useQuery<Trip[]>({
     queryKey: ["/api/trips"],
     queryFn: getQueryFn({ on401: "throw" }),
+    refetchInterval: 10000,
   });
 
   const { data: vehicleTypes = [] } = useQuery<VehicleType[]>({
@@ -69,6 +72,7 @@ export default function AdminApp() {
   const { data: allUsers = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],
     queryFn: getQueryFn({ on401: "throw" }),
+    refetchInterval: 10000,
   });
 
   const { data: pendingResetRequests = [] } = useQuery<any[]>({
