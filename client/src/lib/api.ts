@@ -177,3 +177,19 @@ export async function getRiderPendingBalance(userId: string): Promise<number> {
   const data = await res.json();
   return data.pendingBalance || 0;
 }
+
+export async function confirmCashPayment(tripId: string): Promise<void> {
+  const res = await apiRequest("POST", `/api/trips/${tripId}/confirm-cash`, {});
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || "Failed to confirm payment");
+  }
+}
+
+export async function getTripReceipt(tripId: string): Promise<{
+  trip: any; riderName: string; driverName: string; driverVehicle: string; licensePlate: string;
+}> {
+  const res = await fetch(`/api/trips/${tripId}/receipt`, { credentials: "include" });
+  if (!res.ok) throw new Error("Receipt not found");
+  return res.json();
+}

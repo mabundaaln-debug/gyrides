@@ -590,6 +590,44 @@ export async function registerRoutes(
     return res.json(trip);
   });
 
+  // Driver confirms cash payment for failed card trip
+  app.post("/api/trips/:id/confirm-cash", async (req, res) => {
+    try {
+      const trip = await storage.getTrip(req.params.id);
+      if (!trip) return res.status(404).json({ message: "Trip not found" });
+      await storage.updateTrip(req.params.id, { paymentStatus: "paid" as any });
+      // Clear rider pending balance
+      try {
+        const rider = await storage.getUser(trip.riderId);
+        if (rider && (rider.pendingBalance || 0) > 0) {
+          await storage.updateUser(trip.riderId, { pendingBalance: 0 } as any);
+        }
+      } catch {}
+      return res.json({ success: true });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Receipt data for a trip (used by PDF generator)
+  app.get("/api/trips/:id/receipt", async (req, res) => {
+    try {
+      const trip = await storage.getTrip(req.params.id);
+      if (!trip) return res.status(404).json({ message: "Trip not found" });
+      const rider = await storage.getUser(trip.riderId);
+      const driver = trip.driverId ? await storage.getUser(trip.driverId) : null;
+      return res.json({
+        trip,
+        riderName: rider?.fullName || "Rider",
+        driverName: driver?.fullName || "Driver",
+        driverVehicle: driver ? `${driver.vehicleMake || ""} ${driver.vehicleModel || ""} ${driver.vehicleColor || ""}`.trim() : "",
+        licensePlate: driver?.licensePlate || "",
+      });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   app.patch("/api/trips/:id", async (req, res) => {
     const trip = await storage.updateTrip(req.params.id, req.body);
     if (!trip) return res.status(404).json({ message: "Trip not found" });

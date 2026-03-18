@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
-import { MapPin, DollarSign, Star, Check, X, Menu, LogOut, Navigation, Car, Clock, TrendingUp, User, ChevronLeft, History, Phone, MessageCircle, AlertTriangle, Shield, ExternalLink, BadgeCheck, Heart, Package, Users, Bus, Upload } from "lucide-react";
+import { MapPin, DollarSign, Star, Check, X, Menu, LogOut, Navigation, Car, Clock, TrendingUp, User, ChevronLeft, History, Phone, MessageCircle, AlertTriangle, Shield, ExternalLink, BadgeCheck, Heart, Package, Users, Bus, Upload, Banknote, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth";
-import { updateTrip, updateUser, sendSosAlert, uploadProfilePicture, getWebauthnRegisterOptions, verifyWebauthnRegistration } from "@/lib/api";
+import { updateTrip, updateUser, sendSosAlert, uploadProfilePicture, getWebauthnRegisterOptions, verifyWebauthnRegistration, confirmCashPayment, getTripReceipt } from "@/lib/api";
+import { generateReceiptPDF } from "@/lib/generateReceipt";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +23,8 @@ export default function DriverApp() {
   const [showChat, setShowChat] = useState(false);
   const [countdown, setCountdown] = useState(30);
   const [activeTab, setActiveTab] = useState<"home" | "trips" | "earnings" | "profile">("home");
+  const [cashConfirming, setCashConfirming] = useState(false);
+  const [cashConfirmed, setCashConfirmed] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -535,6 +538,61 @@ export default function DriverApp() {
             <span className="text-gray-300">→</span>
             <div className="flex items-center gap-2 flex-1"><div className="w-2 h-2 bg-black rounded-full" /><span className="font-medium truncate">{onTrip.dropoffName}</span></div>
           </div>
+
+          {tripPhase === "inprogress" && tripRider && (tripRider as any).pendingBalance > 0 && !cashConfirmed && (
+            <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Banknote className="h-4 w-4 text-orange-600 shrink-0" />
+                <p className="text-sm font-bold text-orange-800">Outstanding Balance</p>
+              </div>
+              <p className="text-xs text-orange-700 mb-3">
+                This rider has an unpaid balance of <span className="font-bold">R{(tripRider as any).pendingBalance?.toFixed(2)}</span> from a failed card payment. Please collect cash before completing the trip.
+              </p>
+              {!cashConfirmed && (
+                <button
+                  data-testid="btn-confirm-cash"
+                  disabled={cashConfirming}
+                  className="w-full h-10 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                  onClick={async () => {
+                    setCashConfirming(true);
+                    try {
+                      await confirmCashPayment(onTrip.id);
+                      setCashConfirmed(true);
+                      toast({ title: "Cash received ✓", description: "Payment confirmed. Receipt will be sent to the rider." });
+                      // Send receipt to rider via chat message
+                      try {
+                        await fetch("/api/messages", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          credentials: "include",
+                          body: JSON.stringify({
+                            tripId: onTrip.id,
+                            senderId: user.id,
+                            senderRole: "driver",
+                            text: `✅ Cash payment of R${(tripRider as any).pendingBalance?.toFixed(2)} received and confirmed. Your receipt is ready — tap "Download Receipt" on your trip completion screen.`,
+                          }),
+                        });
+                      } catch {}
+                    } catch (err: any) {
+                      toast({ title: "Error", description: err.message, variant: "destructive" });
+                    } finally {
+                      setCashConfirming(false);
+                    }
+                  }}
+                >
+                  <Check className="h-4 w-4" />
+                  {cashConfirming ? "Confirming..." : `Confirm R${(tripRider as any).pendingBalance?.toFixed(2)} Cash Received`}
+                </button>
+              )}
+            </div>
+          )}
+
+          {cashConfirmed && (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-3 flex items-center gap-2">
+              <Check className="h-4 w-4 text-green-600" />
+              <span className="text-sm font-semibold text-green-700">Cash payment confirmed — receipt sent to rider</span>
+            </div>
+          )}
 
           <Button size="lg" className="w-full h-14 rounded-2xl text-lg font-bold bg-black text-white hover:bg-gray-900" onClick={advanceTrip} data-testid="btn-advance-trip">
             {tripPhase === "arriving" ? "Arrived at Pickup" : tripPhase === "pickup" ? (isParcel ? "Collected Parcel" : "Start Trip") : (isParcel ? "Delivered" : "Complete Trip")}

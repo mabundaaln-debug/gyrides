@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth";
-import { createTrip, updateTrip, updateUser, sendSosAlert, uploadProfilePicture, getWebauthnRegisterOptions, verifyWebauthnRegistration, getWebauthnCredentials, deleteWebauthnCredential, createYocoCheckout, getPublicConfig, chargeYocoToken, getRiderPendingBalance } from "@/lib/api";
+import { createTrip, updateTrip, updateUser, sendSosAlert, uploadProfilePicture, getWebauthnRegisterOptions, verifyWebauthnRegistration, getWebauthnCredentials, deleteWebauthnCredential, createYocoCheckout, getPublicConfig, chargeYocoToken, getRiderPendingBalance, getTripReceipt } from "@/lib/api";
+import { generateReceiptPDF } from "@/lib/generateReceipt";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -102,6 +103,7 @@ export default function RiderApp() {
   const [tipCharged, setTipCharged] = useState(false);
   const [tipSubmitting, setTipSubmitting] = useState(false);
   const [pendingBalance, setPendingBalance] = useState(0);
+  const [downloadingReceipt, setDownloadingReceipt] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -1736,10 +1738,38 @@ export default function RiderApp() {
             <Button className="w-full h-14 rounded-2xl bg-black text-white hover:bg-gray-900 font-bold text-lg" onClick={handleSubmitRating} data-testid="btn-submit-rating">
               {driverRating > 0 ? `Submit ${driverRating}-Star Rating` : "Done"}
             </Button>
+            {pendingBalance > 0 && currentTrip?.paymentMethod === "card" && (
+              <div className="bg-orange-50 border border-orange-200 rounded-2xl p-3 flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-orange-500 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-orange-800">Outstanding balance: R{pendingBalance.toFixed(2)}</p>
+                  <p className="text-xs text-orange-700 mt-0.5">Your card payment failed. Please pay your driver cash — they will confirm receipt on their app and your receipt will be ready.</p>
+                </div>
+              </div>
+            )}
             <div className="flex gap-3">
-              <Button variant="outline" className="flex-1 h-12 rounded-2xl text-sm gap-2" onClick={() => {
-                toast({ title: "Receipt", description: "Receipt download will be available soon" });
-              }} data-testid="btn-download-receipt"><Download className="h-4 w-4" /> Receipt</Button>
+              <Button
+                variant="outline"
+                className="flex-1 h-12 rounded-2xl text-sm gap-2"
+                disabled={downloadingReceipt}
+                data-testid="btn-download-receipt"
+                onClick={async () => {
+                  if (!currentTrip) return;
+                  setDownloadingReceipt(true);
+                  try {
+                    const receiptData = await getTripReceipt(currentTrip.id);
+                    await generateReceiptPDF(receiptData);
+                    toast({ title: "Receipt downloaded!", description: "Check your downloads folder." });
+                  } catch (err: any) {
+                    toast({ title: "Download failed", description: err.message || "Could not generate receipt.", variant: "destructive" });
+                  } finally {
+                    setDownloadingReceipt(false);
+                  }
+                }}
+              >
+                <Download className="h-4 w-4" />
+                {downloadingReceipt ? "Generating..." : "Receipt PDF"}
+              </Button>
               <Button variant="outline" className="flex-1 h-12 rounded-2xl text-sm gap-2" onClick={() => { setView("confirm"); }} data-testid="btn-rebook"><RotateCcw className="h-4 w-4" /> Rebook</Button>
             </div>
           </div>
