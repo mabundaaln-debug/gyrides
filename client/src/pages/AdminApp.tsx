@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { Users, Car, DollarSign, LogOut, ChevronRight, ChevronLeft, Star, MapPin, TrendingUp, Activity, AlertCircle, CheckCircle, Shield, XCircle, FileText, Eye, User as UserIcon, AlertTriangle, Phone, MessageCircle, KeyRound, ShieldCheck, ShieldX, Lock, EyeOff, Clock } from "lucide-react";
+import { Users, Car, DollarSign, LogOut, ChevronRight, ChevronLeft, Star, MapPin, TrendingUp, Activity, AlertCircle, CheckCircle, Shield, XCircle, FileText, Eye, User as UserIcon, AlertTriangle, Phone, MessageCircle, KeyRound, ShieldCheck, ShieldX, Lock, EyeOff, Clock, Download, BarChart3 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { approveDriver, rejectDriver, updateSosAlert, getUser, adminResetUserPassword, verifyUser, getPendingPasswordResetRequests, updatePasswordResetRequest } from "@/lib/api";
+import { generateStatementPDF } from "@/lib/generateStatement";
 import { useToast } from "@/hooks/use-toast";
 import TripChat from "@/components/TripChat";
 import type { User, Trip, VehicleType, SosAlert } from "@shared/schema";
@@ -15,7 +16,7 @@ import type { User, Trip, VehicleType, SosAlert } from "@shared/schema";
 export default function AdminApp() {
   const { user, logout } = useAuth();
   const [, setLocation] = useLocation();
-  const [view, setView] = useState<"dashboard" | "drivers" | "trips" | "pricing" | "approvals" | "review-driver" | "sos" | "users">("dashboard");
+  const [view, setView] = useState<"dashboard" | "drivers" | "trips" | "pricing" | "approvals" | "review-driver" | "sos" | "users" | "statements">("dashboard");
   const [reviewingDriver, setReviewingDriver] = useState<User | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [showRejectInput, setShowRejectInput] = useState(false);
@@ -26,6 +27,11 @@ export default function AdminApp() {
   const [resetPasswordValue, setResetPasswordValue] = useState("");
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [stmtDriverId, setStmtDriverId] = useState("");
+  const [stmtMonth, setStmtMonth] = useState(() => new Date().getMonth() + 1);
+  const [stmtYear, setStmtYear] = useState(() => new Date().getFullYear());
+  const [stmtData, setStmtData] = useState<any>(null);
+  const [stmtLoading, setStmtLoading] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -753,6 +759,193 @@ export default function AdminApp() {
     );
   }
 
+  // ── Driver Statements ──
+  if (view === "statements") {
+    const approvedDrivers = drivers.filter(d => d.approvalStatus === "approved");
+    const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    const years = [new Date().getFullYear(), new Date().getFullYear() - 1];
+
+    const fetchStatement = async () => {
+      if (!stmtDriverId) { toast({ title: "Select a driver", variant: "destructive" }); return; }
+      setStmtLoading(true);
+      setStmtData(null);
+      try {
+        const res = await fetch(`/api/admin/driver-statement?driverId=${stmtDriverId}&month=${stmtMonth}&year=${stmtYear}`, { credentials: "include" });
+        if (!res.ok) throw new Error(await res.text());
+        setStmtData(await res.json());
+      } catch (err: any) {
+        toast({ title: "Failed to load statement", description: err.message, variant: "destructive" });
+      } finally {
+        setStmtLoading(false);
+      }
+    };
+
+    const handleDownload = () => {
+      if (!stmtData) return;
+      generateStatementPDF(stmtData);
+    };
+
+    return (
+      <div className="min-h-[100dvh] bg-gray-50 flex flex-col">
+        <div className="bg-white p-4 flex items-center gap-3 border-b sticky top-0 z-10">
+          <Button variant="ghost" size="icon" onClick={() => { setView("dashboard"); setStmtData(null); }} className="rounded-full"><ChevronLeft className="h-6 w-6" /></Button>
+          <h1 className="text-xl font-bold">Driver Statements</h1>
+        </div>
+
+        <div className="flex-1 p-4 space-y-4 overflow-auto pb-8">
+          {/* Filters */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
+            <h2 className="font-bold text-sm">Generate Statement</h2>
+
+            <div>
+              <label className="text-xs text-gray-500 font-medium block mb-1">Driver</label>
+              <select
+                data-testid="stmt-driver-select"
+                value={stmtDriverId}
+                onChange={e => { setStmtDriverId(e.target.value); setStmtData(null); }}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
+              >
+                <option value="">— Select a driver —</option>
+                {approvedDrivers.map(d => (
+                  <option key={d.id} value={d.id}>{d.fullName} · {d.phone}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="text-xs text-gray-500 font-medium block mb-1">Month</label>
+                <select
+                  data-testid="stmt-month-select"
+                  value={stmtMonth}
+                  onChange={e => { setStmtMonth(Number(e.target.value)); setStmtData(null); }}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                >
+                  {MONTH_NAMES.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+                </select>
+              </div>
+              <div className="flex-1">
+                <label className="text-xs text-gray-500 font-medium block mb-1">Year</label>
+                <select
+                  data-testid="stmt-year-select"
+                  value={stmtYear}
+                  onChange={e => { setStmtYear(Number(e.target.value)); setStmtData(null); }}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                >
+                  {years.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <button
+              data-testid="btn-generate-statement"
+              onClick={fetchStatement}
+              disabled={stmtLoading || !stmtDriverId}
+              className="w-full h-12 rounded-xl bg-black text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-gray-900 transition-colors"
+            >
+              <BarChart3 className="h-4 w-4" />
+              {stmtLoading ? "Loading..." : "Generate Statement"}
+            </button>
+          </div>
+
+          {/* Statement Preview */}
+          {stmtData && (
+            <>
+              {/* Driver card */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center font-bold text-lg text-black">
+                    {stmtData.driver.fullName[0]}
+                  </div>
+                  <div>
+                    <div className="font-bold">{stmtData.driver.fullName}</div>
+                    <div className="text-xs text-gray-500">{stmtData.driver.phone}</div>
+                    {stmtData.driver.vehicleMake && (
+                      <div className="text-xs text-gray-500">{stmtData.driver.vehicleMake} {stmtData.driver.vehicleModel} · {stmtData.driver.licensePlate || "No plate"}</div>
+                    )}
+                  </div>
+                </div>
+                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{MONTH_NAMES[stmtData.month - 1]} {stmtData.year} Statement</div>
+              </div>
+
+              {/* Summary stats */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
+                  <div className="text-xs text-gray-500 mb-1">Completed Trips</div>
+                  <div className="text-2xl font-bold">{stmtData.summary.completedTrips}</div>
+                  <div className="text-[10px] text-gray-400">{stmtData.summary.cancelledTrips} cancelled</div>
+                </div>
+                <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
+                  <div className="text-xs text-gray-500 mb-1">Gross Fares</div>
+                  <div className="text-2xl font-bold">R{stmtData.summary.totalFare.toFixed(2)}</div>
+                  <div className="text-[10px] text-gray-400">Cash: {stmtData.summary.cashTrips} · Card: {stmtData.summary.cardTrips}</div>
+                </div>
+                <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
+                  <div className="text-xs text-gray-500 mb-1">Platform Fee (15%)</div>
+                  <div className="text-xl font-bold text-red-600">R{stmtData.summary.platformFee.toFixed(2)}</div>
+                </div>
+                <div className="bg-yellow-400 rounded-xl p-3 shadow-sm">
+                  <div className="text-xs font-semibold text-yellow-900 mb-1">Driver Payout (85%)</div>
+                  <div className="text-2xl font-bold text-black">R{stmtData.summary.driverPayout.toFixed(2)}</div>
+                </div>
+              </div>
+
+              {/* Trip list */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                  <h3 className="font-bold text-sm">Trip Log ({stmtData.trips.length})</h3>
+                  <span className="text-xs text-gray-500">{MONTH_NAMES[stmtData.month - 1]} {stmtData.year}</span>
+                </div>
+                {stmtData.trips.length === 0 ? (
+                  <div className="p-8 text-center text-gray-400 text-sm">No trips found for this period</div>
+                ) : (
+                  <div className="divide-y divide-gray-50">
+                    {stmtData.trips.map((trip: any) => (
+                      <div key={trip.id} className="px-4 py-3 flex items-start gap-3" data-testid={`stmt-trip-${trip.id}`}>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs text-gray-500 mb-0.5">
+                            {trip.createdAt ? new Date(trip.createdAt).toLocaleDateString("en-ZA", { day: "2-digit", month: "short" }) : "—"}
+                            {" · "}
+                            {trip.createdAt ? new Date(trip.createdAt).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" }) : ""}
+                          </div>
+                          <div className="text-sm font-medium truncate">{trip.pickupName} → {trip.dropoffName}</div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[10px] text-gray-400 capitalize">{trip.paymentMethod}</span>
+                            {trip.duration && <span className="text-[10px] text-gray-400">{trip.duration} min</span>}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="font-bold text-sm">R{trip.fare.toFixed(2)}</div>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                            trip.status === "completed" ? "bg-green-100 text-green-700" :
+                            trip.status === "cancelled" ? "bg-red-100 text-red-600" :
+                            "bg-gray-100 text-gray-500"
+                          }`}>
+                            {trip.status === "completed" ? "Done" : trip.status === "cancelled" ? "Cancelled" : trip.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Download button */}
+              <button
+                data-testid="btn-download-statement"
+                onClick={handleDownload}
+                className="w-full h-14 rounded-2xl bg-black text-white font-bold text-base flex items-center justify-center gap-3 hover:bg-gray-900 transition-colors shadow-lg"
+              >
+                <Download className="h-5 w-5" />
+                Download PDF Statement
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // ── Dashboard ──
   return (
     <div className="min-h-[100dvh] bg-gray-50 flex flex-col">
@@ -936,6 +1129,17 @@ export default function AdminApp() {
               <div className="text-left">
                 <div className="font-bold text-sm">Vehicles & Pricing</div>
                 <div className="text-[10px] text-gray-500">{vehicleTypes.length} categories</div>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-gray-400" />
+          </Button>
+
+          <Button variant="outline" className="w-full justify-between h-14 rounded-xl bg-white border-gray-100 shadow-sm px-4" onClick={() => setView("statements")} data-testid="btn-manage-statements">
+            <div className="flex items-center gap-3">
+              <div className="bg-yellow-50 p-2 rounded-lg text-yellow-600"><BarChart3 className="h-4 w-4" /></div>
+              <div className="text-left">
+                <div className="font-bold text-sm">Driver Statements</div>
+                <div className="text-[10px] text-gray-500">Monthly earnings & reimbursements</div>
               </div>
             </div>
             <ChevronRight className="h-4 w-4 text-gray-400" />

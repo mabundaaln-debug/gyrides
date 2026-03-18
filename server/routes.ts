@@ -769,6 +769,45 @@ export async function registerRoutes(
     return res.json(stats);
   });
 
+  // Driver earnings statement for a specific month
+  app.get("/api/admin/driver-statement", async (req, res) => {
+    try {
+      const { driverId, month, year } = req.query as { driverId: string; month: string; year: string };
+      if (!driverId || !month || !year) return res.status(400).json({ message: "driverId, month and year required" });
+      const driver = await storage.getUser(driverId);
+      if (!driver) return res.status(404).json({ message: "Driver not found" });
+      const allDriverTrips = await storage.getTripsByDriver(driverId);
+      const m = parseInt(month, 10);
+      const y = parseInt(year, 10);
+      const monthTrips = allDriverTrips.filter(t => {
+        const d = new Date(t.createdAt!);
+        return d.getFullYear() === y && d.getMonth() + 1 === m;
+      });
+      const completed = monthTrips.filter(t => t.status === "completed");
+      const totalFare = completed.reduce((s, t) => s + (t.fare || 0), 0);
+      const platformFee = Math.round(totalFare * 0.15 * 100) / 100;
+      const driverPayout = Math.round(totalFare * 0.85 * 100) / 100;
+      return res.json({
+        driver,
+        month: m,
+        year: y,
+        trips: monthTrips,
+        summary: {
+          totalTrips: monthTrips.length,
+          completedTrips: completed.length,
+          cancelledTrips: monthTrips.filter(t => t.status === "cancelled").length,
+          totalFare: Math.round(totalFare * 100) / 100,
+          platformFee,
+          driverPayout,
+          cashTrips: completed.filter(t => t.paymentMethod === "cash").length,
+          cardTrips: completed.filter(t => t.paymentMethod === "card").length,
+        },
+      });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── Messages ──
   app.get("/api/messages/:tripId", async (req, res) => {
     const msgs = await storage.getMessagesByTrip(req.params.tripId);
