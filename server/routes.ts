@@ -135,7 +135,37 @@ export async function registerRoutes(
     }
   });
 
+  // ── Public config ──
+  app.get("/api/config/public", (_req, res) => {
+    res.json({ yocoPublicKey: process.env.YOCO_PUBLIC_KEY || "" });
+  });
+
   // ── Yoco Payments ──
+  app.post("/api/payments/yoco/charge", async (req, res) => {
+    const secretKey = process.env.YOCO_SECRET_KEY;
+    if (!secretKey) return res.status(500).json({ message: "Yoco not configured" });
+    try {
+      const { token, amountInCents, tripId } = req.body;
+      if (!token || !amountInCents) return res.status(400).json({ message: "token and amountInCents required" });
+      const response = await fetch("https://online.yoco.com/v1/charges/", {
+        method: "POST",
+        headers: { "X-Auth-Token": secretKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ token, amountInCents, currency: "ZAR" }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        console.error("[Yoco] Charge error:", JSON.stringify(data));
+        return res.status(response.status).json({ message: data.message || data.error || "Payment failed", yocoError: data });
+      }
+      if (tripId) {
+        try { await storage.updateTrip(tripId, { paymentMethod: "card" as any }); } catch {}
+      }
+      return res.json({ success: true, chargeId: data.id });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   app.post("/api/payments/yoco/checkout", async (req, res) => {
     const yocoKey = process.env.YOCO_SECRET_KEY;
     if (!yocoKey) {

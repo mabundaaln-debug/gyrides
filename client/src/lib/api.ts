@@ -157,3 +157,17 @@ export async function getWebauthnCredentials(userId: string): Promise<any[]> {
 export async function deleteWebauthnCredential(id: string): Promise<void> {
   await apiRequest("DELETE", `/api/webauthn/credentials/${id}`);
 }
+
+export async function getPublicConfig(): Promise<{ yocoPublicKey: string }> {
+  const res = await fetch("/api/config/public");
+  return res.json();
+}
+
+export async function chargeYocoToken(data: { token: string; amountInCents: number; tripId?: string }): Promise<{ success: boolean; chargeId: string }> {
+  const res = await apiRequest("POST", "/api/payments/yoco/charge", data);
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || "Card payment failed");
+  }
+  return res.json();
+}

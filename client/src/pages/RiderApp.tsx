@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth";
-import { createTrip, updateTrip, updateUser, sendSosAlert, uploadProfilePicture, getWebauthnRegisterOptions, verifyWebauthnRegistration, getWebauthnCredentials, deleteWebauthnCredential, createYocoCheckout } from "@/lib/api";
+import { createTrip, updateTrip, updateUser, sendSosAlert, uploadProfilePicture, getWebauthnRegisterOptions, verifyWebauthnRegistration, getWebauthnCredentials, deleteWebauthnCredential, createYocoCheckout, getPublicConfig, chargeYocoToken } from "@/lib/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -93,6 +93,10 @@ export default function RiderApp() {
   const [driverPos, setDriverPos] = useState<{ lat: number; lng: number } | null>(null);
   const [tripEta, setTripEta] = useState<number | null>(null);
   const [tripStartTime, setTripStartTime] = useState<number | null>(null);
+  const [yocoPublicKey, setYocoPublicKey] = useState("");
+  const [cardCharged, setCardCharged] = useState(false);
+  const [cardChargeId, setCardChargeId] = useState("");
+  const [cardVerifying, setCardVerifying] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -148,6 +152,51 @@ export default function RiderApp() {
       setLocation("/");
     }
   }, [user]);
+
+  // Load Yoco SDK and public key
+  useEffect(() => {
+    getPublicConfig().then(cfg => {
+      if (cfg.yocoPublicKey) setYocoPublicKey(cfg.yocoPublicKey);
+    }).catch(() => {});
+    if (!document.getElementById("yoco-sdk")) {
+      const s = document.createElement("script");
+      s.id = "yoco-sdk";
+      s.src = "https://js.yoco.com/sdk/v1/yoco-sdk-web.js";
+      document.head.appendChild(s);
+    }
+  }, []);
+
+  const handleYocoVerify = useCallback((fare: number, onSuccess: () => void) => {
+    const YocoSDK = (window as any).YocoSDK;
+    if (!YocoSDK || !yocoPublicKey) {
+      toast({ title: "Yoco not ready", description: "Payment SDK is loading, please try again in a moment.", variant: "destructive" });
+      return;
+    }
+    setCardVerifying(true);
+    const yoco = new YocoSDK({ publicKey: yocoPublicKey });
+    yoco.showPopup({
+      amountInCents: Math.round(fare * 100),
+      currency: "ZAR",
+      name: "GY Rides",
+      description: "Card verification & payment",
+      callback: async (result: any) => {
+        setCardVerifying(false);
+        if (result.error) {
+          toast({ title: "Card declined", description: result.error.message || "Please check your card details and try again.", variant: "destructive" });
+          return;
+        }
+        try {
+          const charge = await chargeYocoToken({ token: result.id, amountInCents: Math.round(fare * 100) });
+          setCardCharged(true);
+          setCardChargeId(charge.chargeId);
+          toast({ title: "Card verified ✓", description: `R${fare} charged successfully. Your ride is confirmed.` });
+          onSuccess();
+        } catch (err: any) {
+          toast({ title: "Payment failed", description: err.message || "Card charge failed. Please try another payment method.", variant: "destructive" });
+        }
+      },
+    });
+  }, [yocoPublicKey, toast]);
 
   const { data: savedPlaces = [] } = useQuery<SavedPlace[]>({
     queryKey: ["/api/saved-places", user?.id ?? ""],
@@ -1333,8 +1382,21 @@ export default function RiderApp() {
             </div>
           </div>
 
-          <Button size="lg" className="w-full h-14 rounded-2xl text-lg font-bold bg-black text-white hover:bg-gray-900" disabled={!selectedVehicle} onClick={handleBookRide} data-testid="btn-confirm-ride">
-            {selectedVehicle ? `Book ${selectedVehicle.name} · R${calcFare(selectedVehicle)}` : "Select a ride"}
+          <Button
+            size="lg"
+            className="w-full h-14 rounded-2xl text-lg font-bold bg-black text-white hover:bg-gray-900"
+            disabled={!selectedVehicle || cardVerifying}
+            onClick={() => {
+              if (!selectedVehicle) return;
+              if (paymentMethod === "card") {
+                handleYocoVerify(calcFare(selectedVehicle), handleBookRide);
+              } else {
+                handleBookRide();
+              }
+            }}
+            data-testid="btn-confirm-ride"
+          >
+            {cardVerifying ? "Verifying card..." : selectedVehicle ? `Book ${selectedVehicle.name} · R${calcFare(selectedVehicle)}` : "Select a ride"}
           </Button>
         </div>
       </div>
@@ -1540,27 +1602,25 @@ export default function RiderApp() {
           </div>
 
           {currentTrip?.paymentMethod === "card" && (
-            <button
-              className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-base flex items-center justify-center gap-2 mb-4 transition-colors"
-              data-testid="btn-pay-yoco"
-              onClick={async () => {
-                try {
-                  const amountInCents = Math.round((currentTrip.fare || 0) * 100);
-                  const checkout = await createYocoCheckout({
-                    amount: amountInCents,
-                    tripId: currentTrip.id,
-                    riderId: user.id,
-                    description: `GY Rides: ${currentTrip.pickupName} → ${currentTrip.dropoffName}`,
+            cardCharged ? (
+              <div className="w-full h-14 rounded-2xl bg-green-50 border border-green-200 flex items-center justify-center gap-2 mb-4">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <span className="font-bold text-green-700">R{currentTrip?.fare} paid by card</span>
+              </div>
+            ) : (
+              <button
+                className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-base flex items-center justify-center gap-2 mb-4 transition-colors"
+                data-testid="btn-pay-yoco"
+                onClick={() => {
+                  handleYocoVerify(currentTrip.fare || 0, () => {
+                    if (currentTrip?.id) updateTrip(currentTrip.id, { paymentMethod: "card" as any }).catch(() => {});
                   });
-                  window.location.href = checkout.redirectUrl;
-                } catch (err: any) {
-                  toast({ title: "Payment failed", description: err.message || "Could not open Yoco. Please try again.", variant: "destructive" });
-                }
-              }}
-            >
-              <CreditCard className="h-5 w-5" />
-              Pay R{currentTrip?.fare} with Yoco
-            </button>
+                }}
+              >
+                <CreditCard className="h-5 w-5" />
+                Pay R{currentTrip?.fare} with Yoco
+              </button>
+            )
           )}
 
           {assignedDriver && (
