@@ -362,23 +362,6 @@ export default function RiderApp() {
       setCurrentTrip(trip);
       if (driver) setAssignedDriver(driver);
 
-      if (paymentMethod === "card") {
-        try {
-          const amountInCents = Math.round(fare * 100);
-          const checkout = await createYocoCheckout({
-            amount: amountInCents,
-            tripId: trip.id,
-            riderId: user.id,
-            description: `GY Rides: ${pickup.name} → ${dropoff.name}`,
-          });
-          window.location.href = checkout.redirectUrl;
-          return;
-        } catch (err: any) {
-          toast({ title: "Yoco payment failed", description: err.message || "Could not start payment. Ride booked with cash instead.", variant: "destructive" });
-          await updateTrip(trip.id, { paymentMethod: "cash" as any });
-        }
-      }
-
       setTimeout(async () => {
         if (driver) {
           const updated = await updateTrip(trip.id, { status: "accepted", driverId: driver.id });
@@ -1550,8 +1533,35 @@ export default function RiderApp() {
               <div className="flex justify-between text-sm"><span className="text-gray-500">Type</span><span className="font-medium capitalize">{currentTrip.rideType}</span></div>
             )}
             <div className="flex justify-between text-sm border-t pt-3 border-gray-200"><span className="text-gray-500">Fare</span><span className="text-xl font-bold">R{currentTrip?.fare}</span></div>
-            <div className="flex justify-between text-sm"><span className="text-gray-500">Payment</span><span className="font-medium text-green-600 capitalize">{currentTrip?.paymentMethod || "Cash"}</span></div>
+            <div className="flex justify-between text-sm items-center">
+              <span className="text-gray-500">Payment</span>
+              <span className="font-medium text-green-600 capitalize">{currentTrip?.paymentMethod === "card" ? "Yoco (card)" : currentTrip?.paymentMethod || "Cash"}</span>
+            </div>
           </div>
+
+          {currentTrip?.paymentMethod === "card" && (
+            <button
+              className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-base flex items-center justify-center gap-2 mb-4 transition-colors"
+              data-testid="btn-pay-yoco"
+              onClick={async () => {
+                try {
+                  const amountInCents = Math.round((currentTrip.fare || 0) * 100);
+                  const checkout = await createYocoCheckout({
+                    amount: amountInCents,
+                    tripId: currentTrip.id,
+                    riderId: user.id,
+                    description: `GY Rides: ${currentTrip.pickupName} → ${currentTrip.dropoffName}`,
+                  });
+                  window.location.href = checkout.redirectUrl;
+                } catch (err: any) {
+                  toast({ title: "Payment failed", description: err.message || "Could not open Yoco. Please try again.", variant: "destructive" });
+                }
+              }}
+            >
+              <CreditCard className="h-5 w-5" />
+              Pay R{currentTrip?.fare} with Yoco
+            </button>
+          )}
 
           {assignedDriver && (
             <div className="mb-6">
