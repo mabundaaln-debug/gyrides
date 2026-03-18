@@ -43,12 +43,30 @@ interface StatementData {
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
-export function generateStatementPDF(data: StatementData): void {
+async function fetchLogoBase64(): Promise<string | null> {
+  try {
+    const res = await fetch("/logo.png");
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+export async function generateStatementPDF(data: StatementData): Promise<void> {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const { driver, month, year, trips, summary } = data;
   const W = 210;
   const margin = 16;
   let y = 0;
+
+  const logoDataUrl = await fetchLogoBase64();
 
   const fmtDate = (d: string | Date | null | undefined) => {
     if (!d) return "—";
@@ -62,26 +80,34 @@ export function generateStatementPDF(data: StatementData): void {
 
   // ── Header band ──
   doc.setFillColor(0, 0, 0);
-  doc.rect(0, 0, W, 46, "F");
+  doc.rect(0, 0, W, 52, "F");
 
-  doc.setFillColor(250, 204, 21);
-  doc.circle(margin + 8, 23, 9, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(0, 0, 0);
-  doc.text("GY", margin + 8, 25.5, { align: "center" });
+  // Logo image (top-left)
+  if (logoDataUrl) {
+    doc.addImage(logoDataUrl, "PNG", margin, 4, 40, 40);
+  } else {
+    // Fallback circle logo
+    doc.setFillColor(250, 204, 21);
+    doc.circle(margin + 10, 26, 10, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.text("GY", margin + 10, 29, { align: "center" });
+  }
 
+  // Company name text (right of logo)
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
   doc.setTextColor(255, 255, 255);
-  doc.text("GY RIDES", margin + 21, 19);
+  doc.text("GY RIDES", margin + 46, 20);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(180, 180, 180);
-  doc.text("GIYANI'S TRUSTED RIDE-HAILING SERVICE", margin + 21, 26);
+  doc.text("GIYANI'S TRUSTED RIDE-HAILING SERVICE", margin + 46, 28);
   doc.setFontSize(6.5);
-  doc.text("Powered by Mpfuno Medical Services & Dr NI Mabunda", margin + 21, 32);
+  doc.text("Powered by Mpfuno Medical Services & Dr NI Mabunda", margin + 46, 35);
 
+  // Statement label (right side)
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(250, 204, 21);
@@ -89,11 +115,11 @@ export function generateStatementPDF(data: StatementData): void {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(180, 180, 180);
-  doc.text(`Period: ${MONTH_NAMES[month - 1]} ${year}`, W - margin, 25, { align: "right" });
+  doc.text(`Period: ${MONTH_NAMES[month - 1]} ${year}`, W - margin, 26, { align: "right" });
   const generatedOn = new Date().toLocaleDateString("en-ZA", { day: "2-digit", month: "short", year: "numeric" });
-  doc.text(`Generated: ${generatedOn}`, W - margin, 31, { align: "right" });
+  doc.text(`Generated: ${generatedOn}`, W - margin, 33, { align: "right" });
 
-  y = 54;
+  y = 60;
 
   // ── Driver Info ──
   doc.setFont("helvetica", "bold");

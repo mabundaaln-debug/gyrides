@@ -780,9 +780,13 @@ export default function AdminApp() {
       }
     };
 
-    const handleDownload = () => {
+    const handleDownload = async () => {
       if (!stmtData) return;
-      generateStatementPDF(stmtData);
+      try {
+        await generateStatementPDF(stmtData);
+      } catch (err: any) {
+        toast({ title: "PDF error", description: err.message, variant: "destructive" });
+      }
     };
 
     return (

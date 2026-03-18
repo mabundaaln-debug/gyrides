@@ -1,5 +1,21 @@
 import { jsPDF } from "jspdf";
 
+async function fetchLogoBase64(): Promise<string | null> {
+  try {
+    const res = await fetch("/logo.png");
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 interface ReceiptData {
   trip: {
     id: string;
@@ -29,29 +45,35 @@ export async function generateReceiptPDF(data: ReceiptData): Promise<void> {
   const margin = 18;
   let y = 0;
 
+  const logoDataUrl = await fetchLogoBase64();
+
   // ── Header band ──
   doc.setFillColor(0, 0, 0);
-  doc.rect(0, 0, W, 42, "F");
+  doc.rect(0, 0, W, 50, "F");
 
-  // Logo placeholder circle
-  doc.setFillColor(250, 204, 21);
-  doc.circle(margin + 8, 21, 8, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(0, 0, 0);
-  doc.text("GY", margin + 8, 23.5, { align: "center" });
+  // Logo image (top-left)
+  if (logoDataUrl) {
+    doc.addImage(logoDataUrl, "PNG", margin, 4, 38, 38);
+  } else {
+    doc.setFillColor(250, 204, 21);
+    doc.circle(margin + 8, 25, 9, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+    doc.text("GY", margin + 8, 27.5, { align: "center" });
+  }
 
   // Company name
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
   doc.setTextColor(255, 255, 255);
-  doc.text("GY RIDES", margin + 20, 18);
+  doc.text("GY RIDES", margin + 43, 19);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(180, 180, 180);
-  doc.text("GIYANI'S TRUSTED RIDE-HAILING SERVICE", margin + 20, 25);
+  doc.text("GIYANI'S TRUSTED RIDE-HAILING SERVICE", margin + 43, 27);
   doc.setFontSize(7);
-  doc.text("Powered by Mpfuno Medical Services & Dr NI Mabunda", margin + 20, 31);
+  doc.text("Powered by Mpfuno Medical Services & Dr NI Mabunda", margin + 43, 34);
 
   // Receipt label right side
   doc.setFont("helvetica", "bold");
@@ -61,14 +83,14 @@ export async function generateReceiptPDF(data: ReceiptData): Promise<void> {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(180, 180, 180);
-  doc.text(`#${trip.id.slice(-8).toUpperCase()}`, W - margin, 25, { align: "right" });
+  doc.text(`#${trip.id.slice(-8).toUpperCase()}`, W - margin, 26, { align: "right" });
 
   const tripDate = trip.completedAt || trip.createdAt;
   const dateStr = tripDate ? new Date(tripDate).toLocaleDateString("en-ZA", { day: "2-digit", month: "short", year: "numeric" }) : new Date().toLocaleDateString("en-ZA");
   const timeStr = tripDate ? new Date(tripDate).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" }) : "";
-  doc.text(`${dateStr}  ${timeStr}`, W - margin, 32, { align: "right" });
+  doc.text(`${dateStr}  ${timeStr}`, W - margin, 33, { align: "right" });
 
-  y = 52;
+  y = 58;
 
   // ── Route section ──
   doc.setFont("helvetica", "bold");
