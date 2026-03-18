@@ -20,6 +20,7 @@ export default function AdminApp() {
   const [reviewingDriver, setReviewingDriver] = useState<User | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [showRejectInput, setShowRejectInput] = useState(false);
+  const [viewedDocs, setViewedDocs] = useState<Set<string>>(new Set());
   const [sosNotes, setSosNotes] = useState<Record<string, string>>({});
   const [chatTripId, setChatTripId] = useState<string | null>(null);
   const [chatLabel, setChatLabel] = useState("");
@@ -127,16 +128,59 @@ export default function AdminApp() {
   // ── Review Driver Application ──
   if (view === "review-driver" && reviewingDriver) {
     const d = reviewingDriver;
+    const DOCS = [
+      { label: "Driver's License", doc: d.driverLicenseDoc },
+      { label: "Vehicle License Disc", doc: d.vehicleLicenseDoc },
+      { label: "Roadworthy Certificate", doc: d.roadworthyCertDoc },
+      { label: "Proof of Insurance", doc: d.proofOfInsuranceDoc },
+      { label: "Profile Photo", doc: d.profilePhotoDoc },
+    ];
+    const uploadedDocs = DOCS.filter(x => x.doc);
+    const allDocsViewed = uploadedDocs.length > 0 && uploadedDocs.every(x => viewedDocs.has(x.label));
+    const unviewedCount = uploadedDocs.filter(x => !viewedDocs.has(x.label)).length;
+
+    const PRESET_REASONS = [
+      "Documents are expired",
+      "Documents are unreadable or blurry",
+      "Documents do not match the application details",
+      "Vehicle does not meet requirements",
+      "Incomplete or incorrect information",
+    ];
+
+    const openDoc = (label: string, doc: string) => {
+      setViewedDocs(prev => new Set([...prev, label]));
+      if (doc.startsWith("data:")) {
+        const win = window.open();
+        if (win) { win.document.write(`<html><body style="margin:0;background:#000;display:flex;justify-content:center;align-items:center;min-height:100vh"><img src="${doc}" style="max-width:100%;height:auto" /></body></html>`); }
+      } else {
+        window.open(doc, "_blank");
+      }
+    };
+
     return (
       <div className="min-h-[100dvh] bg-gray-50 flex flex-col">
         <div className="bg-white p-4 flex items-center gap-3 border-b sticky top-0 z-10">
-          <Button variant="ghost" size="icon" onClick={() => { setView("approvals"); setReviewingDriver(null); setShowRejectInput(false); }} className="rounded-full"><ChevronLeft className="h-6 w-6" /></Button>
-          <h1 className="text-xl font-bold">Review Application</h1>
+          <Button variant="ghost" size="icon" onClick={() => { setView("approvals"); setReviewingDriver(null); setShowRejectInput(false); setViewedDocs(new Set()); }} className="rounded-full"><ChevronLeft className="h-6 w-6" /></Button>
+          <div className="flex-1">
+            <h1 className="text-lg font-bold">Review Application</h1>
+            {uploadedDocs.length > 0 && (
+              <p className="text-xs text-gray-500">{viewedDocs.size}/{uploadedDocs.length} documents reviewed</p>
+            )}
+          </div>
+          {!allDocsViewed && uploadedDocs.length > 0 && (
+            <span className="text-[11px] bg-orange-100 text-orange-700 font-bold px-2 py-1 rounded-full">{unviewedCount} doc{unviewedCount > 1 ? "s" : ""} to review</span>
+          )}
         </div>
-        <div className="flex-1 p-4 space-y-4 overflow-auto">
+
+        <div className="flex-1 p-4 space-y-4 overflow-auto pb-28">
+          {/* Applicant profile */}
           <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 text-center">
             <Avatar className="h-16 w-16 mx-auto mb-3 border-2 border-yellow-400">
-              <AvatarFallback className="bg-yellow-400 text-black text-xl font-bold">{d.fullName[0]}</AvatarFallback>
+              {d.profilePhotoDoc ? (
+                <img src={d.profilePhotoDoc} alt={d.fullName} className="w-full h-full object-cover rounded-full" />
+              ) : (
+                <AvatarFallback className="bg-yellow-400 text-black text-xl font-bold">{d.fullName[0]}</AvatarFallback>
+              )}
             </Avatar>
             <h2 className="text-lg font-bold">{d.fullName}</h2>
             <p className="text-gray-500 text-sm">{d.phone}</p>
@@ -144,6 +188,7 @@ export default function AdminApp() {
             <span className="inline-block mt-2 text-xs font-bold px-3 py-1 rounded-full bg-yellow-100 text-yellow-700">Pending Approval</span>
           </div>
 
+          {/* Personal Details */}
           <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-2">
             <h3 className="font-bold text-sm text-gray-600 flex items-center gap-2"><UserIcon className="h-4 w-4" /> Personal Details</h3>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
@@ -154,6 +199,7 @@ export default function AdminApp() {
             </div>
           </div>
 
+          {/* Vehicle Details */}
           <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-2">
             <h3 className="font-bold text-sm text-gray-600 flex items-center gap-2"><Car className="h-4 w-4" /> Vehicle Details</h3>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
@@ -166,6 +212,7 @@ export default function AdminApp() {
             </div>
           </div>
 
+          {/* License Info */}
           <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-2">
             <h3 className="font-bold text-sm text-gray-600 flex items-center gap-2"><FileText className="h-4 w-4" /> License Info</h3>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
@@ -177,72 +224,112 @@ export default function AdminApp() {
             </div>
           </div>
 
+          {/* Documents — must open each to unlock approve */}
           <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-3">
-            <h3 className="font-bold text-sm text-gray-600 flex items-center gap-2"><FileText className="h-4 w-4" /> Uploaded Documents</h3>
-            {[
-              { label: "Driver's License", doc: d.driverLicenseDoc },
-              { label: "Vehicle License Disc", doc: d.vehicleLicenseDoc },
-              { label: "Roadworthy Certificate", doc: d.roadworthyCertDoc },
-              { label: "Proof of Insurance", doc: d.proofOfInsuranceDoc },
-              { label: "Profile Photo", doc: d.profilePhotoDoc },
-            ].map(({ label, doc }) => (
-              <div key={label} className="flex items-center gap-3">
-                {doc ? (
-                  <>
-                    <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
-                    <span className="text-sm flex-1">{label}</span>
-                    {(doc.startsWith("data:image") || (!doc.endsWith(".pdf") && !doc.includes("data:application/pdf"))) && (
-                      <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 shrink-0">
-                        <img src={doc} alt={label} className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                      </div>
-                    )}
-                    <button className="text-xs text-blue-600 font-medium" onClick={() => {
-                      if (doc.startsWith("data:")) {
-                        const win = window.open();
-                        if (win) { win.document.write(`<img src="${doc}" style="max-width:100%;height:auto" />`); }
-                      } else {
-                        window.open(doc, "_blank");
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-sm text-gray-600 flex items-center gap-2"><FileText className="h-4 w-4" /> Uploaded Documents</h3>
+              {!allDocsViewed && uploadedDocs.length > 0 && (
+                <span className="text-[10px] text-orange-600 font-medium">Open each document to enable approval</span>
+              )}
+              {allDocsViewed && <span className="text-[10px] text-green-600 font-bold flex items-center gap-1"><CheckCircle className="h-3 w-3" /> All reviewed</span>}
+            </div>
+            {DOCS.map(({ label, doc }) => {
+              const viewed = viewedDocs.has(label);
+              return (
+                <div key={label} className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${doc ? (viewed ? "bg-green-50" : "bg-orange-50") : "bg-gray-50"}`}>
+                  {doc ? (
+                    <>
+                      {viewed
+                        ? <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
+                        : <Eye className="h-4 w-4 text-orange-400 shrink-0" />
                       }
-                    }}>
-                      <Eye className="h-3.5 w-3.5" />
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <XCircle className="h-4 w-4 text-gray-300 shrink-0" />
-                    <span className="text-sm text-gray-400 flex-1">{label} — not uploaded</span>
-                  </>
-                )}
-              </div>
-            ))}
+                      <span className="text-sm flex-1">{label}</span>
+                      {(!doc.endsWith(".pdf") && !doc.startsWith("data:application/pdf")) && (
+                        <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-gray-100">
+                          <img src={doc} alt={label} className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                        </div>
+                      )}
+                      <button
+                        className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${viewed ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700 hover:bg-orange-200"}`}
+                        onClick={() => openDoc(label, doc)}
+                        data-testid={`view-doc-${label.toLowerCase().replace(/\s+/g, '-')}`}
+                      >
+                        {viewed ? "Reviewed" : "Open"}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-4 w-4 text-gray-300 shrink-0" />
+                      <span className="text-sm text-gray-400 flex-1">{label} — not uploaded</span>
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
+          {/* Rejection panel */}
           {showRejectInput && (
             <div className="bg-red-50 rounded-xl p-4 border border-red-200 space-y-3">
-              <p className="text-sm font-bold text-red-700">Rejection Reason</p>
+              <p className="text-sm font-bold text-red-700 flex items-center gap-2"><XCircle className="h-4 w-4" /> Rejection Feedback</p>
+              <p className="text-xs text-gray-500">Select a reason or write a custom message. This will be shown to the applicant.</p>
+              <div className="flex flex-wrap gap-2">
+                {PRESET_REASONS.map(r => (
+                  <button
+                    key={r}
+                    className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${rejectReason === r ? "bg-red-600 text-white border-red-600" : "bg-white text-gray-600 border-gray-300 hover:border-red-400"}`}
+                    onClick={() => setRejectReason(r)}
+                    data-testid={`preset-reason-${r.slice(0, 20)}`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
               <textarea
                 value={rejectReason}
                 onChange={e => setRejectReason(e.target.value)}
-                placeholder="Explain why the application is rejected..."
-                className="w-full h-24 rounded-lg border border-red-200 p-3 text-sm resize-none"
+                placeholder="Or write a custom message to the applicant..."
+                className="w-full h-24 rounded-lg border border-red-200 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-300"
                 data-testid="input-reject-reason"
               />
+              <p className="text-[11px] text-gray-400">The applicant will see this message and can resubmit after addressing the issue.</p>
               <div className="flex gap-3">
                 <Button variant="outline" className="flex-1 rounded-xl h-11" onClick={() => { setShowRejectInput(false); setRejectReason(""); }}>Cancel</Button>
-                <Button className="flex-1 rounded-xl h-11 bg-red-600 hover:bg-red-700 text-white" onClick={() => handleReject(d.id)} data-testid="btn-confirm-reject">Confirm Reject</Button>
+                <Button
+                  className="flex-1 rounded-xl h-11 bg-red-600 hover:bg-red-700 text-white"
+                  onClick={() => handleReject(d.id)}
+                  disabled={!rejectReason.trim()}
+                  data-testid="btn-confirm-reject"
+                >
+                  Send Feedback & Reject
+                </Button>
               </div>
             </div>
           )}
         </div>
 
+        {/* Action buttons */}
         {!showRejectInput && (
-          <div className="bg-white border-t border-gray-100 p-4 flex gap-3">
-            <Button variant="outline" className="flex-1 h-14 rounded-2xl text-red-600 border-red-200" onClick={() => setShowRejectInput(true)} data-testid="btn-reject-driver">
-              <XCircle className="h-4 w-4 mr-2" /> Reject
-            </Button>
-            <Button className="flex-1 h-14 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-bold" onClick={() => handleApprove(d.id)} data-testid="btn-approve-driver">
-              <CheckCircle className="h-4 w-4 mr-2" /> Approve
-            </Button>
+          <div className="bg-white border-t border-gray-100 p-4 space-y-2 fixed bottom-0 left-0 right-0">
+            {!allDocsViewed && uploadedDocs.length > 0 && (
+              <p className="text-center text-xs text-orange-600 font-medium">
+                Open all documents above to enable approval
+              </p>
+            )}
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1 h-14 rounded-2xl text-red-600 border-red-200" onClick={() => setShowRejectInput(true)} data-testid="btn-reject-driver">
+                <XCircle className="h-4 w-4 mr-2" /> Reject
+              </Button>
+              <Button
+                className={`flex-1 h-14 rounded-2xl font-bold transition-all ${allDocsViewed || uploadedDocs.length === 0 ? "bg-green-600 hover:bg-green-700 text-white" : "bg-gray-200 text-gray-400 cursor-not-allowed"}`}
+                onClick={() => { if (allDocsViewed || uploadedDocs.length === 0) handleApprove(d.id); }}
+                disabled={!allDocsViewed && uploadedDocs.length > 0}
+                data-testid="btn-approve-driver"
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                {allDocsViewed || uploadedDocs.length === 0 ? "Approve" : `Review ${unviewedCount} doc${unviewedCount > 1 ? "s" : ""} first`}
+              </Button>
+            </div>
           </div>
         )}
       </div>
@@ -268,7 +355,7 @@ export default function AdminApp() {
             <button
               key={d.id}
               className="w-full text-left bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center gap-3"
-              onClick={() => { setReviewingDriver(d); setView("review-driver"); }}
+              onClick={() => { setReviewingDriver(d); setView("review-driver"); setViewedDocs(new Set()); setShowRejectInput(false); setRejectReason(""); }}
               data-testid={`pending-driver-${d.id}`}
             >
               <Avatar className="h-11 w-11 border-2 border-yellow-400">
@@ -514,7 +601,7 @@ export default function AdminApp() {
                   ) : u.role === "driver" && u.approvalStatus !== "approved" ? (
                     <button
                       className="flex-1 h-8 rounded-lg text-[11px] font-bold bg-yellow-50 text-yellow-700 hover:bg-yellow-100 transition-colors"
-                      onClick={() => { setReviewingDriver(u); setView("review-driver"); }}
+                      onClick={() => { setReviewingDriver(u); setView("review-driver"); setViewedDocs(new Set()); setShowRejectInput(false); setRejectReason(""); }}
                       data-testid={`btn-review-${u.id}`}
                     >
                       <Eye className="inline h-3 w-3 mr-1" />Review Application
