@@ -77,18 +77,50 @@ export default function DriverOnboarding() {
     if (idx > 0) setStep(keys[idx - 1]);
   };
 
+  const compressAndReadFile = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      // PDFs pass through as-is (can't be canvas-compressed)
+      if (file.type === "application/pdf") {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+        return;
+      }
+      // Compress images via canvas
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        const MAX = 1024;
+        let { width, height } = img;
+        if (width > MAX || height > MAX) {
+          if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
+          else { width = Math.round((width * MAX) / height); height = MAX; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.75));
+      };
+      img.onerror = reject;
+      img.src = objectUrl;
+    });
+  };
+
   const handleFileUpload = (setter: (val: string) => void) => {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*,.pdf";
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          setter(reader.result as string);
-        };
-        reader.readAsDataURL(file);
+      if (!file) return;
+      try {
+        const result = await compressAndReadFile(file);
+        setter(result);
+      } catch {
+        toast({ title: "Upload failed", description: "Could not read the file. Try a different image.", variant: "destructive" });
       }
     };
     input.click();
@@ -122,8 +154,9 @@ export default function DriverOnboarding() {
       });
       setUser(updated);
       toast({ title: "Application submitted!", description: "Your documents are under review. We'll notify you once approved." });
-    } catch {
-      toast({ title: "Submission failed", description: "Please try again", variant: "destructive" });
+    } catch (err: any) {
+      const msg = err?.message || "Please check your connection and try again.";
+      toast({ title: "Submission failed", description: msg, variant: "destructive" });
     }
     setSubmitting(false);
   };
