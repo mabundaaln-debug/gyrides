@@ -1416,7 +1416,8 @@ export default function RiderApp() {
             disabled={!selectedVehicle || cardVerifying}
             onClick={() => {
               if (!selectedVehicle) return;
-              if (paymentMethod === "card") {
+              const isFirstRide = !user?.totalTrips || user.totalTrips === 0;
+              if (paymentMethod === "card" && isFirstRide) {
                 handleYocoVerify(calcFare(selectedVehicle), handleBookRide);
               } else {
                 handleBookRide();
