@@ -32,6 +32,15 @@ const carIcon = new L.DivIcon({
   iconAnchor: [22, 22],
 });
 
+const riderIcon = new L.DivIcon({
+  className: "",
+  html: `<div style="width:38px;height:38px;background:#3b82f6;border:3px solid white;border-radius:50%;box-shadow:0 4px 12px rgba(59,130,246,0.5);display:flex;align-items:center;justify-content:center">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="0"><path d="M12 12c2.7 0 4-1.8 4-4s-1.3-4-4-4-4 1.8-4 4 1.3 4 4 4zm0 2c-4 0-8 2-8 4v1h16v-1c0-2-4-4-8-4z"/></svg>
+  </div>`,
+  iconSize: [38, 38],
+  iconAnchor: [19, 19],
+});
+
 const pinDropIcon = new L.DivIcon({
   className: "",
   html: `<div style="width:36px;height:46px;display:flex;flex-direction:column;align-items:center">
@@ -106,6 +115,7 @@ interface GiyaniMapProps {
   pickup?: { lat: number; lng: number; name?: string } | null;
   dropoff?: { lat: number; lng: number; name?: string } | null;
   driverLocation?: { lat: number; lng: number } | null;
+  riderLocation?: { lat: number; lng: number } | null;
   className?: string;
   showRoute?: boolean;
   interactive?: boolean;
@@ -117,6 +127,7 @@ export default function GiyaniMap({
   pickup,
   dropoff,
   driverLocation,
+  riderLocation,
   className = "",
   showRoute = true,
   interactive = false,
@@ -178,6 +189,7 @@ export default function GiyaniMap({
   if (pickup) fitPoints.push([pickup.lat, pickup.lng]);
   if (dropoff) fitPoints.push([dropoff.lat, dropoff.lng]);
   if (driverLocation) fitPoints.push([driverLocation.lat, driverLocation.lng]);
+  if (riderLocation) fitPoints.push([riderLocation.lat, riderLocation.lng]);
   if (pinDropLocation) fitPoints.push([pinDropLocation.lat, pinDropLocation.lng]);
 
   const handleMapClick = useCallback((lat: number, lng: number) => {
@@ -238,6 +250,12 @@ export default function GiyaniMap({
         {driverLocation && (
           <Marker position={[driverLocation.lat, driverLocation.lng]} icon={carIcon}>
             <Popup>Driver location</Popup>
+          </Marker>
+        )}
+
+        {riderLocation && (
+          <Marker position={[riderLocation.lat, riderLocation.lng]} icon={riderIcon}>
+            <Popup>Rider location</Popup>
           </Marker>
         )}
 

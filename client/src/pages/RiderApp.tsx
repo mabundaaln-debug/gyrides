@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
 import { MapPin, Search, Clock, CreditCard, ChevronLeft, Star, Home as HomeIcon, Briefcase, ShoppingBag, User, History, BookmarkPlus, Car, LogOut, Menu, X, Navigation, Share2, Crosshair, Phone, MessageCircle, Shield, AlertTriangle, Edit2, Tag, StickyNote, RotateCcw, Download, Users, Package, Heart, Bus, Banknote, Wallet, Upload, CheckCircle, UserPlus, Minus, Plus, BadgeCheck, LocateFixed } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -106,6 +106,56 @@ export default function RiderApp() {
   const [downloadingReceipt, setDownloadingReceipt] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // ── Rider GPS tracking refs and state ──
+  const riderGpsWatchRef = useRef<number | null>(null);
+  const riderLastSentRef = useRef<number>(0);
+  const [riderOwnGps, setRiderOwnGps] = useState<{ lat: number; lng: number } | null>(null);
+
+  // ── Track rider GPS while a trip is active ──
+  useEffect(() => {
+    if (!user) return;
+    const tripIsActive = currentTrip && ["requested", "accepted", "on_the_way", "arrived", "in_progress"].includes(currentTrip.status ?? "");
+
+    if (tripIsActive) {
+      if (riderGpsWatchRef.current !== null) return;
+      if (!navigator.geolocation) return;
+
+      riderGpsWatchRef.current = navigator.geolocation.watchPosition(
+        async (pos) => {
+          const { latitude: lat, longitude: lng } = pos.coords;
+          setRiderOwnGps({ lat, lng });
+
+          const now = Date.now();
+          if (now - riderLastSentRef.current < 5000) return;
+          riderLastSentRef.current = now;
+          try {
+            await fetch(`/api/drivers/${user.id}/location`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ lat, lng }),
+            });
+          } catch {}
+        },
+        () => {},
+        { enableHighAccuracy: true, maximumAge: 3000 }
+      );
+    } else {
+      if (riderGpsWatchRef.current !== null) {
+        navigator.geolocation.clearWatch(riderGpsWatchRef.current);
+        riderGpsWatchRef.current = null;
+      }
+      setRiderOwnGps(null);
+    }
+
+    return () => {
+      if (riderGpsWatchRef.current !== null) {
+        navigator.geolocation.clearWatch(riderGpsWatchRef.current);
+        riderGpsWatchRef.current = null;
+      }
+    };
+  }, [currentTrip?.id, currentTrip?.status, user?.id]);
 
   const useCurrentLocation = useCallback((target: "pickup" | "dropoff") => {
     if (!navigator.geolocation) {
@@ -1525,6 +1575,12 @@ export default function RiderApp() {
               <Clock className="h-3.5 w-3.5 text-yellow-500" />
               <span className="text-xs font-bold" data-testid="text-eta">ETA: {etaText}</span>
             </div>
+            {riderOwnGps && (
+              <div className="bg-blue-500 shadow-md rounded-full px-2.5 py-1.5 flex items-center gap-1.5" data-testid="rider-gps-badge">
+                <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                <span className="text-xs font-bold text-white">GPS Live</span>
+              </div>
+            )}
             <button onClick={handleSOS} className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center shadow-lg" data-testid="btn-sos">
               <AlertTriangle className="h-5 w-5 text-white" />
             </button>
@@ -1536,6 +1592,7 @@ export default function RiderApp() {
             pickup={currentTrip ? { lat: currentTrip.pickupLat ?? -23.306, lng: currentTrip.pickupLng ?? 30.718, name: currentTrip.pickupName } : null}
             dropoff={currentTrip ? { lat: currentTrip.dropoffLat ?? -23.315, lng: currentTrip.dropoffLng ?? 30.726, name: currentTrip.dropoffName } : null}
             driverLocation={driverPos}
+            riderLocation={rideStatus === "in_progress" ? riderOwnGps : null}
             className="h-full absolute inset-0"
             showRoute={true}
           />

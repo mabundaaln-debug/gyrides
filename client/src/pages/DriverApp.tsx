@@ -28,6 +28,7 @@ export default function DriverApp() {
   const [tripStartedAt, setTripStartedAt] = useState<Date | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [driverGps, setDriverGps] = useState<{ lat: number; lng: number } | null>(null);
+  const [riderPos, setRiderPos] = useState<{ lat: number; lng: number } | null>(null);
   const gpsWatchRef = useRef<number | null>(null);
   const lastSentRef = useRef<number>(0);
   const queryClient = useQueryClient();
@@ -96,6 +97,27 @@ export default function DriverApp() {
     }, 1000);
     return () => clearInterval(interval);
   }, [tripPhase, tripStartedAt]);
+
+  // ── Poll rider's live GPS every 4 seconds while on a trip ──
+  useEffect(() => {
+    if (!onTrip?.riderId) { setRiderPos(null); return; }
+    let cancelled = false;
+
+    const poll = async () => {
+      if (cancelled) return;
+      try {
+        const res = await fetch(`/api/users/${onTrip.riderId}`, { credentials: "include" });
+        const data = await res.json();
+        if (!cancelled && typeof data.currentLat === "number" && typeof data.currentLng === "number") {
+          setRiderPos({ lat: data.currentLat, lng: data.currentLng });
+        }
+      } catch {}
+    };
+
+    poll();
+    const interval = setInterval(poll, 4000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [onTrip?.id, onTrip?.riderId]);
 
   const formatElapsed = (secs: number) => {
     const m = Math.floor(secs / 60).toString().padStart(2, "0");
@@ -578,7 +600,8 @@ export default function DriverApp() {
           <GiyaniMap
             pickup={{ lat: onTrip.pickupLat ?? -23.31, lng: onTrip.pickupLng ?? 30.72, name: onTrip.pickupName }}
             dropoff={{ lat: onTrip.dropoffLat ?? -23.32, lng: onTrip.dropoffLng ?? 30.71, name: onTrip.dropoffName }}
-            driverLocation={{ lat: (onTrip.pickupLat ?? -23.31) + (tripPhase === "arriving" ? 0.006 : 0.001), lng: (onTrip.pickupLng ?? 30.72) - 0.003 }}
+            driverLocation={driverGps ?? { lat: (onTrip.pickupLat ?? -23.31) + 0.003, lng: (onTrip.pickupLng ?? 30.72) - 0.003 }}
+            riderLocation={tripPhase === "arriving" ? riderPos : null}
             className="h-full absolute inset-0"
             showRoute={true}
           />
