@@ -77,50 +77,34 @@ export default function DriverOnboarding() {
     if (idx > 0) setStep(keys[idx - 1]);
   };
 
-  const compressAndReadFile = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      // PDFs pass through as-is (can't be canvas-compressed)
-      if (file.type === "application/pdf") {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-        return;
-      }
-      // Compress images via canvas
-      const img = new Image();
-      const objectUrl = URL.createObjectURL(file);
-      img.onload = () => {
-        URL.revokeObjectURL(objectUrl);
-        const MAX = 1024;
-        let { width, height } = img;
-        if (width > MAX || height > MAX) {
-          if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
-          else { width = Math.round((width * MAX) / height); height = MAX; }
-        }
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", 0.75));
-      };
-      img.onerror = reject;
-      img.src = objectUrl;
-    });
-  };
+  const [uploading, setUploading] = useState<string | null>(null);
 
-  const handleFileUpload = (setter: (val: string) => void) => {
+  const handleFileUpload = (fieldName: string, setter: (val: string) => void) => {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*,.pdf";
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
+      setUploading(fieldName);
       try {
-        const result = await compressAndReadFile(file);
-        setter(result);
-      } catch {
-        toast({ title: "Upload failed", description: "Could not read the file. Try a different image.", variant: "destructive" });
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/upload/document", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ message: "Upload failed" }));
+          throw new Error(err.message || "Upload failed");
+        }
+        const { url } = await res.json();
+        setter(url);
+      } catch (err: any) {
+        toast({ title: "Upload failed", description: err.message || "Could not upload file. Try again.", variant: "destructive" });
+      } finally {
+        setUploading(null);
       }
     };
     input.click();
@@ -210,32 +194,41 @@ export default function DriverOnboarding() {
     );
   }
 
-  const DocUploadButton = ({ label, value, setter, required = true }: { label: string; value: string; setter: (v: string) => void; required?: boolean }) => (
-    <button
-      className={`w-full p-4 rounded-xl border-2 border-dashed flex items-center gap-3 text-left transition-all ${value ? "border-green-400 bg-green-50" : "border-gray-300 bg-gray-50 hover:border-yellow-400"}`}
-      onClick={() => handleFileUpload(setter)}
-      data-testid={`upload-${label.toLowerCase().replace(/\s+/g, '-')}`}
-    >
-      {value ? (
-        <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center shrink-0"><CheckCircle className="h-5 w-5 text-green-600" /></div>
-      ) : (
-        <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center shrink-0"><Upload className="h-5 w-5 text-gray-500" /></div>
-      )}
-      <div className="flex-1 min-w-0">
-        <div className="font-medium text-sm">{label} {required && <span className="text-red-500">*</span>}</div>
-        <div className="text-xs text-gray-500">{value ? "Uploaded - tap to replace" : "Tap to upload (image or PDF)"}</div>
-      </div>
-      {value && (
-        <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-gray-100">
-          {value.startsWith("data:image") ? (
-            <img src={value} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <FileText className="h-5 w-5 text-gray-500 m-2.5" />
-          )}
+  const DocUploadButton = ({ label, fieldName, value, setter, required = true }: { label: string; fieldName: string; value: string; setter: (v: string) => void; required?: boolean }) => {
+    const isLoading = uploading === fieldName;
+    const isImage = value && !value.endsWith(".pdf") && !value.startsWith("data:application/pdf");
+    return (
+      <button
+        className={`w-full p-4 rounded-xl border-2 border-dashed flex items-center gap-3 text-left transition-all ${value ? "border-green-400 bg-green-50" : "border-gray-300 bg-gray-50 hover:border-yellow-400"} ${isLoading ? "opacity-60 pointer-events-none" : ""}`}
+        onClick={() => handleFileUpload(fieldName, setter)}
+        disabled={isLoading}
+        data-testid={`upload-${label.toLowerCase().replace(/\s+/g, '-')}`}
+      >
+        {isLoading ? (
+          <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center shrink-0 animate-spin">
+            <Upload className="h-5 w-5 text-yellow-600" />
+          </div>
+        ) : value ? (
+          <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center shrink-0"><CheckCircle className="h-5 w-5 text-green-600" /></div>
+        ) : (
+          <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center shrink-0"><Upload className="h-5 w-5 text-gray-500" /></div>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-sm">{label} {required && <span className="text-red-500">*</span>}</div>
+          <div className="text-xs text-gray-500">{isLoading ? "Uploading..." : value ? "Uploaded ✓ — tap to replace" : "Tap to upload (photo or PDF)"}</div>
         </div>
-      )}
-    </button>
-  );
+        {value && !isLoading && (
+          <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-gray-100">
+            {isImage ? (
+              <img src={value} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <FileText className="h-5 w-5 text-gray-500 m-2.5" />
+            )}
+          </div>
+        )}
+      </button>
+    );
+  };
 
   return (
     <div className="min-h-[100dvh] bg-gray-50 flex flex-col">
@@ -369,11 +362,11 @@ export default function DriverOnboarding() {
             <h2 className="text-lg font-bold">Upload Documents</h2>
             <p className="text-sm text-gray-500">Upload clear photos or scans of the following documents.</p>
             <div className="space-y-3">
-              <DocUploadButton label="Driver's License" value={driverLicenseDoc} setter={setDriverLicenseDoc} />
-              <DocUploadButton label="Vehicle License Disc" value={vehicleLicenseDoc} setter={setVehicleLicenseDoc} />
-              <DocUploadButton label="Roadworthy Certificate" value={roadworthyCertDoc} setter={setRoadworthyCertDoc} />
-              <DocUploadButton label="Proof of Insurance" value={proofOfInsuranceDoc} setter={setProofOfInsuranceDoc} required={false} />
-              <DocUploadButton label="Profile Photo" value={profilePhotoDoc} setter={setProfilePhotoDoc} required={false} />
+              <DocUploadButton label="Driver's License" fieldName="driverLicenseDoc" value={driverLicenseDoc} setter={setDriverLicenseDoc} />
+              <DocUploadButton label="Vehicle License Disc" fieldName="vehicleLicenseDoc" value={vehicleLicenseDoc} setter={setVehicleLicenseDoc} />
+              <DocUploadButton label="Roadworthy Certificate" fieldName="roadworthyCertDoc" value={roadworthyCertDoc} setter={setRoadworthyCertDoc} />
+              <DocUploadButton label="Proof of Insurance" fieldName="proofOfInsuranceDoc" value={proofOfInsuranceDoc} setter={setProofOfInsuranceDoc} required={false} />
+              <DocUploadButton label="Profile Photo" fieldName="profilePhotoDoc" value={profilePhotoDoc} setter={setProfilePhotoDoc} required={false} />
             </div>
           </div>
         )}

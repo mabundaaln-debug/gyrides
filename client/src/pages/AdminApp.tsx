@@ -191,15 +191,17 @@ export default function AdminApp() {
                   <>
                     <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
                     <span className="text-sm flex-1">{label}</span>
-                    {doc.startsWith("data:image") && (
+                    {(doc.startsWith("data:image") || (!doc.endsWith(".pdf") && !doc.includes("data:application/pdf"))) && (
                       <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 shrink-0">
-                        <img src={doc} alt={label} className="w-full h-full object-cover" />
+                        <img src={doc} alt={label} className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
                       </div>
                     )}
                     <button className="text-xs text-blue-600 font-medium" onClick={() => {
                       if (doc.startsWith("data:")) {
                         const win = window.open();
-                        if (win) { win.document.write(`<img src="${doc}" style="max-width:100%" />`); }
+                        if (win) { win.document.write(`<img src="${doc}" style="max-width:100%;height:auto" />`); }
+                      } else {
+                        window.open(doc, "_blank");
                       }
                     }}>
                       <Eye className="h-3.5 w-3.5" />

@@ -33,6 +33,27 @@ const upload = multer({
   },
 });
 
+const docUploadStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadsDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname) || ".jpg";
+    cb(null, `doc_${crypto.randomUUID()}${ext}`);
+  },
+});
+
+const docUpload = multer({
+  storage: docUploadStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = /\.(jpg|jpeg|png|gif|webp|pdf)$/i;
+    if (allowed.test(path.extname(file.originalname)) || file.mimetype === "application/pdf" || file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image or PDF files are allowed"));
+    }
+  },
+});
+
 const webauthnChallenges = new Map<string, string>();
 
 export async function registerRoutes(
@@ -407,6 +428,16 @@ export async function registerRoutes(
       const user = await storage.updateUser(userId, { avatarUrl });
       if (!user) return res.status(404).json({ message: "User not found" });
       return res.json({ avatarUrl, user });
+    } catch (e: any) {
+      return res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/upload/document", docUpload.single("file"), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+      const url = `/uploads/${req.file.filename}`;
+      return res.json({ url });
     } catch (e: any) {
       return res.status(500).json({ message: e.message });
     }
