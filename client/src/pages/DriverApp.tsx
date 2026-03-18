@@ -29,6 +29,10 @@ export default function DriverApp() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [driverGps, setDriverGps] = useState<{ lat: number; lng: number } | null>(null);
   const [riderPos, setRiderPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [pinEntry, setPinEntry] = useState("");
+  const [pinVerified, setPinVerified] = useState(false);
+  const [pinError, setPinError] = useState("");
+  const [pinVerifying, setPinVerifying] = useState(false);
   const gpsWatchRef = useRef<number | null>(null);
   const lastSentRef = useRef<number>(0);
   const queryClient = useQueryClient();
@@ -191,8 +195,16 @@ export default function DriverApp() {
     if (tripPhase === "arriving") {
       await updateTrip(onTrip.id, { status: "arriving" });
       setTripPhase("pickup");
-      toast({ title: "Arrived at pickup", description: "Let the rider know you're here." });
+      setPinEntry("");
+      setPinVerified(false);
+      setPinError("");
+      toast({ title: "Arrived at pickup", description: isParcel ? "Collect the parcel." : "Ask the rider for their Trip PIN." });
     } else if (tripPhase === "pickup") {
+      // Parcel trips don't need a PIN — no rider in the car
+      if (!isParcel && !pinVerified) {
+        toast({ title: "PIN required", description: "Enter the rider's 4-digit Trip PIN first.", variant: "destructive" });
+        return;
+      }
       const now = new Date();
       await updateTrip(onTrip.id, { status: "in_progress", startedAt: now } as any);
       setTripStartedAt(now);
@@ -772,7 +784,97 @@ export default function DriverApp() {
             </div>
           )}
 
-          <Button size="lg" className="w-full h-14 rounded-2xl text-lg font-bold bg-black text-white hover:bg-gray-900" onClick={advanceTrip} data-testid="btn-advance-trip">
+          {/* PIN Verification — shown in pickup phase for non-parcel trips */}
+          {tripPhase === "pickup" && !isParcel && (
+            <div className={`rounded-2xl border-2 p-4 ${pinVerified ? "bg-green-50 border-green-300" : "bg-black border-yellow-400"}`} data-testid="pin-verification-panel">
+              {pinVerified ? (
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center shrink-0">
+                    <Check className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-green-800 text-sm">PIN Verified ✓</p>
+                    <p className="text-xs text-green-600">Identity confirmed — you can start the trip</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Shield className="h-4 w-4 text-yellow-400" />
+                    <p className="text-sm font-bold text-white">Enter Rider's Trip PIN</p>
+                  </div>
+                  <p className="text-xs text-gray-400 mb-3">Ask the rider for their 4-digit safety PIN before starting</p>
+                  <div className="flex gap-2 mb-3">
+                    {[0, 1, 2, 3].map(i => (
+                      <div key={i} className={`flex-1 h-12 rounded-xl border-2 flex items-center justify-center ${pinEntry[i] ? "bg-yellow-400 border-yellow-400" : "bg-white/10 border-white/20"}`}>
+                        <span className="text-xl font-black text-black">{pinEntry[i] || ""}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Numeric keypad */}
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    {["1","2","3","4","5","6","7","8","9","","0","⌫"].map((key, idx) => (
+                      <button
+                        key={idx}
+                        disabled={!key}
+                        data-testid={key && key !== "⌫" ? `pin-key-${key}` : key === "⌫" ? "pin-key-backspace" : undefined}
+                        className={`h-11 rounded-xl font-bold text-lg transition-all active:scale-95 ${!key ? "invisible" : key === "⌫" ? "bg-white/20 text-white" : "bg-white/10 text-white hover:bg-white/20"}`}
+                        onClick={() => {
+                          setPinError("");
+                          if (key === "⌫") {
+                            setPinEntry(p => p.slice(0, -1));
+                          } else if (pinEntry.length < 4) {
+                            setPinEntry(p => p + key);
+                          }
+                        }}
+                      >{key}</button>
+                    ))}
+                  </div>
+                  {pinError && <p className="text-red-400 text-xs text-center mb-2 font-medium" data-testid="pin-error">{pinError}</p>}
+                  <button
+                    disabled={pinEntry.length !== 4 || pinVerifying}
+                    data-testid="btn-verify-pin"
+                    className="w-full h-11 rounded-xl bg-yellow-400 text-black font-bold text-sm disabled:opacity-40 transition-all active:scale-95"
+                    onClick={async () => {
+                      if (!onTrip) return;
+                      setPinVerifying(true);
+                      setPinError("");
+                      try {
+                        const res = await fetch(`/api/trips/${onTrip.id}/verify-pin`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          credentials: "include",
+                          body: JSON.stringify({ pin: pinEntry }),
+                        });
+                        if (res.ok) {
+                          setPinVerified(true);
+                          toast({ title: "PIN Verified!", description: "Identity confirmed. Start the trip when ready." });
+                        } else {
+                          const data = await res.json();
+                          setPinError(data.message || "Incorrect PIN — ask the rider again");
+                          setPinEntry("");
+                        }
+                      } catch {
+                        setPinError("Could not verify PIN — check your connection");
+                      } finally {
+                        setPinVerifying(false);
+                      }
+                    }}
+                  >
+                    {pinVerifying ? "Verifying..." : "Verify PIN"}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          <Button
+            size="lg"
+            className={`w-full h-14 rounded-2xl text-lg font-bold transition-all ${tripPhase === "pickup" && !isParcel && !pinVerified ? "bg-gray-300 text-gray-500 cursor-not-allowed" : "bg-black text-white hover:bg-gray-900"}`}
+            onClick={advanceTrip}
+            disabled={tripPhase === "pickup" && !isParcel && !pinVerified}
+            data-testid="btn-advance-trip"
+          >
             {tripPhase === "arriving" ? "Arrived at Pickup" : tripPhase === "pickup" ? (isParcel ? "Collected Parcel" : "Start Trip") : (isParcel ? "Delivered" : "Complete Trip")}
           </Button>
         </div>

@@ -493,7 +493,8 @@ export default function RiderApp() {
         medicalNotes: rideType === "medical" ? medicalNotes : null,
         parcelDescription: rideType === "parcel" ? parcelDescription : null,
         rideNote,
-      });
+        tripPin: pin,
+      } as any);
       setCurrentTrip(trip);
       if (driver) setAssignedDriver(driver);
 
@@ -514,6 +515,8 @@ export default function RiderApp() {
     const pickupText = pickup?.name || "My location";
     const dropoffText = dropoff?.name || "Not set";
     const typeLabel = rideType === "medical" ? "Medical Transport" : rideType === "parcel" ? "Parcel Delivery" : rideType === "shared" ? `Shared Ride (${sharedSeats} seat${sharedSeats > 1 ? "s" : ""})` : "Private Ride";
+    const waPin = generateTripPin();
+    setTripPin(waPin);
 
     try {
       const tripData: any = {
@@ -535,6 +538,7 @@ export default function RiderApp() {
         medicalNotes: medicalNotes || null,
         parcelDescription: parcelDescription || null,
         bookingChannel: "whatsapp",
+        tripPin: waPin,
       };
       const trip = await createTrip(tripData);
       setCurrentTrip(trip);
@@ -1600,9 +1604,28 @@ export default function RiderApp() {
 
         <div className="bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.08)] p-5 space-y-4">
           {tripPin && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-2 flex items-center justify-between">
-              <span className="text-xs text-yellow-700 font-medium">Trip PIN</span>
-              <span className="text-xl font-black tracking-widest text-black" data-testid="text-trip-pin">{tripPin}</span>
+            <div className="bg-black rounded-2xl px-4 py-3" data-testid="trip-pin-card">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-yellow-400 font-bold uppercase tracking-wide flex items-center gap-1.5">
+                  <Shield className="h-3.5 w-3.5" /> Trip Safety PIN
+                </span>
+                <span className="text-[10px] text-gray-400">Share only with your driver</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex gap-3 mt-1">
+                  {tripPin.split("").map((digit, i) => (
+                    <div key={i} className="w-11 h-12 bg-yellow-400 rounded-xl flex items-center justify-center">
+                      <span className="text-2xl font-black text-black">{digit}</span>
+                    </div>
+                  ))}
+                </div>
+                <span className="text-[10px] text-gray-400 text-right max-w-[80px]" data-testid="text-trip-pin">{tripPin}</span>
+              </div>
+              <p className="text-[10px] text-gray-400 mt-2">
+                {rideStatus === "arrived"
+                  ? "Your driver has arrived — tell them this PIN before getting in"
+                  : "When your driver arrives, tell them this PIN to verify your identity"}
+              </p>
             </div>
           )}
 

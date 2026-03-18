@@ -621,6 +621,19 @@ export async function registerRoutes(
     return res.json(trip);
   });
 
+  // Driver verifies rider's trip PIN before starting trip
+  app.post("/api/trips/:id/verify-pin", async (req, res) => {
+    const trip = await storage.getTrip(req.params.id);
+    if (!trip) return res.status(404).json({ message: "Trip not found" });
+    const { pin } = req.body;
+    if (!pin) return res.status(400).json({ message: "PIN required" });
+    if (!trip.tripPin) return res.status(400).json({ message: "No PIN set for this trip" });
+    if (String(pin).trim() !== String(trip.tripPin).trim()) {
+      return res.status(401).json({ message: "Incorrect PIN" });
+    }
+    return res.json({ success: true });
+  });
+
   // Driver confirms cash payment for failed card trip
   app.post("/api/trips/:id/confirm-cash", async (req, res) => {
     try {

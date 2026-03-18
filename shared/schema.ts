@@ -84,6 +84,7 @@ export const trips = pgTable("trips", {
   createdAt: timestamp("created_at").defaultNow(),
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
+  tripPin: varchar("trip_pin", { length: 4 }),
 });
 
 export const savedPlaces = pgTable("saved_places", {
