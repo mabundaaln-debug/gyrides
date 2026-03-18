@@ -94,6 +94,8 @@ export default function RiderApp() {
   const [driverPos, setDriverPos] = useState<{ lat: number; lng: number } | null>(null);
   const [tripEta, setTripEta] = useState<number | null>(null);
   const [tripStartTime, setTripStartTime] = useState<number | null>(null);
+  const [searchWaitSecs, setSearchWaitSecs] = useState(0);
+  const searchStartRef = useRef<number | null>(null);
   const [yocoPublicKey, setYocoPublicKey] = useState("");
   const [cardCharged, setCardCharged] = useState(false);
   const [cardChargeId, setCardChargeId] = useState("");
@@ -156,6 +158,81 @@ export default function RiderApp() {
       }
     };
   }, [currentTrip?.id, currentTrip?.status, user?.id]);
+
+  // ── Real-time trip status polling ──
+  // Polls every 3s whenever rider has an active trip (searching or tracking)
+  // This is how driver actions (accept, arrive, start, complete) reach the rider
+  useEffect(() => {
+    if (!currentTrip?.id) return;
+    if (!["searching", "tracking"].includes(view)) return;
+
+    let cancelled = false;
+
+    const poll = async () => {
+      if (cancelled) return;
+      try {
+        const res = await fetch(`/api/trips/${currentTrip.id}`, { credentials: "include" });
+        if (!res.ok || cancelled) return;
+        const updated: Trip = await res.json();
+        if (cancelled) return;
+
+        setCurrentTrip(updated);
+
+        // ── Status machine: react to server-side status changes ──
+        if (updated.status === "accepted" && rideStatus === "searching") {
+          // Driver has accepted — fetch their info and move to tracking
+          if (updated.driverId) {
+            try {
+              const dRes = await fetch(`/api/users/${updated.driverId}`, { credentials: "include" });
+              const driver = await dRes.json();
+              setAssignedDriver(driver);
+            } catch {}
+          }
+          setRideStatus("on_the_way");
+          setTripEta(updated.duration ?? null);
+          setView("tracking");
+          toast({ title: "Driver found!", description: "Your driver is on the way." });
+        } else if (updated.status === "arriving" && rideStatus === "on_the_way") {
+          setRideStatus("arrived");
+          toast({ title: "Driver arrived!", description: "Your driver is at the pickup point." });
+        } else if (updated.status === "in_progress" && rideStatus !== "in_progress") {
+          setRideStatus("in_progress");
+          setTripStartTime(prev => prev ?? Date.now());
+        } else if (updated.status === "completed" && view !== "completed") {
+          cancelled = true;
+          setView("completed");
+        } else if (updated.status === "cancelled" && view !== "home") {
+          cancelled = true;
+          setCurrentTrip(null);
+          setAssignedDriver(null);
+          setView("home");
+          toast({ title: "Trip cancelled", variant: "destructive" });
+        }
+
+        // Timeout: no driver accepted after 5 minutes → auto-cancel
+        if (view === "searching" && searchStartRef.current && Date.now() - searchStartRef.current > 300000) {
+          cancelled = true;
+          try { await updateTrip(currentTrip.id, { status: "cancelled" }); } catch {}
+          setCurrentTrip(null);
+          setView("home");
+          toast({ title: "No drivers available", description: "Try again or book via WhatsApp.", variant: "destructive" });
+        }
+      } catch {}
+    };
+
+    poll();
+    const interval = setInterval(poll, 3000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [currentTrip?.id, view, rideStatus]);
+
+  // ── Wait timer displayed on searching screen ──
+  useEffect(() => {
+    if (view !== "searching") { setSearchWaitSecs(0); searchStartRef.current = null; return; }
+    searchStartRef.current = Date.now();
+    setSearchWaitSecs(0);
+    const interval = setInterval(() => setSearchWaitSecs(s => s + 1), 1000);
+    return () => clearInterval(interval);
+  }, [view]);
 
   const useCurrentLocation = useCallback((target: "pickup" | "dropoff") => {
     if (!navigator.geolocation) {
@@ -462,19 +539,18 @@ export default function RiderApp() {
 
   const handleBookRide = async () => {
     if (!pickup || !dropoff || !selectedVehicle || !user) return;
-    setView("searching");
-    setRideStatus("searching");
     const pin = generateTripPin();
     setTripPin(pin);
+    setRideStatus("searching");
+    setView("searching");
 
     try {
-      const driver = onlineDrivers[0];
       const dist = calcDistance();
       const fare = calcFare(selectedVehicle);
       const totalFare = fare + (pendingBalance > 0 && paymentMethod === "card" ? pendingBalance : 0);
       const trip = await createTrip({
         riderId: user.id,
-        driverId: driver?.id || null,
+        driverId: null,          // No pre-assignment — driver accepts from their app
         rideType,
         pickupName: pickup.name,
         pickupLat: pickup.lat,
@@ -496,18 +572,10 @@ export default function RiderApp() {
         tripPin: pin,
       } as any);
       setCurrentTrip(trip);
-      if (driver) setAssignedDriver(driver);
-
-      setTimeout(async () => {
-        if (driver) {
-          const updated = await updateTrip(trip.id, { status: "accepted", driverId: driver.id });
-          setCurrentTrip(updated);
-          setRideStatus("on_the_way");
-        }
-        setView("tracking");
-      }, 2500);
+      // Polling effect (below) watches this trip and reacts when a driver accepts
     } catch {
       setView("home");
+      toast({ title: "Booking failed", description: "Please check your connection and try again.", variant: "destructive" });
     }
   };
 
@@ -1521,41 +1589,81 @@ export default function RiderApp() {
 
   // ── Searching for Driver ──
   if (view === "searching") {
+    const waitMins = Math.floor(searchWaitSecs / 60);
+    const waitSecs = searchWaitSecs % 60;
+    const waitLabel = waitMins > 0 ? `${waitMins}m ${waitSecs}s` : `${waitSecs}s`;
     return (
       <div className="min-h-[100dvh] bg-black flex flex-col">
-        <div className="absolute top-0 left-0 right-0 z-20 p-4">
+        <div className="absolute top-0 left-0 right-0 z-20 p-4 flex items-center justify-between">
           <Button variant="ghost" size="icon" onClick={handleCancelTrip} className="rounded-full bg-white/10 text-white"><X className="h-5 w-5" /></Button>
+          <div className="bg-white/10 rounded-full px-3 py-1.5 flex items-center gap-2">
+            <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
+            <span className="text-white text-xs font-bold tabular-nums">{waitLabel}</span>
+          </div>
         </div>
-        <div className="flex-1 relative opacity-60">
+        <div className="flex-1 relative opacity-50">
           <GiyaniMap pickup={pickup} dropoff={dropoff} className="h-full absolute inset-0" showRoute={true} />
         </div>
-        <div className="bg-white rounded-t-3xl p-6 space-y-5 relative z-10">
+        <div className="bg-white rounded-t-3xl p-6 space-y-4 relative z-10">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-yellow-400/20 rounded-full flex items-center justify-center animate-pulse">
-              <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
-                <Search className="h-5 w-5 text-black animate-spin" style={{ animationDuration: "3s" }} />
+            <div className="relative shrink-0">
+              <div className="w-14 h-14 bg-yellow-400/20 rounded-full flex items-center justify-center animate-pulse">
+                <div className="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center">
+                  <Search className="h-5 w-5 text-black animate-spin" style={{ animationDuration: "3s" }} />
+                </div>
               </div>
             </div>
             <div>
               <h2 className="text-xl font-bold">
                 {rideType === "medical" ? "Finding medical transport" : rideType === "parcel" ? "Finding delivery driver" : "Finding your driver"}
               </h2>
-              <p className="text-gray-500 text-sm">Connecting to nearby drivers...</p>
+              <p className="text-gray-500 text-sm">
+                {onlineDrivers.length > 0
+                  ? `${onlineDrivers.length} driver${onlineDrivers.length > 1 ? "s" : ""} online — waiting for acceptance`
+                  : "Broadcasting your request..."}
+              </p>
             </div>
           </div>
-          <div className="bg-gray-50 rounded-xl p-3 flex items-center gap-3">
-            <div className="flex items-center gap-2 text-sm flex-1">
-              <div className="w-2 h-2 bg-green-500 rounded-full" /><span className="truncate">{pickup?.name}</span>
+
+          <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+            <div className="flex items-center gap-2 text-sm">
+              <div className="w-2.5 h-2.5 bg-green-500 rounded-full shrink-0" />
+              <span className="truncate font-medium">{pickup?.name}</span>
             </div>
-            <span className="text-gray-300">→</span>
-            <div className="flex items-center gap-2 text-sm flex-1">
-              <div className="w-2 h-2 bg-black rounded-full" /><span className="truncate">{dropoff?.name}</span>
+            <div className="border-l-2 border-dashed border-gray-300 ml-1 h-3" />
+            <div className="flex items-center gap-2 text-sm">
+              <div className="w-2.5 h-2.5 bg-black rounded-full shrink-0" />
+              <span className="truncate font-medium">{dropoff?.name}</span>
             </div>
           </div>
-          <Button variant="outline" className="w-full rounded-2xl h-12 text-red-500 border-red-200" onClick={handleCancelTrip} data-testid="btn-cancel-search">Cancel</Button>
-          <button onClick={handleWhatsAppBooking} className="w-full h-11 rounded-2xl bg-green-600 text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-green-700 transition-colors" data-testid="btn-whatsapp-book">
-            <MessageCircle className="h-4 w-4" /> Complete via WhatsApp
-          </button>
+
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="bg-yellow-50 rounded-xl p-2">
+              <div className="text-base font-black">R{selectedVehicle ? calcFare(selectedVehicle).toFixed(0) : "—"}</div>
+              <div className="text-[10px] text-gray-500">Fare</div>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-2">
+              <div className="text-base font-black">{calcDuration()} min</div>
+              <div className="text-[10px] text-gray-500">Est. time</div>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-2">
+              <div className="text-base font-black">{calcDistance().toFixed(1)} km</div>
+              <div className="text-[10px] text-gray-500">Distance</div>
+            </div>
+          </div>
+
+          {searchWaitSecs >= 60 && (
+            <div className="bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 text-xs text-blue-700">
+              Still searching... Tap "WhatsApp" below to get a driver faster.
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1 rounded-2xl h-12 text-red-500 border-red-200" onClick={handleCancelTrip} data-testid="btn-cancel-search">Cancel</Button>
+            <button onClick={handleWhatsAppBooking} className="flex-1 h-12 rounded-2xl bg-green-600 text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-green-700 transition-colors" data-testid="btn-whatsapp-book">
+              <MessageCircle className="h-4 w-4" /> WhatsApp
+            </button>
+          </div>
         </div>
       </div>
     );

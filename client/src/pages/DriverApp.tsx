@@ -192,16 +192,17 @@ export default function DriverApp() {
 
   const advanceTrip = async () => {
     if (!onTrip) return;
+    const tripIsParcel = onTrip.rideType === "parcel";
     if (tripPhase === "arriving") {
       await updateTrip(onTrip.id, { status: "arriving" });
       setTripPhase("pickup");
       setPinEntry("");
       setPinVerified(false);
       setPinError("");
-      toast({ title: "Arrived at pickup", description: isParcel ? "Collect the parcel." : "Ask the rider for their Trip PIN." });
+      toast({ title: "Arrived at pickup", description: tripIsParcel ? "Collect the parcel." : "Ask the rider for their Trip PIN." });
     } else if (tripPhase === "pickup") {
       // Parcel trips don't need a PIN — no rider in the car
-      if (!isParcel && !pinVerified) {
+      if (!tripIsParcel && !pinVerified) {
         toast({ title: "PIN required", description: "Enter the rider's 4-digit Trip PIN first.", variant: "destructive" });
         return;
       }
