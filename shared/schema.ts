@@ -79,6 +79,7 @@ export const trips = pgTable("trips", {
   bookingChannel: text("booking_channel").default("app"),
   paymentStatus: paymentStatusEnum("payment_status").default("pending"),
   createdAt: timestamp("created_at").defaultNow(),
+  startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
 });
 

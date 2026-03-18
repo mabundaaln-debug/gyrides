@@ -25,8 +25,25 @@ export default function DriverApp() {
   const [activeTab, setActiveTab] = useState<"home" | "trips" | "earnings" | "profile">("home");
   const [cashConfirming, setCashConfirming] = useState(false);
   const [cashConfirmed, setCashConfirmed] = useState(false);
+  const [tripStartedAt, setTripStartedAt] = useState<Date | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // Live elapsed timer when trip is in progress
+  useEffect(() => {
+    if (tripPhase !== "inprogress" || !tripStartedAt) return;
+    const interval = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - tripStartedAt.getTime()) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [tripPhase, tripStartedAt]);
+
+  const formatElapsed = (secs: number) => {
+    const m = Math.floor(secs / 60).toString().padStart(2, "0");
+    const s = (secs % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+  };
 
   useEffect(() => {
     if (!user || user.role !== "driver") {
@@ -94,16 +111,28 @@ export default function DriverApp() {
     if (tripPhase === "arriving") {
       await updateTrip(onTrip.id, { status: "arriving" });
       setTripPhase("pickup");
+      toast({ title: "Arrived at pickup", description: "Let the rider know you're here." });
     } else if (tripPhase === "pickup") {
-      await updateTrip(onTrip.id, { status: "in_progress" });
+      const now = new Date();
+      await updateTrip(onTrip.id, { status: "in_progress", startedAt: now } as any);
+      setTripStartedAt(now);
+      setElapsedSeconds(0);
       setTripPhase("inprogress");
+      toast({ title: "Trip started!", description: "Timer running. Drive safely." });
     } else {
-      await updateTrip(onTrip.id, { status: "completed" });
+      const completedAt = new Date();
+      const actualMins = tripStartedAt
+        ? Math.round((completedAt.getTime() - tripStartedAt.getTime()) / 60000)
+        : onTrip.duration ?? 0;
+      await updateTrip(onTrip.id, { status: "completed", completedAt, duration: actualMins } as any);
       setOnTrip(null);
       setTripRider(null);
+      setTripStartedAt(null);
+      setElapsedSeconds(0);
       setView("home");
       queryClient.invalidateQueries({ queryKey: ["/api/trips/driver"] });
-      toast({ title: "Trip completed!", description: `Fare: R${onTrip.fare}` });
+      const durationText = actualMins >= 1 ? `${actualMins} min` : `${elapsedSeconds}s`;
+      toast({ title: "Trip completed!", description: `Fare: R${onTrip.fare} · Duration: ${durationText}` });
     }
   };
 
@@ -538,6 +567,32 @@ export default function DriverApp() {
             <span className="text-gray-300">→</span>
             <div className="flex items-center gap-2 flex-1"><div className="w-2 h-2 bg-black rounded-full" /><span className="font-medium truncate">{onTrip.dropoffName}</span></div>
           </div>
+
+          {/* Phase timeline */}
+          <div className="flex items-center gap-1 text-[11px] font-medium">
+            <span className={`flex items-center gap-1 px-2 py-1 rounded-full ${tripPhase === "arriving" ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-700"}`}>
+              <Check className="h-3 w-3" /> En Route
+            </span>
+            <div className="flex-1 h-px bg-gray-200" />
+            <span className={`flex items-center gap-1 px-2 py-1 rounded-full ${tripPhase === "pickup" ? "bg-green-600 text-white" : tripPhase === "inprogress" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
+              <Check className="h-3 w-3" /> Arrived
+            </span>
+            <div className="flex-1 h-px bg-gray-200" />
+            <span className={`flex items-center gap-1 px-2 py-1 rounded-full ${tripPhase === "inprogress" ? "bg-yellow-500 text-white" : "bg-gray-100 text-gray-400"}`}>
+              <Clock className="h-3 w-3" /> In Progress
+            </span>
+          </div>
+
+          {/* Live elapsed timer */}
+          {tripPhase === "inprogress" && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-3 flex items-center justify-between" data-testid="trip-timer">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-yellow-700" />
+                <span className="text-sm font-semibold text-yellow-800">Trip in Progress</span>
+              </div>
+              <span className="text-2xl font-bold text-yellow-700 tabular-nums" data-testid="elapsed-time">{formatElapsed(elapsedSeconds)}</span>
+            </div>
+          )}
 
           {tripPhase === "inprogress" && onTrip.paymentMethod === "cash" && !cashConfirmed && (
             <div className="bg-green-50 border border-green-200 rounded-2xl p-4">

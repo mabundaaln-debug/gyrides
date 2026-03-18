@@ -501,19 +501,21 @@ export default function RiderApp() {
     setView("completed");
   };
 
-  // Poll payment status on completion screen for cash trips until driver confirms
+  // Poll trip data on completion screen (for cash confirmation + actual duration)
   useEffect(() => {
     if (view !== "completed" || !currentTrip?.id) return;
-    if (currentTrip.paymentMethod !== "cash" || currentTrip.paymentStatus === "paid") return;
+    if (currentTrip.paymentStatus === "paid" && currentTrip.duration != null) return;
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/trips/${currentTrip.id}`, { credentials: "include" });
         if (res.ok) {
           const data = await res.json();
-          if (data.paymentStatus === "paid") {
-            setCurrentTrip(prev => prev ? { ...prev, paymentStatus: "paid" } : prev);
-            clearInterval(interval);
-          }
+          setCurrentTrip(prev => prev ? {
+            ...prev,
+            paymentStatus: data.paymentStatus ?? prev.paymentStatus,
+            duration: data.duration ?? prev.duration,
+          } : prev);
+          if (data.paymentStatus === "paid") clearInterval(interval);
         }
       } catch {}
     }, 5000);
