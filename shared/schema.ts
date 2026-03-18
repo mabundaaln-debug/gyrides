@@ -7,6 +7,7 @@ export const userRoleEnum = pgEnum("user_role", ["rider", "driver", "admin"]);
 export const tripStatusEnum = pgEnum("trip_status", ["requested", "accepted", "arriving", "in_progress", "completed", "cancelled"]);
 export const paymentMethodEnum = pgEnum("payment_method", ["cash", "card", "ewallet", "eft"]);
 export const approvalStatusEnum = pgEnum("approval_status", ["pending", "approved", "rejected"]);
+export const paymentStatusEnum = pgEnum("payment_status", ["pending", "paid", "failed"]);
 export const rideTypeEnum = pgEnum("ride_type", ["private", "shared", "taxi", "parcel", "medical"]);
 
 export const users = pgTable("users", {
@@ -46,6 +47,7 @@ export const users = pgTable("users", {
   rejectionReason: text("rejection_reason"),
   isVerified: boolean("is_verified").default(false),
   walletBalance: real("wallet_balance").default(0),
+  pendingBalance: real("pending_balance").default(0),
   trustedContacts: text("trusted_contacts"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -75,6 +77,7 @@ export const trips = pgTable("trips", {
   eftProofUrl: text("eft_proof_url"),
   rideNote: text("ride_note"),
   bookingChannel: text("booking_channel").default("app"),
+  paymentStatus: paymentStatusEnum("payment_status").default("pending"),
   createdAt: timestamp("created_at").defaultNow(),
   completedAt: timestamp("completed_at"),
 });

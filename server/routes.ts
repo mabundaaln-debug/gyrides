@@ -145,7 +145,7 @@ export async function registerRoutes(
     const secretKey = process.env.YOCO_SECRET_KEY;
     if (!secretKey) return res.status(500).json({ message: "Yoco not configured" });
     try {
-      const { token, amountInCents, tripId } = req.body;
+      const { token, amountInCents, tripId, riderId } = req.body;
       if (!token || !amountInCents) return res.status(400).json({ message: "token and amountInCents required" });
       const response = await fetch("https://online.yoco.com/v1/charges/", {
         method: "POST",
@@ -155,10 +155,27 @@ export async function registerRoutes(
       const data = await response.json();
       if (!response.ok) {
         console.error("[Yoco] Charge error:", JSON.stringify(data));
-        return res.status(response.status).json({ message: data.message || data.error || "Payment failed", yocoError: data });
+        // Mark trip as failed and add to rider's pending balance
+        if (tripId) {
+          try { await storage.updateTrip(tripId, { paymentStatus: "failed" as any }); } catch {}
+        }
+        if (riderId) {
+          try {
+            const rider = await storage.getUser(riderId);
+            if (rider) {
+              const amountRand = amountInCents / 100;
+              await storage.updateUser(riderId, { pendingBalance: (rider.pendingBalance || 0) + amountRand } as any);
+            }
+          } catch {}
+        }
+        return res.status(response.status).json({ message: data.message || data.error || "Payment failed", yocoError: data, paymentFailed: true });
       }
       if (tripId) {
-        try { await storage.updateTrip(tripId, { paymentMethod: "card" as any }); } catch {}
+        try { await storage.updateTrip(tripId, { paymentStatus: "paid" as any }); } catch {}
+      }
+      // Clear rider's pending balance on successful payment
+      if (riderId) {
+        try { await storage.updateUser(riderId, { pendingBalance: 0 } as any); } catch {}
       }
       return res.json({ success: true, chargeId: data.id });
     } catch (err: any) {

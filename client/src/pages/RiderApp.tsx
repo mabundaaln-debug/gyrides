@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth";
-import { createTrip, updateTrip, updateUser, sendSosAlert, uploadProfilePicture, getWebauthnRegisterOptions, verifyWebauthnRegistration, getWebauthnCredentials, deleteWebauthnCredential, createYocoCheckout, getPublicConfig, chargeYocoToken } from "@/lib/api";
+import { createTrip, updateTrip, updateUser, sendSosAlert, uploadProfilePicture, getWebauthnRegisterOptions, verifyWebauthnRegistration, getWebauthnCredentials, deleteWebauthnCredential, createYocoCheckout, getPublicConfig, chargeYocoToken, getRiderPendingBalance } from "@/lib/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -101,6 +101,7 @@ export default function RiderApp() {
   const [customTipInput, setCustomTipInput] = useState("");
   const [tipCharged, setTipCharged] = useState(false);
   const [tipSubmitting, setTipSubmitting] = useState(false);
+  const [pendingBalance, setPendingBalance] = useState(0);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -157,7 +158,7 @@ export default function RiderApp() {
     }
   }, [user]);
 
-  // Load Yoco SDK and public key
+  // Load Yoco SDK, public key and pending balance
   useEffect(() => {
     getPublicConfig().then(cfg => {
       if (cfg.yocoPublicKey) setYocoPublicKey(cfg.yocoPublicKey);
@@ -168,9 +169,12 @@ export default function RiderApp() {
       s.src = "https://js.yoco.com/sdk/v1/yoco-sdk-web.js";
       document.head.appendChild(s);
     }
-  }, []);
+    if (user?.id) {
+      getRiderPendingBalance(user.id).then(bal => setPendingBalance(bal)).catch(() => {});
+    }
+  }, [user?.id]);
 
-  const handleYocoVerify = useCallback((fare: number, onSuccess: () => void) => {
+  const handleYocoVerify = useCallback((fare: number, onSuccess: () => void, tripId?: string) => {
     const YocoSDK = (window as any).YocoSDK;
     if (!YocoSDK || !yocoPublicKey) {
       toast({ title: "Yoco not ready", description: "Payment SDK is loading, please try again in a moment.", variant: "destructive" });
@@ -190,17 +194,24 @@ export default function RiderApp() {
           return;
         }
         try {
-          const charge = await chargeYocoToken({ token: result.id, amountInCents: Math.round(fare * 100) });
+          const charge = await chargeYocoToken({ token: result.id, amountInCents: Math.round(fare * 100), tripId, riderId: user?.id });
           setCardCharged(true);
           setCardChargeId(charge.chargeId);
           toast({ title: "Card verified ✓", description: `R${fare} charged successfully. Your ride is confirmed.` });
           onSuccess();
         } catch (err: any) {
-          toast({ title: "Payment failed", description: err.message || "Card charge failed. Please try another payment method.", variant: "destructive" });
+          // Immediate failure notification
+          toast({
+            title: "⚠️ Payment failed",
+            description: `R${fare} could not be charged. The amount has been added to your account balance and will be collected on your next trip.`,
+            variant: "destructive",
+          });
+          // Refresh pending balance
+          if (user?.id) getRiderPendingBalance(user.id).then(bal => setPendingBalance(bal)).catch(() => {});
         }
       },
     });
-  }, [yocoPublicKey, toast]);
+  }, [yocoPublicKey, toast, user?.id]);
 
   const { data: savedPlaces = [] } = useQuery<SavedPlace[]>({
     queryKey: ["/api/saved-places", user?.id ?? ""],
@@ -391,6 +402,7 @@ export default function RiderApp() {
       const driver = onlineDrivers[0];
       const dist = calcDistance();
       const fare = calcFare(selectedVehicle);
+      const totalFare = fare + (pendingBalance > 0 && paymentMethod === "card" ? pendingBalance : 0);
       const trip = await createTrip({
         riderId: user.id,
         driverId: driver?.id || null,
@@ -401,11 +413,12 @@ export default function RiderApp() {
         dropoffName: dropoff.name,
         dropoffLat: dropoff.lat,
         dropoffLng: dropoff.lng,
-        fare,
+        fare: totalFare,
         distance: dist,
         duration: calcDuration(),
         vehicleType: selectedVehicle.name,
         paymentMethod: paymentMethod as any,
+        paymentStatus: (paymentMethod === "card" && cardCharged ? "paid" : paymentMethod === "cash" ? "paid" : "pending") as any,
         status: "requested",
         seatsBooked: rideType === "shared" ? sharedSeats : 1,
         medicalNotes: rideType === "medical" ? medicalNotes : null,
@@ -1227,6 +1240,15 @@ export default function RiderApp() {
         </div>
 
         <div className="flex-1 px-5 pb-6 overflow-auto -mt-3 relative z-10">
+          {pendingBalance > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-3 flex items-start gap-2 mb-3" data-testid="pending-balance-warning">
+              <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold text-red-700">Outstanding balance: R{pendingBalance.toFixed(2)}</p>
+                <p className="text-xs text-red-600">A previous card payment failed. This amount will be added to your fare.</p>
+              </div>
+            </div>
+          )}
           <div className="bg-white rounded-2xl p-4 shadow-md border border-gray-100 space-y-3 mb-4">
             <div className="flex items-start gap-3">
               <div className="flex flex-col items-center gap-1 pt-1">
@@ -1617,8 +1639,8 @@ export default function RiderApp() {
                 data-testid="btn-pay-yoco"
                 onClick={() => {
                   handleYocoVerify(currentTrip.fare || 0, () => {
-                    if (currentTrip?.id) updateTrip(currentTrip.id, { paymentMethod: "card" as any }).catch(() => {});
-                  });
+                    if (currentTrip?.id) updateTrip(currentTrip.id, { paymentStatus: "paid" as any }).catch(() => {});
+                  }, currentTrip?.id);
                 }}
               >
                 <CreditCard className="h-5 w-5" />

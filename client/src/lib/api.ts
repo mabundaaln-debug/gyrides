@@ -163,11 +163,17 @@ export async function getPublicConfig(): Promise<{ yocoPublicKey: string }> {
   return res.json();
 }
 
-export async function chargeYocoToken(data: { token: string; amountInCents: number; tripId?: string }): Promise<{ success: boolean; chargeId: string }> {
+export async function chargeYocoToken(data: { token: string; amountInCents: number; tripId?: string; riderId?: string }): Promise<{ success: boolean; chargeId: string }> {
   const res = await apiRequest("POST", "/api/payments/yoco/charge", data);
   if (!res.ok) {
     const err = await res.json();
     throw new Error(err.message || "Card payment failed");
   }
   return res.json();
+}
+
+export async function getRiderPendingBalance(userId: string): Promise<number> {
+  const res = await fetch(`/api/users/${userId}`, { credentials: "include" });
+  const data = await res.json();
+  return data.pendingBalance || 0;
 }

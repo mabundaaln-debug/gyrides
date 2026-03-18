@@ -255,14 +255,18 @@ export default function DriverApp() {
           <div className="space-y-2">
             {completedTrips.slice(0, 8).map(trip => {
               const driverEarnings = Math.round(trip.fare * 0.85);
+              const pStatus = (trip as any).paymentStatus || (trip.paymentMethod === "cash" ? "paid" : "pending");
               return (
                 <div key={trip.id} className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 flex justify-between items-center">
                   <div>
                     <div className="font-medium text-sm">{trip.pickupName} → {trip.dropoffName}</div>
                     <div className="text-[10px] text-gray-500">{trip.createdAt ? new Date(trip.createdAt).toLocaleDateString("en-ZA") : ""} · {trip.distance?.toFixed(1)} km</div>
+                    <span className={`inline-block mt-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${pStatus === "paid" ? "bg-green-100 text-green-700" : pStatus === "failed" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
+                      {pStatus === "paid" ? "✓ Paid" : pStatus === "failed" ? "⚠ Payment failed" : "⏳ Pending"}
+                    </span>
                   </div>
                   <div className="text-right">
-                    <div className="font-bold text-green-600">R{driverEarnings}</div>
+                    <div className={`font-bold ${pStatus === "failed" ? "text-red-500" : "text-green-600"}`}>R{driverEarnings}</div>
                     <div className="text-[9px] text-gray-400">of R{trip.fare}</div>
                   </div>
                 </div>
@@ -284,26 +288,36 @@ export default function DriverApp() {
           <h1 className="text-xl font-bold">Trip History</h1>
         </div>
         <div className="flex-1 p-4 space-y-2 overflow-auto pb-20">
-          {myTrips.map(trip => (
-            <div key={trip.id} className="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
-              <div className="flex justify-between items-start mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">{trip.createdAt ? new Date(trip.createdAt).toLocaleDateString("en-ZA") : ""}</span>
-                  {trip.rideType && trip.rideType !== "private" && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">{trip.rideType}</span>
-                  )}
+          {myTrips.map(trip => {
+            const pStatus = (trip as any).paymentStatus || (trip.paymentMethod === "cash" ? "paid" : trip.status === "completed" ? "pending" : null);
+            return (
+              <div key={trip.id} className="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">{trip.createdAt ? new Date(trip.createdAt).toLocaleDateString("en-ZA") : ""}</span>
+                    {trip.rideType && trip.rideType !== "private" && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">{trip.rideType}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {trip.status === "completed" && pStatus && (
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${pStatus === "paid" ? "bg-green-100 text-green-700" : pStatus === "failed" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
+                        {pStatus === "paid" ? "✓ Paid" : pStatus === "failed" ? "⚠ Failed" : "⏳ Pending"}
+                      </span>
+                    )}
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${trip.status === "completed" ? "bg-green-100 text-green-700" : trip.status === "cancelled" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
+                      {trip.status}
+                    </span>
+                  </div>
                 </div>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${trip.status === "completed" ? "bg-green-100 text-green-700" : trip.status === "cancelled" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
-                  {trip.status}
-                </span>
+                <div className="font-medium text-sm">{trip.pickupName} → {trip.dropoffName}</div>
+                <div className="flex justify-between items-center mt-1">
+                  <span className="text-[10px] text-gray-500">{trip.vehicleType} · {trip.distance?.toFixed(1)} km · {trip.paymentMethod}</span>
+                  <span className={`text-sm font-bold ${pStatus === "failed" ? "text-red-500 line-through" : ""}`}>R{trip.fare}</span>
+                </div>
               </div>
-              <div className="font-medium text-sm">{trip.pickupName} → {trip.dropoffName}</div>
-              <div className="flex justify-between items-center mt-1">
-                <span className="text-[10px] text-gray-500">{trip.vehicleType} · {trip.distance?.toFixed(1)} km</span>
-                <span className="text-sm font-bold">R{trip.fare}</span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
           {myTrips.length === 0 && <div className="text-center py-16 text-gray-400 text-sm">No trips yet</div>}
         </div>
         <BottomNav />
