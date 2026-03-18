@@ -164,7 +164,8 @@ export async function registerRoutes(
       });
       const data = await response.json();
       if (!response.ok) {
-        return res.status(response.status).json({ message: data.message || "Failed to create checkout" });
+        console.error("[Yoco] Checkout error:", JSON.stringify(data));
+        return res.status(response.status).json({ message: data.message || data.error || data.detail || "Failed to create checkout", yocoError: data });
       }
       return res.json({ checkoutId: data.id, redirectUrl: data.redirectUrl });
     } catch (err: any) {
