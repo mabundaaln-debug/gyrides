@@ -603,6 +603,26 @@ export async function registerRoutes(
           await storage.updateUser(trip.riderId, { pendingBalance: 0 } as any);
         }
       } catch {}
+      // Update driver earnings
+      if (trip.driverId) {
+        try {
+          const driver = await storage.getUser(trip.driverId);
+          if (driver) {
+            const driverShare = Math.round((trip.fare || 0) * 0.85 * 100) / 100;
+            await storage.updateUser(trip.driverId, {
+              earnings: (driver.earnings || 0) + driverShare,
+              totalTrips: (driver.totalTrips || 0) + 1,
+            } as any);
+          }
+        } catch {}
+      }
+      // Update rider total trips
+      try {
+        const rider = await storage.getUser(trip.riderId);
+        if (rider) {
+          await storage.updateUser(trip.riderId, { totalTrips: (rider.totalTrips || 0) + 1 } as any);
+        }
+      } catch {}
       return res.json({ success: true });
     } catch (err: any) {
       return res.status(500).json({ message: err.message });

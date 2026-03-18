@@ -420,7 +420,7 @@ export default function RiderApp() {
         duration: calcDuration(),
         vehicleType: selectedVehicle.name,
         paymentMethod: paymentMethod as any,
-        paymentStatus: (paymentMethod === "card" && cardCharged ? "paid" : paymentMethod === "cash" ? "paid" : "pending") as any,
+        paymentStatus: "pending" as any,
         status: "requested",
         seatsBooked: rideType === "shared" ? sharedSeats : 1,
         medicalNotes: rideType === "medical" ? medicalNotes : null,
@@ -500,6 +500,25 @@ export default function RiderApp() {
     setDriverRating(0);
     setView("completed");
   };
+
+  // Poll payment status on completion screen for cash trips until driver confirms
+  useEffect(() => {
+    if (view !== "completed" || !currentTrip?.id) return;
+    if (currentTrip.paymentMethod !== "cash" || currentTrip.paymentStatus === "paid") return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/trips/${currentTrip.id}`, { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.paymentStatus === "paid") {
+            setCurrentTrip(prev => prev ? { ...prev, paymentStatus: "paid" } : prev);
+            clearInterval(interval);
+          }
+        }
+      } catch {}
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [view, currentTrip?.id, currentTrip?.paymentMethod, currentTrip?.paymentStatus]);
 
   const handleSubmitRating = async () => {
     if (currentTrip) {
@@ -1624,6 +1643,20 @@ export default function RiderApp() {
               <span className="font-medium text-green-600 capitalize">{currentTrip?.paymentMethod === "card" ? "Yoco (card)" : currentTrip?.paymentMethod || "Cash"}</span>
             </div>
           </div>
+
+          {currentTrip?.paymentMethod === "cash" && (
+            currentTrip?.paymentStatus === "paid" ? (
+              <div className="w-full h-14 rounded-2xl bg-green-50 border border-green-200 flex items-center justify-center gap-2 mb-4">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <span className="font-bold text-green-700">R{currentTrip?.fare} cash confirmed by driver</span>
+              </div>
+            ) : (
+              <div className="w-full h-14 rounded-2xl bg-yellow-50 border border-yellow-300 flex items-center justify-center gap-2 mb-4">
+                <Banknote className="h-5 w-5 text-yellow-700" />
+                <span className="font-bold text-yellow-800">Awaiting driver cash confirmation</span>
+              </div>
+            )
+          )}
 
           {currentTrip?.paymentMethod === "card" && (
             cardCharged ? (
