@@ -97,6 +97,10 @@ export default function RiderApp() {
   const [cardCharged, setCardCharged] = useState(false);
   const [cardChargeId, setCardChargeId] = useState("");
   const [cardVerifying, setCardVerifying] = useState(false);
+  const [tipAmount, setTipAmount] = useState(0);
+  const [customTipInput, setCustomTipInput] = useState("");
+  const [tipCharged, setTipCharged] = useState(false);
+  const [tipSubmitting, setTipSubmitting] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -1642,6 +1646,67 @@ export default function RiderApp() {
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {assignedDriver && !tipCharged && (
+            <div className="bg-gray-50 rounded-2xl p-4 mb-4">
+              <p className="text-sm font-semibold text-center text-gray-700 mb-3">
+                Add a tip for {assignedDriver.fullName.split(" ")[0]}
+              </p>
+              <div className="grid grid-cols-4 gap-2 mb-3">
+                {[5, 10, 20, 50].map(amt => (
+                  <button
+                    key={amt}
+                    data-testid={`tip-preset-${amt}`}
+                    className={`h-10 rounded-xl text-sm font-bold border-2 transition-all ${tipAmount === amt ? "bg-yellow-400 border-yellow-400 text-black" : "bg-white border-gray-200 text-gray-700"}`}
+                    onClick={() => { setTipAmount(tipAmount === amt ? 0 : amt); setCustomTipInput(""); }}
+                  >
+                    R{amt}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2 mb-3">
+                <input
+                  type="number"
+                  placeholder="Custom amount (R)"
+                  value={customTipInput}
+                  min={1}
+                  data-testid="input-custom-tip"
+                  onChange={e => { setCustomTipInput(e.target.value); setTipAmount(parseFloat(e.target.value) || 0); }}
+                  className="flex-1 h-10 rounded-xl border-2 border-gray-200 px-3 text-sm outline-none focus:border-yellow-400"
+                />
+              </div>
+              {tipAmount > 0 && (
+                <button
+                  data-testid="btn-send-tip"
+                  disabled={tipSubmitting}
+                  className="w-full h-11 rounded-xl bg-yellow-400 hover:bg-yellow-500 text-black font-bold text-sm transition-colors disabled:opacity-60"
+                  onClick={async () => {
+                    if (currentTrip?.paymentMethod === "card") {
+                      handleYocoVerify(tipAmount, () => {
+                        setTipCharged(true);
+                        toast({ title: `Tip sent!`, description: `R${tipAmount} tip sent to ${assignedDriver.fullName.split(" ")[0]} via card.` });
+                      });
+                    } else {
+                      setTipSubmitting(true);
+                      await new Promise(r => setTimeout(r, 400));
+                      setTipCharged(true);
+                      setTipSubmitting(false);
+                      toast({ title: "Tip noted!", description: `Please hand R${tipAmount} cash to ${assignedDriver.fullName.split(" ")[0]}.` });
+                    }
+                  }}
+                >
+                  {tipSubmitting ? "Processing..." : currentTrip?.paymentMethod === "card" ? `Pay R${tipAmount} tip with Yoco` : `Give R${tipAmount} cash tip`}
+                </button>
+              )}
+            </div>
+          )}
+
+          {tipCharged && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-3 flex items-center gap-2 mb-4">
+              <CheckCircle className="h-5 w-5 text-yellow-600 shrink-0" />
+              <span className="text-sm font-semibold text-yellow-800">Tip of R{tipAmount} sent — thank you!</span>
             </div>
           )}
 
