@@ -763,6 +763,19 @@ export async function registerRoutes(
   });
 
   // ── Driver Onboarding ──
+  app.patch("/api/drivers/:id/location", async (req, res) => {
+    const { lat, lng } = req.body;
+    if (typeof lat !== "number" || typeof lng !== "number") {
+      return res.status(400).json({ message: "lat and lng required" });
+    }
+    await storage.updateUser(req.params.id, {
+      currentLat: lat,
+      currentLng: lng,
+      locationUpdatedAt: new Date(),
+    } as any);
+    return res.json({ ok: true });
+  });
+
   app.patch("/api/drivers/:id/onboarding", async (req, res) => {
     const user = await storage.getUser(req.params.id);
     if (!user || user.role !== "driver") return res.status(404).json({ message: "Driver not found" });

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
 import { MapPin, DollarSign, Star, Check, X, Menu, LogOut, Navigation, Car, Clock, TrendingUp, User, ChevronLeft, History, Phone, MessageCircle, AlertTriangle, Shield, ExternalLink, BadgeCheck, Heart, Package, Users, Bus, Upload, Banknote, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,8 +27,66 @@ export default function DriverApp() {
   const [cashConfirmed, setCashConfirmed] = useState(false);
   const [tripStartedAt, setTripStartedAt] = useState<Date | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [driverGps, setDriverGps] = useState<{ lat: number; lng: number } | null>(null);
+  const gpsWatchRef = useRef<number | null>(null);
+  const lastSentRef = useRef<number>(0);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // ── Continuous GPS tracking when online ──
+  useEffect(() => {
+    if (!user) return;
+
+    const startGps = () => {
+      if (!navigator.geolocation) return;
+      if (gpsWatchRef.current !== null) return; // already watching
+
+      gpsWatchRef.current = navigator.geolocation.watchPosition(
+        (pos) => {
+          const { latitude: lat, longitude: lng } = pos.coords;
+          setDriverGps({ lat, lng });
+
+          // Throttle server updates to max once every 5 seconds
+          const now = Date.now();
+          if (now - lastSentRef.current >= 5000) {
+            lastSentRef.current = now;
+            fetch(`/api/drivers/${user.id}/location`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ lat, lng }),
+            }).catch(() => {});
+          }
+        },
+        (err) => {
+          console.warn("GPS error:", err.message);
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 3000,
+          timeout: 10000,
+        }
+      );
+    };
+
+    const stopGps = () => {
+      if (gpsWatchRef.current !== null) {
+        navigator.geolocation.clearWatch(gpsWatchRef.current);
+        gpsWatchRef.current = null;
+      }
+      setDriverGps(null);
+    };
+
+    if (user.isOnline) {
+      startGps();
+    } else {
+      stopGps();
+    }
+
+    return () => {
+      stopGps();
+    };
+  }, [user?.isOnline, user?.id]);
 
   // Live elapsed timer when trip is in progress
   useEffect(() => {
@@ -750,6 +808,10 @@ export default function DriverApp() {
               </div>
             </div>
             <p className="text-white font-medium bg-black/50 px-4 py-1.5 rounded-full text-sm backdrop-blur">Looking for trips...</p>
+            <div className={`mt-3 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${driverGps ? "bg-green-500/20 text-green-300 border border-green-500/30" : "bg-yellow-500/20 text-yellow-300 border border-yellow-500/30"}`} data-testid="gps-status">
+              <div className={`w-2 h-2 rounded-full ${driverGps ? "bg-green-400 animate-pulse" : "bg-yellow-400 animate-pulse"}`} />
+              {driverGps ? `GPS Active · ${driverGps.lat.toFixed(4)}, ${driverGps.lng.toFixed(4)}` : "Acquiring GPS..."}
+            </div>
             <Button variant="ghost" className="text-red-400 mt-4 bg-white/80 rounded-full" onClick={toggleOnline} data-testid="btn-go-offline">Go Offline</Button>
           </div>
         )}

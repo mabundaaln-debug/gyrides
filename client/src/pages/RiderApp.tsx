@@ -276,6 +276,7 @@ export default function RiderApp() {
     return () => { cancelled = true; };
   }, [pickup?.lat, pickup?.lng, dropoff?.lat, dropoff?.lng]);
 
+  // ── Real GPS polling: fetch driver's live position every 4 seconds ──
   useEffect(() => {
     if (view !== "tracking" || !currentTrip || !assignedDriver) return;
 
@@ -284,46 +285,62 @@ export default function RiderApp() {
     const dLat = currentTrip.dropoffLat ?? -23.315;
     const dLng = currentTrip.dropoffLng ?? 30.726;
 
-    let startLat: number, startLng: number, endLat: number, endLng: number;
-
-    if (rideStatus === "on_the_way") {
-      startLat = pLat + 0.008;
-      startLng = pLng - 0.006;
-      endLat = pLat;
-      endLng = pLng;
-      setTripEta(prev => prev ?? (currentTrip.duration ?? 5));
-    } else if (rideStatus === "in_progress") {
-      startLat = pLat;
-      startLng = pLng;
-      endLat = dLat;
-      endLng = dLng;
+    if (rideStatus === "in_progress") {
       setTripStartTime(prev => prev ?? Date.now());
-    } else {
-      setDriverPos({ lat: pLat, lng: pLng });
-      return;
     }
 
-    let step = 0;
-    const totalSteps = 40;
-    const interval = setInterval(() => {
-      step++;
-      const progress = Math.min(step / totalSteps, 1);
-      const eased = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-      const lat = startLat + (endLat - startLat) * eased;
-      const lng = startLng + (endLng - startLng) * eased;
-      setDriverPos({ lat, lng });
+    // Set ETA
+    if (rideStatus === "on_the_way") {
+      setTripEta(prev => prev ?? (currentTrip.duration ?? 5));
+    }
 
-      const totalDur = currentTrip.duration ?? 5;
-      if (rideStatus === "on_the_way") {
-        setTripEta(Math.max(1, Math.round(totalDur * (1 - progress) * 0.4)));
-      } else if (rideStatus === "in_progress") {
-        setTripEta(Math.max(1, Math.round(totalDur * (1 - progress))));
+    let cancelled = false;
+
+    const pollDriverLocation = async () => {
+      if (cancelled) return;
+      try {
+        const res = await fetch(`/api/users/${assignedDriver.id}`, { credentials: "include" });
+        const driverData = await res.json();
+
+        if (cancelled) return;
+
+        const hasRealGps = typeof driverData.currentLat === "number" && typeof driverData.currentLng === "number";
+
+        if (hasRealGps) {
+          setDriverPos({ lat: driverData.currentLat, lng: driverData.currentLng });
+
+          // Update ETA based on distance to destination
+          const totalDur = currentTrip.duration ?? 5;
+          if (rideStatus === "on_the_way") {
+            const distToPickup = Math.sqrt(Math.pow(driverData.currentLat - pLat, 2) + Math.pow(driverData.currentLng - pLng, 2));
+            const eta = Math.max(1, Math.round(distToPickup * 5000));
+            setTripEta(Math.min(eta, totalDur));
+          } else if (rideStatus === "in_progress") {
+            const distToDropoff = Math.sqrt(Math.pow(driverData.currentLat - dLat, 2) + Math.pow(driverData.currentLng - dLng, 2));
+            setTripEta(Math.max(1, Math.round(distToDropoff * 5000)));
+          }
+        } else {
+          // Fallback: show pickup location if no GPS
+          if (rideStatus === "on_the_way") {
+            setDriverPos({ lat: pLat + 0.003, lng: pLng - 0.003 });
+          } else if (rideStatus === "in_progress") {
+            setDriverPos({ lat: pLat, lng: pLng });
+          } else {
+            setDriverPos({ lat: pLat, lng: pLng });
+          }
+        }
+      } catch {
+        // Network error — keep existing position
       }
+    };
 
-      if (step >= totalSteps) clearInterval(interval);
-    }, 2000);
+    pollDriverLocation();
+    const interval = setInterval(pollDriverLocation, 4000);
 
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [view, rideStatus, currentTrip?.id, assignedDriver?.id]);
 
   const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {

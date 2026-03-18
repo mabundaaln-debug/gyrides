@@ -49,6 +49,9 @@ export const users = pgTable("users", {
   walletBalance: real("wallet_balance").default(0),
   pendingBalance: real("pending_balance").default(0),
   trustedContacts: text("trusted_contacts"),
+  currentLat: real("current_lat"),
+  currentLng: real("current_lng"),
+  locationUpdatedAt: timestamp("location_updated_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
