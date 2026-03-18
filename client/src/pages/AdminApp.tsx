@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { Users, Car, DollarSign, LogOut, ChevronRight, ChevronLeft, Star, MapPin, TrendingUp, Activity, AlertCircle, CheckCircle, Shield, XCircle, FileText, Eye, User as UserIcon, AlertTriangle, Phone, MessageCircle, KeyRound, ShieldCheck, ShieldX, Lock, EyeOff, Clock, Download, BarChart3 } from "lucide-react";
+import { Users, Car, DollarSign, LogOut, ChevronRight, ChevronLeft, Star, MapPin, TrendingUp, Activity, AlertCircle, CheckCircle, Shield, XCircle, FileText, Eye, User as UserIcon, AlertTriangle, Phone, MessageCircle, KeyRound, ShieldCheck, ShieldX, Lock, EyeOff, Clock, Download, BarChart3, Navigation } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -11,7 +11,124 @@ import { approveDriver, rejectDriver, updateSosAlert, getUser, adminResetUserPas
 import { generateStatementPDF } from "@/lib/generateStatement";
 import { useToast } from "@/hooks/use-toast";
 import TripChat from "@/components/TripChat";
+import GiyaniMap from "@/components/GiyaniMap";
 import type { User, Trip, VehicleType, SosAlert } from "@shared/schema";
+
+// ── Live location map for an SOS alert ──
+function SosLiveMap({ alert }: { alert: SosAlert }) {
+  const [driverPos, setDriverPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [riderPos, setRiderPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [driverName, setDriverName] = useState<string>("");
+  const [riderName, setRiderName] = useState<string>("");
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [riderId, setRiderId] = useState<string | null>(null);
+  const [driverId, setDriverId] = useState<string | null>(null);
+  const cancelledRef = useRef(false);
+
+  // Step 1: fetch the trip once to get rider/driver IDs
+  useEffect(() => {
+    if (!alert.tripId) return;
+    cancelledRef.current = false;
+    fetch(`/api/trips/${alert.tripId}`, { credentials: "include" })
+      .then(r => r.json())
+      .then((trip: Trip) => {
+        if (cancelledRef.current) return;
+        setRiderId(trip.riderId ?? null);
+        setDriverId(trip.driverId ?? null);
+      })
+      .catch(() => {});
+    return () => { cancelledRef.current = true; };
+  }, [alert.tripId]);
+
+  // Step 2: poll both users' GPS every 4 seconds
+  useEffect(() => {
+    if (!riderId && !driverId) return;
+    cancelledRef.current = false;
+
+    const pollUser = async (userId: string, role: "rider" | "driver") => {
+      try {
+        const res = await fetch(`/api/users/${userId}`, { credentials: "include" });
+        const data = await res.json();
+        if (cancelledRef.current) return;
+        if (typeof data.currentLat === "number" && typeof data.currentLng === "number") {
+          const pos = { lat: data.currentLat, lng: data.currentLng };
+          if (role === "driver") { setDriverPos(pos); setDriverName(data.fullName || "Driver"); }
+          else { setRiderPos(pos); setRiderName(data.fullName || "Rider"); }
+          setLastUpdated(new Date());
+        }
+      } catch {}
+    };
+
+    const poll = () => {
+      if (driverId) pollUser(driverId, "driver");
+      if (riderId) pollUser(riderId, "rider");
+    };
+
+    poll();
+    const interval = setInterval(poll, 4000);
+    return () => { cancelledRef.current = true; clearInterval(interval); };
+  }, [riderId, driverId]);
+
+  const hasAnyLocation = driverPos || riderPos;
+
+  return (
+    <div className="mb-3 rounded-xl overflow-hidden border border-gray-200 bg-white" data-testid="sos-live-map">
+      <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-100">
+        <div className="flex items-center gap-1.5">
+          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+          <span className="text-xs font-bold text-gray-700">Live Locations</span>
+        </div>
+        {lastUpdated && (
+          <span className="text-[10px] text-gray-400">Updated {lastUpdated.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+        )}
+      </div>
+
+      {hasAnyLocation ? (
+        <>
+          <GiyaniMap
+            pickup={riderPos ? { lat: riderPos.lat, lng: riderPos.lng, name: `Rider: ${riderName}` } : null}
+            driverLocation={driverPos}
+            className="h-48"
+            showRoute={false}
+          />
+          <div className="flex gap-2 px-3 py-2 border-t border-gray-100">
+            {driverPos && (
+              <a
+                href={`https://www.google.com/maps?q=${driverPos.lat},${driverPos.lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-1.5 bg-yellow-50 border border-yellow-200 rounded-lg py-1.5 text-xs font-bold text-yellow-800"
+                data-testid="link-driver-maps"
+              >
+                <Car className="h-3.5 w-3.5" /> Driver in Maps
+              </a>
+            )}
+            {riderPos && (
+              <a
+                href={`https://www.google.com/maps?q=${riderPos.lat},${riderPos.lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-1.5 bg-blue-50 border border-blue-200 rounded-lg py-1.5 text-xs font-bold text-blue-800"
+                data-testid="link-rider-maps"
+              >
+                <Navigation className="h-3.5 w-3.5" /> Rider in Maps
+              </a>
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="h-24 flex items-center justify-center text-gray-400 text-xs">
+          <div className="text-center">
+            <div className="animate-pulse mb-1">
+              <MapPin className="h-5 w-5 mx-auto text-gray-300" />
+            </div>
+            {alert.tripId ? "Waiting for live GPS..." : "No trip linked to this alert"}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminApp() {
   const { user, logout } = useAuth();
@@ -792,6 +909,11 @@ export default function AdminApp() {
                   </div>
                 )}
               </div>
+
+              {/* Live GPS map — always shown for active/acknowledged alerts */}
+              {(alert.status === "active" || alert.status === "acknowledged") && (
+                <SosLiveMap alert={alert} />
+              )}
 
               {alert.adminNotes && (
                 <div className="bg-white/80 rounded-lg px-3 py-2 mb-3 text-xs text-gray-700 border border-gray-100">
