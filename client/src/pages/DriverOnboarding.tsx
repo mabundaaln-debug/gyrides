@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Car, User, FileText, Camera, ChevronRight, ChevronLeft, CheckCircle, Clock, XCircle, Upload, Shield, CreditCard, LogOut } from "lucide-react";
+import { Car, User, FileText, Camera, ChevronRight, ChevronLeft, CheckCircle, Clock, XCircle, Upload, Shield, CreditCard, LogOut, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
@@ -173,16 +173,27 @@ export default function DriverOnboarding() {
         <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mb-6">
           <XCircle className="h-10 w-10 text-red-500" />
         </div>
-        <h1 className="text-2xl font-black text-white mb-2">Application Rejected</h1>
-        <p className="text-gray-400 mb-2 max-w-xs">Unfortunately your application was not approved.</p>
+        <h1 className="text-2xl font-black text-white mb-2">Application Not Approved</h1>
+        <p className="text-gray-400 mb-5 max-w-xs">Our team has reviewed your application and could not approve it at this time.</p>
+
         {user.rejectionReason && (
-          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-6 w-full max-w-sm">
-            <p className="text-sm text-red-400"><strong>Reason:</strong> {user.rejectionReason}</p>
+          <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-5 mb-6 w-full max-w-sm text-left">
+            <div className="flex items-center gap-2 mb-2">
+              <MessageCircle className="h-4 w-4 text-red-400 shrink-0" />
+              <p className="text-xs font-bold text-red-400 uppercase tracking-wider">Feedback from our team</p>
+            </div>
+            <p className="text-sm text-white leading-relaxed">{user.rejectionReason}</p>
           </div>
         )}
-        <p className="text-gray-500 text-sm mb-8">You can update your documents and re-submit.</p>
-        <Button className="bg-yellow-400 text-black hover:bg-yellow-500 font-bold rounded-2xl h-14 px-8" onClick={() => {
-          setStep("personal");
+
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-8 w-full max-w-sm text-left space-y-2">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">What to do next</p>
+          <p className="text-sm text-gray-300">Address the feedback above, update your documents, and resubmit your application.</p>
+          <p className="text-xs text-gray-500">Your previous details have been saved — only update what needs to change.</p>
+        </div>
+
+        <Button className="bg-yellow-400 text-black hover:bg-yellow-500 font-bold rounded-2xl h-14 px-8 w-full max-w-sm" onClick={() => {
+          setStep("documents");
           setUser({ ...user, onboardingComplete: false, approvalStatus: "pending" } as any);
         }} data-testid="btn-resubmit">
           Update & Resubmit
