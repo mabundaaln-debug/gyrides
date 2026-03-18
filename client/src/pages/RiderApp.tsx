@@ -1413,19 +1413,14 @@ export default function RiderApp() {
           <Button
             size="lg"
             className="w-full h-14 rounded-2xl text-lg font-bold bg-black text-white hover:bg-gray-900"
-            disabled={!selectedVehicle || cardVerifying}
+            disabled={!selectedVehicle}
             onClick={() => {
               if (!selectedVehicle) return;
-              const isFirstRide = !user?.totalTrips || user.totalTrips === 0;
-              if (paymentMethod === "card" && isFirstRide) {
-                handleYocoVerify(calcFare(selectedVehicle), handleBookRide);
-              } else {
-                handleBookRide();
-              }
+              handleBookRide();
             }}
             data-testid="btn-confirm-ride"
           >
-            {cardVerifying ? "Verifying card..." : selectedVehicle ? `Book ${selectedVehicle.name} · R${calcFare(selectedVehicle)}` : "Select a ride"}
+            {selectedVehicle ? `Book ${selectedVehicle.name} · R${calcFare(selectedVehicle)}` : "Select a ride"}
           </Button>
         </div>
       </div>
