@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { Car, User, Settings, ArrowRight, LogIn, UserPlus, Eye, EyeOff, Download, ArrowLeft, Phone, KeyRound, CheckCircle2, ShieldCheck, Fingerprint } from "lucide-react";
+import { Car, User, Settings, ArrowRight, LogIn, UserPlus, Eye, EyeOff, Download, ArrowLeft, Phone, KeyRound, CheckCircle2, ShieldCheck, Fingerprint, X, FileText, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
@@ -28,6 +28,8 @@ export default function Home() {
   const [resetUsername, setResetUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -68,6 +70,10 @@ export default function Home() {
     }
     if (password !== confirmPassword) {
       toast({ title: "Passwords don't match", description: "Please confirm your password", variant: "destructive" });
+      return;
+    }
+    if (!termsAccepted) {
+      toast({ title: "Terms & Conditions required", description: "Please accept the Terms and Conditions to create your account.", variant: "destructive" });
       return;
     }
     setLoading(true);
@@ -425,6 +431,7 @@ export default function Home() {
 
   if (showLogin) {
     return (
+      <>
       <div className="min-h-[100dvh] flex flex-col p-6 bg-black">
         <div className="w-full max-w-sm mx-auto flex-1 flex flex-col justify-center">
           <img src="/gy-logo.png" alt="GY Rides" className="w-20 h-20 object-contain mb-8 mx-auto drop-shadow-2xl" />
@@ -528,10 +535,36 @@ export default function Home() {
               </div>
             )}
 
+            {/* Terms & Conditions checkbox — registration only */}
+            {isRegister && (
+              <div
+                className={`flex items-start gap-3 p-3 rounded-2xl border-2 transition-all cursor-pointer ${termsAccepted ? "bg-yellow-400/10 border-yellow-400" : "bg-white/5 border-white/20"}`}
+                onClick={() => setTermsAccepted(v => !v)}
+                data-testid="terms-checkbox-row"
+              >
+                <div className={`w-6 h-6 rounded-lg shrink-0 flex items-center justify-center mt-0.5 transition-all ${termsAccepted ? "bg-yellow-400" : "bg-white/10 border border-white/30"}`}>
+                  {termsAccepted && <Check className="h-4 w-4 text-black font-black" strokeWidth={3} />}
+                </div>
+                <p className="text-sm text-gray-300 leading-relaxed">
+                  I agree to the{" "}
+                  <button
+                    type="button"
+                    className="text-yellow-400 font-bold underline"
+                    onClick={e => { e.stopPropagation(); setShowTermsModal(true); }}
+                    data-testid="btn-view-terms"
+                  >
+                    Terms &amp; Conditions
+                  </button>
+                  {" "}and acknowledge the liability waiver. I confirm I have read and understood GY Rides' POPIA compliance policy.
+                  {role === "driver" && " As a driver, I accept full responsibility for passengers and vehicle compliance."}
+                </p>
+              </div>
+            )}
+
             <button
               className="w-full h-14 rounded-2xl text-lg font-bold bg-yellow-400 hover:bg-yellow-500 text-black transition-colors disabled:opacity-50"
               onClick={isRegister ? handleRegister : handleLogin}
-              disabled={loading}
+              disabled={loading || (isRegister && !termsAccepted)}
               data-testid="btn-submit-auth"
             >
               {loading ? "Please wait..." : isRegister ? "Create Account" : "Sign In"}
@@ -575,7 +608,7 @@ export default function Home() {
             </div>
 
 
-            <button className="w-full text-gray-400 text-sm py-3" onClick={() => { setIsRegister(!isRegister); setConfirmPassword(""); }}>
+            <button className="w-full text-gray-400 text-sm py-3" onClick={() => { setIsRegister(!isRegister); setConfirmPassword(""); setTermsAccepted(false); }}>
               {isRegister ? "Already have an account? Sign In" : "New here? Create Account"}
             </button>
             <button className="w-full text-gray-500 text-sm" onClick={() => setShowLogin(false)}>
@@ -584,6 +617,104 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* ── Terms & Conditions Modal ── */}
+      {showTermsModal && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex flex-col" data-testid="terms-modal">
+          {/* Header */}
+          <div className="bg-black border-b border-white/10 px-4 py-4 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-yellow-400 rounded-xl flex items-center justify-center shrink-0">
+                <FileText className="h-5 w-5 text-black" />
+              </div>
+              <div>
+                <h2 className="text-white font-black text-base leading-tight">Terms &amp; Conditions</h2>
+                <p className="text-gray-500 text-[11px]">GY Rides · A subsidiary of Mpfuno Medical Services</p>
+              </div>
+            </div>
+            <button onClick={() => setShowTermsModal(false)} className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center" data-testid="btn-close-terms">
+              <X className="h-5 w-5 text-white" />
+            </button>
+          </div>
+
+          {/* Scrollable content */}
+          <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6 text-sm text-gray-300">
+
+            <div className="bg-yellow-400/10 border border-yellow-400/30 rounded-2xl p-4">
+              <p className="text-yellow-300 font-bold text-xs uppercase tracking-widest mb-1">Effective Date</p>
+              <p className="text-white font-semibold">Please read these terms carefully before creating your account.</p>
+            </div>
+
+            {[
+              {
+                num: "1", title: "COMPANY STRUCTURE",
+                body: "GY Rides operates as a subsidiary of Mpfuno Medical Services. All services are provided under the GY Rides platform brand."
+              },
+              {
+                num: "2", title: "POPIA COMPLIANCE",
+                body: "GY Rides complies with the Protection of Personal Information Act (POPIA). User data is collected and processed strictly for operational purposes. Users consent to data processing upon using the platform."
+              },
+              {
+                num: "3", title: "LIMITATION OF LIABILITY & INDEMNITY",
+                body: "GY Rides shall not be liable for any loss, injury, damage, or death during rides. Users indemnify GY Rides and Mpfuno Medical Services against all claims arising from use of the platform or services."
+              },
+              {
+                num: "4", title: "DRIVER AGREEMENT",
+                body: "Drivers are independent contractors. Drivers are fully responsible for passenger safety, vehicle insurance, and legal compliance at all times. Drivers must maintain a valid driver's licence and a roadworthy vehicle, and accept full responsibility for passengers. Drivers operate independently from GY Rides."
+              },
+              {
+                num: "5", title: "INSURANCE",
+                body: "Drivers must maintain valid vehicle insurance at all times. GY Rides does not provide ride insurance coverage for drivers or passengers."
+              },
+              {
+                num: "6", title: "PASSENGER WAIVER",
+                body: "Passengers use the platform at their own risk. All claims against GY Rides are waived to the fullest extent permitted by law. GY Rides accepts no liability for incidents occurring during rides."
+              },
+              {
+                num: "7", title: "CONTACT",
+                body: "GY Rides (Subsidiary of Mpfuno Medical Services)\nWhatsApp / Phone: 068 642 7644"
+              },
+            ].map(s => (
+              <div key={s.num}>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 bg-yellow-400 rounded-lg flex items-center justify-center shrink-0">
+                    <span className="text-black font-black text-xs">{s.num}</span>
+                  </div>
+                  <h3 className="text-white font-bold text-sm">{s.title}</h3>
+                </div>
+                <p className="text-gray-400 leading-relaxed whitespace-pre-line pl-8">{s.body}</p>
+              </div>
+            ))}
+
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+              <p className="text-white font-bold text-sm mb-2">APP CHECKBOX DECLARATION</p>
+              <p className="text-gray-400 text-sm">By checking "I agree" on the sign-up screen, you confirm that you have read, understood, and accepted these Terms and Conditions in their entirety, including the liability waiver and POPIA consent.</p>
+            </div>
+
+            <div className="h-4" />
+          </div>
+
+          {/* Accept button at bottom */}
+          <div className="shrink-0 bg-black border-t border-white/10 px-5 py-4 space-y-3">
+            <button
+              data-testid="btn-accept-terms"
+              onClick={() => { setTermsAccepted(true); setShowTermsModal(false); }}
+              className="w-full h-14 rounded-2xl bg-yellow-400 text-black font-black text-base flex items-center justify-center gap-2 hover:bg-yellow-300 transition-colors active:scale-95"
+            >
+              <Check className="h-5 w-5" strokeWidth={3} />
+              I Accept These Terms
+            </button>
+            <button
+              data-testid="btn-decline-terms"
+              onClick={() => setShowTermsModal(false)}
+              className="w-full text-gray-500 text-sm py-2"
+            >
+              Close without accepting
+            </button>
+          </div>
+        </div>
+      )}
+      </>
     );
   }
 
