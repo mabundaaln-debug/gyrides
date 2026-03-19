@@ -13,6 +13,16 @@ import GiyaniMap from "@/components/GiyaniMap";
 import TripChat from "@/components/TripChat";
 import type { Trip, User as UserType } from "@shared/schema";
 
+function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+const COMPLETION_RADIUS_M = 200;
+
 export default function DriverApp() {
   const { user, setUser, logout } = useAuth();
   const [, setLocation] = useLocation();
@@ -30,6 +40,8 @@ export default function DriverApp() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [driverGps, setDriverGps] = useState<{ lat: number; lng: number } | null>(null);
   const [riderPos, setRiderPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [distToDropoff, setDistToDropoff] = useState<number | null>(null);
+  const [nearDropoff, setNearDropoff] = useState(false);
   const [pinEntry, setPinEntry] = useState("");
   const [pinVerified, setPinVerified] = useState(false);
   const [pinError, setPinError] = useState("");
@@ -115,6 +127,18 @@ export default function DriverApp() {
     const interval = setInterval(poll, 4000);
     return () => { cancelled = true; clearInterval(interval); };
   }, [onTrip?.id, onTrip?.riderId]);
+
+  // ── Geo-fence: compute distance to dropoff when driving ──
+  useEffect(() => {
+    if (tripPhase !== "inprogress" || !driverGps || !onTrip?.dropoffLat || !onTrip?.dropoffLng) {
+      setDistToDropoff(null);
+      setNearDropoff(false);
+      return;
+    }
+    const dist = haversineMeters(driverGps.lat, driverGps.lng, onTrip.dropoffLat, onTrip.dropoffLng);
+    setDistToDropoff(Math.round(dist));
+    setNearDropoff(dist <= COMPLETION_RADIUS_M);
+  }, [driverGps, tripPhase, onTrip?.dropoffLat, onTrip?.dropoffLng]);
 
   const formatElapsed = (secs: number) => {
     const m = Math.floor(secs / 60).toString().padStart(2, "0");
@@ -222,6 +246,8 @@ export default function DriverApp() {
         const fareDisplay = `R${onTrip.fare}`;
         const durationText = actualMins >= 1 ? `${actualMins} min` : `${elapsedSeconds}s`;
         setOnTrip(null);
+        setDistToDropoff(null);
+        setNearDropoff(false);
         setTripRider(null);
         setTripStartedAt(null);
         setElapsedSeconds(0);
@@ -644,7 +670,13 @@ export default function DriverApp() {
       <div className="min-h-[100dvh] bg-gray-50 flex flex-col relative">
         <div className="absolute top-0 left-0 right-0 z-20 p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => { setOnTrip(null); setView("home"); }} className="rounded-full bg-white shadow-md"><ChevronLeft className="h-6 w-6" /></Button>
+            {tripPhase !== "inprogress" ? (
+              <Button variant="ghost" size="icon" onClick={() => { setOnTrip(null); setView("home"); }} className="rounded-full bg-white shadow-md" data-testid="btn-back-trip"><ChevronLeft className="h-6 w-6" /></Button>
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-white/30 flex items-center justify-center shadow-md opacity-30 cursor-not-allowed" title="Cannot cancel while rider is on board">
+                <ChevronLeft className="h-6 w-6 text-gray-400" />
+              </div>
+            )}
             <span className={`text-xs font-bold px-3 py-1.5 rounded-full shadow-sm ${phaseColor}`}>{phaseLabel}</span>
             {onTrip.rideType && onTrip.rideType !== "private" && (
               <span className={`text-[10px] font-bold px-2 py-1 rounded-full shadow-sm ${
@@ -744,6 +776,31 @@ export default function DriverApp() {
               </div>
               <span className="text-2xl font-bold text-yellow-700 tabular-nums" data-testid="elapsed-time">{formatElapsed(elapsedSeconds)}</span>
             </div>
+          )}
+
+          {/* Geo-fence indicator — shown while driving */}
+          {tripPhase === "inprogress" && distToDropoff !== null && (
+            nearDropoff ? (
+              <div className="bg-green-50 border-2 border-green-400 rounded-2xl p-3 flex items-center gap-3 animate-pulse" data-testid="near-destination-banner">
+                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center shrink-0">
+                  <Check className="h-4 w-4 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-green-800">Near destination!</p>
+                  <p className="text-xs text-green-600">{distToDropoff}m away — tap Complete Trip</p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3 flex items-center justify-between" data-testid="distance-to-dropoff">
+                <div className="flex items-center gap-2">
+                  <Navigation className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium text-gray-700">Distance to destination</span>
+                </div>
+                <span className="text-sm font-bold text-gray-800" data-testid="dist-value">
+                  {distToDropoff >= 1000 ? `${(distToDropoff / 1000).toFixed(1)} km` : `${distToDropoff} m`}
+                </span>
+              </div>
+            )
           )}
 
           {tripPhase === "inprogress" && onTrip.paymentMethod === "cash" && !cashConfirmed && (
@@ -927,15 +984,30 @@ export default function DriverApp() {
             </div>
           )}
 
-          <Button
-            size="lg"
-            className={`w-full h-14 rounded-2xl text-lg font-bold transition-all ${tripPhase === "pickup" && !isParcel && !pinVerified ? "bg-gray-300 text-gray-500 cursor-not-allowed" : "bg-black text-white hover:bg-gray-900"}`}
-            onClick={advanceTrip}
-            disabled={tripPhase === "pickup" && !isParcel && !pinVerified}
-            data-testid="btn-advance-trip"
-          >
-            {tripPhase === "arriving" ? "Arrived at Pickup" : tripPhase === "pickup" ? (isParcel ? "Collected Parcel" : "Start Trip") : (isParcel ? "Delivered" : "Complete Trip")}
-          </Button>
+          {(() => {
+            const isCompletionPhase = tripPhase === "inprogress";
+            const completionBlocked = isCompletionPhase && distToDropoff !== null && !nearDropoff;
+            const pinBlocked = tripPhase === "pickup" && !isParcel && !pinVerified;
+            const isDisabled = pinBlocked || completionBlocked;
+            const btnLabel = tripPhase === "arriving"
+              ? "Arrived at Pickup"
+              : tripPhase === "pickup"
+                ? (isParcel ? "Collected Parcel" : "Start Trip")
+                : completionBlocked
+                  ? `${distToDropoff! >= 1000 ? `${(distToDropoff! / 1000).toFixed(1)} km` : `${distToDropoff}m`} to destination`
+                  : (isParcel ? "Delivered" : "Complete Trip");
+            return (
+              <Button
+                size="lg"
+                className={`w-full h-14 rounded-2xl text-lg font-bold transition-all ${isDisabled ? "bg-gray-300 text-gray-500 cursor-not-allowed" : nearDropoff && isCompletionPhase ? "bg-green-600 text-white hover:bg-green-700" : "bg-black text-white hover:bg-gray-900"}`}
+                onClick={advanceTrip}
+                disabled={isDisabled}
+                data-testid="btn-advance-trip"
+              >
+                {btnLabel}
+              </Button>
+            );
+          })()}
         </div>
 
         {showChat && onTrip && tripRider && (
