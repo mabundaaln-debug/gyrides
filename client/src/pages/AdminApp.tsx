@@ -1408,7 +1408,7 @@ export default function AdminApp() {
         />
       )}
       <div className="py-4 text-[10px] text-gray-400 text-center leading-tight">
-        © {new Date().getFullYear()} Mpfuno Medical Services & Dr NI Mabunda. All rights reserved.
+        © {new Date().getFullYear()} Mpfuno Medical Services (PTY) LTD & Dr NI Mabunda. All rights reserved.
       </div>
     </div>
   );

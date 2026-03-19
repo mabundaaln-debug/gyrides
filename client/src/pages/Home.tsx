@@ -631,7 +631,7 @@ export default function Home() {
               </div>
               <div>
                 <h2 className="text-white font-black text-base leading-tight">Terms &amp; Conditions</h2>
-                <p className="text-gray-500 text-[11px]">GY Rides · A subsidiary of Mpfuno Medical Services</p>
+                <p className="text-gray-500 text-[11px]">GY Rides · A division of Mpfuno Medical Services (PTY) LTD</p>
               </div>
             </div>
             <button onClick={() => setShowTermsModal(false)} className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center" data-testid="btn-close-terms">
@@ -653,7 +653,7 @@ export default function Home() {
             {[
               {
                 num: "1", title: "COMPANY STRUCTURE",
-                body: "GY Rides operates as a subsidiary of Mpfuno Medical Services. All services are provided under the GY Rides platform brand."
+                body: "GY Rides operates as a division of Mpfuno Medical Services (PTY) LTD. All services are provided under the GY Rides platform brand."
               },
               {
                 num: "2", title: "POPIA COMPLIANCE",
@@ -661,7 +661,7 @@ export default function Home() {
               },
               {
                 num: "3", title: "LIMITATION OF LIABILITY & INDEMNITY",
-                body: "GY Rides shall not be liable for any loss, injury, damage, or death during rides. Users indemnify GY Rides and Mpfuno Medical Services against all claims arising from use of the platform or services."
+                body: "GY Rides shall not be liable for any loss, injury, damage, or death during rides. Users indemnify GY Rides and Mpfuno Medical Services (PTY) LTD against all claims arising from use of the platform or services."
               },
               {
                 num: "4", title: "DRIVER AGREEMENT",
@@ -677,7 +677,7 @@ export default function Home() {
               },
               {
                 num: "7", title: "CONTACT",
-                body: "GY Rides (Subsidiary of Mpfuno Medical Services)\nWhatsApp / Phone: 068 642 7644"
+                body: "GY Rides (A Division of Mpfuno Medical Services (PTY) LTD)\nWhatsApp / Phone: 068 642 7644"
               },
             ].map(s => (
               <div key={s.num}>
@@ -841,7 +841,7 @@ export default function Home() {
         Giyani, Limpopo, South Africa
       </div>
       <div className="mt-3 text-[10px] text-gray-500 text-center relative z-10 leading-tight">
-        © {new Date().getFullYear()} Mpfuno Medical Services & Dr NI Mabunda. All rights reserved.
+        © {new Date().getFullYear()} Mpfuno Medical Services (PTY) LTD & Dr NI Mabunda. All rights reserved.
       </div>
     </div>
   );

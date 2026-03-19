@@ -105,7 +105,7 @@ export async function generateStatementPDF(data: StatementData): Promise<void> {
   doc.setTextColor(180, 180, 180);
   doc.text("GIYANI'S TRUSTED RIDE-HAILING SERVICE", margin + 46, 28);
   doc.setFontSize(6.5);
-  doc.text("Powered by Mpfuno Medical Services & Dr NI Mabunda", margin + 46, 35);
+  doc.text("GY Rides — A Division of Mpfuno Medical Services (PTY) LTD", margin + 46, 35);
 
   // Statement label (right side)
   doc.setFont("helvetica", "bold");
@@ -321,7 +321,7 @@ export async function generateStatementPDF(data: StatementData): Promise<void> {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(6.5);
     doc.setTextColor(150, 150, 150);
-    doc.text("© Mpfuno Medical Services & Dr NI Mabunda. All rights reserved.", W / 2, 287, { align: "center" });
+    doc.text("© Mpfuno Medical Services (PTY) LTD & Dr NI Mabunda. All rights reserved.", W / 2, 287, { align: "center" });
     doc.text(`GY Rides · Giyani, Limpopo, South Africa · WhatsApp: +27 68 642 7644  |  Page ${p} of ${pageCount}`, W / 2, 292, { align: "center" });
   }
 
