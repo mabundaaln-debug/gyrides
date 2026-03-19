@@ -1,19 +1,20 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Car, User, FileText, Camera, ChevronRight, ChevronLeft, CheckCircle, Clock, XCircle, Upload, Shield, CreditCard, LogOut, MessageCircle } from "lucide-react";
+import { Car, User, FileText, ChevronRight, ChevronLeft, CheckCircle, Clock, XCircle, Upload, Shield, CreditCard, LogOut, MessageCircle, Landmark, Users, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
 import { submitOnboarding } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
-type Step = "personal" | "vehicle" | "license" | "documents" | "review";
+type Step = "personal" | "vehicle" | "license" | "documents" | "banking" | "review";
 
 const STEPS: { key: Step; label: string; icon: React.ReactNode }[] = [
   { key: "personal", label: "Personal Info", icon: <User className="h-4 w-4" /> },
   { key: "vehicle", label: "Vehicle Details", icon: <Car className="h-4 w-4" /> },
   { key: "license", label: "Licenses", icon: <CreditCard className="h-4 w-4" /> },
   { key: "documents", label: "Documents", icon: <FileText className="h-4 w-4" /> },
+  { key: "banking", label: "Banking & Financial", icon: <Landmark className="h-4 w-4" /> },
   { key: "review", label: "Review", icon: <CheckCircle className="h-4 w-4" /> },
 ];
 
@@ -49,6 +50,28 @@ export default function DriverOnboarding() {
   const [proofOfInsuranceDoc, setProofOfInsuranceDoc] = useState("");
   const [profilePhotoDoc, setProfilePhotoDoc] = useState("");
 
+  // Banking & financial details
+  const [bankName, setBankName] = useState("");
+  const [bankAccountHolder, setBankAccountHolder] = useState(user?.fullName || "");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [bankAccountType, setBankAccountType] = useState("Cheque");
+  const [bankBranchCode, setBankBranchCode] = useState("");
+  const [statementEmail, setStatementEmail] = useState(user?.email || "");
+  const [statementPhone, setStatementPhone] = useState(user?.phone || "");
+
+  // Nominee 1
+  const [nominee1Name, setNominee1Name] = useState("");
+  const [nominee1Phone, setNominee1Phone] = useState("");
+  const [nominee1Email, setNominee1Email] = useState("");
+  const [nominee1Relation, setNominee1Relation] = useState("");
+  const [showNominee2, setShowNominee2] = useState(false);
+
+  // Nominee 2
+  const [nominee2Name, setNominee2Name] = useState("");
+  const [nominee2Phone, setNominee2Phone] = useState("");
+  const [nominee2Email, setNominee2Email] = useState("");
+  const [nominee2Relation, setNominee2Relation] = useState("");
+
   if (!user || user.role !== "driver") {
     return null;
   }
@@ -64,6 +87,7 @@ export default function DriverOnboarding() {
   const canProceedVehicle = vehicleMake && vehicleModel && vehicleColor && vehicleYear && licensePlate;
   const canProceedLicense = driverLicenseNumber && driverLicenseExpiry && driverLicenseCode;
   const canProceedDocs = driverLicenseDoc && vehicleLicenseDoc && roadworthyCertDoc;
+  const canProceedBanking = bankName && bankAccountNumber && bankAccountType && bankBranchCode && bankAccountHolder;
 
   const handleNext = () => {
     const keys = STEPS.map(s => s.key);
@@ -135,6 +159,23 @@ export default function DriverOnboarding() {
         roadworthyCertDoc,
         proofOfInsuranceDoc: proofOfInsuranceDoc || null,
         profilePhotoDoc: profilePhotoDoc || null,
+        // Banking
+        bankName,
+        bankAccountHolder,
+        bankAccountNumber,
+        bankAccountType,
+        bankBranchCode,
+        statementEmail: statementEmail || null,
+        statementPhone: statementPhone || null,
+        // Nominees
+        nominee1Name: nominee1Name || null,
+        nominee1Phone: nominee1Phone || null,
+        nominee1Email: nominee1Email || null,
+        nominee1Relation: nominee1Relation || null,
+        nominee2Name: showNominee2 ? (nominee2Name || null) : null,
+        nominee2Phone: showNominee2 ? (nominee2Phone || null) : null,
+        nominee2Email: showNominee2 ? (nominee2Email || null) : null,
+        nominee2Relation: showNominee2 ? (nominee2Relation || null) : null,
       });
       setUser(updated);
       toast({ title: "Application submitted!", description: "Your documents are under review. We'll notify you once approved." });
@@ -382,6 +423,152 @@ export default function DriverOnboarding() {
           </div>
         )}
 
+        {step === "banking" && (
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-lg font-bold">Banking & Financial Details</h2>
+              <p className="text-sm text-gray-500 mt-1">Your earnings (85% of each fare) will be paid to this account. All information is securely stored.</p>
+            </div>
+
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-3">
+              <h3 className="font-bold text-sm flex items-center gap-2"><Landmark className="h-4 w-4 text-yellow-500" /> Bank Account Details</h3>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Bank Name *</label>
+                <select value={bankName} onChange={e => setBankName(e.target.value)} className="h-12 rounded-xl border border-gray-200 bg-white px-3 w-full text-sm" data-testid="select-bank-name">
+                  <option value="">Select your bank</option>
+                  <option>ABSA</option>
+                  <option>FNB (First National Bank)</option>
+                  <option>Standard Bank</option>
+                  <option>Nedbank</option>
+                  <option>Capitec Bank</option>
+                  <option>African Bank</option>
+                  <option>Investec</option>
+                  <option>TymeBank</option>
+                  <option>Discovery Bank</option>
+                  <option>Bidvest Bank</option>
+                  <option>Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Account Holder Name *</label>
+                <Input value={bankAccountHolder} onChange={e => setBankAccountHolder(e.target.value)} placeholder="Full name as it appears on the account" className="h-12 rounded-xl" data-testid="input-bank-holder" />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Account Number *</label>
+                <Input value={bankAccountNumber} onChange={e => setBankAccountNumber(e.target.value)} placeholder="Your account number" className="h-12 rounded-xl" inputMode="numeric" data-testid="input-bank-account" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Account Type *</label>
+                  <select value={bankAccountType} onChange={e => setBankAccountType(e.target.value)} className="h-12 rounded-xl border border-gray-200 bg-white px-3 w-full text-sm" data-testid="select-account-type">
+                    <option>Cheque</option>
+                    <option>Savings</option>
+                    <option>Current</option>
+                    <option>Transmission</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Branch Code *</label>
+                  <Input value={bankBranchCode} onChange={e => setBankBranchCode(e.target.value)} placeholder="e.g. 632005" className="h-12 rounded-xl" inputMode="numeric" data-testid="input-branch-code" />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-3">
+              <h3 className="font-bold text-sm flex items-center gap-2"><FileText className="h-4 w-4 text-yellow-500" /> Statement Delivery</h3>
+              <p className="text-xs text-gray-500">Where should we send your monthly earnings statements?</p>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Email for Statements</label>
+                <Input value={statementEmail} onChange={e => setStatementEmail(e.target.value)} placeholder="statements@example.com" type="email" className="h-12 rounded-xl" data-testid="input-statement-email" />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">WhatsApp / Phone for Statements</label>
+                <Input value={statementPhone} onChange={e => setStatementPhone(e.target.value)} placeholder="e.g. 074 567 8901" className="h-12 rounded-xl" data-testid="input-statement-phone" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-3">
+              <h3 className="font-bold text-sm flex items-center gap-2"><Users className="h-4 w-4 text-yellow-500" /> Financial Nominees</h3>
+              <p className="text-xs text-gray-500">Nominees can view your vehicle's financial statements and earnings history. They cannot withdraw or make changes.</p>
+
+              <div className="border border-gray-100 rounded-xl p-3 space-y-3 bg-gray-50">
+                <p className="text-xs font-bold text-gray-600 uppercase tracking-wider">Nominee 1</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Full Name</label>
+                    <Input value={nominee1Name} onChange={e => setNominee1Name(e.target.value)} placeholder="e.g. Thandi Maluleke" className="h-11 rounded-xl" data-testid="input-nominee1-name" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Relation</label>
+                    <select value={nominee1Relation} onChange={e => setNominee1Relation(e.target.value)} className="h-11 rounded-xl border border-gray-200 bg-white px-3 w-full text-sm" data-testid="select-nominee1-relation">
+                      <option value="">Select</option>
+                      <option>Spouse</option>
+                      <option>Partner</option>
+                      <option>Parent</option>
+                      <option>Sibling</option>
+                      <option>Child</option>
+                      <option>Accountant</option>
+                      <option>Business Partner</option>
+                      <option>Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Phone</label>
+                    <Input value={nominee1Phone} onChange={e => setNominee1Phone(e.target.value)} placeholder="074 567 8901" className="h-11 rounded-xl" data-testid="input-nominee1-phone" />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Email</label>
+                    <Input value={nominee1Email} onChange={e => setNominee1Email(e.target.value)} placeholder="nominee@example.com" type="email" className="h-11 rounded-xl" data-testid="input-nominee1-email" />
+                  </div>
+                </div>
+              </div>
+
+              {!showNominee2 ? (
+                <button onClick={() => setShowNominee2(true)} className="flex items-center gap-2 text-sm text-yellow-600 font-bold py-2" data-testid="btn-add-nominee2">
+                  <Plus className="h-4 w-4" /> Add a second nominee
+                </button>
+              ) : (
+                <div className="border border-gray-100 rounded-xl p-3 space-y-3 bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-gray-600 uppercase tracking-wider">Nominee 2</p>
+                    <button onClick={() => { setShowNominee2(false); setNominee2Name(""); setNominee2Phone(""); setNominee2Email(""); setNominee2Relation(""); }} className="text-red-400" data-testid="btn-remove-nominee2">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2">
+                      <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Full Name</label>
+                      <Input value={nominee2Name} onChange={e => setNominee2Name(e.target.value)} placeholder="e.g. John Mabunda" className="h-11 rounded-xl" data-testid="input-nominee2-name" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Relation</label>
+                      <select value={nominee2Relation} onChange={e => setNominee2Relation(e.target.value)} className="h-11 rounded-xl border border-gray-200 bg-white px-3 w-full text-sm" data-testid="select-nominee2-relation">
+                        <option value="">Select</option>
+                        <option>Spouse</option>
+                        <option>Partner</option>
+                        <option>Parent</option>
+                        <option>Sibling</option>
+                        <option>Child</option>
+                        <option>Accountant</option>
+                        <option>Business Partner</option>
+                        <option>Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Phone</label>
+                      <Input value={nominee2Phone} onChange={e => setNominee2Phone(e.target.value)} placeholder="074 567 8901" className="h-11 rounded-xl" data-testid="input-nominee2-phone" />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Email</label>
+                      <Input value={nominee2Email} onChange={e => setNominee2Email(e.target.value)} placeholder="nominee2@example.com" type="email" className="h-11 rounded-xl" data-testid="input-nominee2-email" />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {step === "review" && (
           <div className="space-y-4">
             <h2 className="text-lg font-bold">Review Your Application</h2>
@@ -429,6 +616,36 @@ export default function DriverOnboarding() {
               </div>
             </div>
 
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-2">
+              <h3 className="font-bold text-sm text-yellow-600 flex items-center gap-2"><Landmark className="h-4 w-4" /> Banking</h3>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                <span className="text-gray-500">Bank</span><span className="font-medium">{bankName}</span>
+                <span className="text-gray-500">Account Holder</span><span className="font-medium">{bankAccountHolder}</span>
+                <span className="text-gray-500">Account No.</span><span className="font-medium">••••{bankAccountNumber.slice(-4)}</span>
+                <span className="text-gray-500">Type</span><span className="font-medium">{bankAccountType}</span>
+                <span className="text-gray-500">Branch Code</span><span className="font-medium">{bankBranchCode}</span>
+                {statementEmail && <><span className="text-gray-500">Statement Email</span><span className="font-medium truncate">{statementEmail}</span></>}
+              </div>
+            </div>
+
+            {nominee1Name && (
+              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-2">
+                <h3 className="font-bold text-sm text-yellow-600 flex items-center gap-2"><Users className="h-4 w-4" /> Financial Nominees</h3>
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <p className="font-medium">{nominee1Name} <span className="text-gray-400 text-xs">({nominee1Relation})</span></p>
+                    <p className="text-gray-500 text-xs">{nominee1Phone}{nominee1Email ? ` · ${nominee1Email}` : ""}</p>
+                  </div>
+                  {showNominee2 && nominee2Name && (
+                    <div>
+                      <p className="font-medium">{nominee2Name} <span className="text-gray-400 text-xs">({nominee2Relation})</span></p>
+                      <p className="text-gray-500 text-xs">{nominee2Phone}{nominee2Email ? ` · ${nominee2Email}` : ""}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="bg-yellow-50 rounded-xl p-4 border border-yellow-200 flex items-start gap-3">
               <Shield className="h-5 w-5 text-yellow-600 mt-0.5 shrink-0" />
               <div className="text-sm text-yellow-800">
@@ -437,6 +654,7 @@ export default function DriverOnboarding() {
                   <li>• All information provided is accurate</li>
                   <li>• Your vehicle is in safe working condition</li>
                   <li>• You hold a valid driver's license</li>
+                  <li>• Your banking details are correct for payout purposes</li>
                   <li>• You agree to GY Rides' terms and conditions</li>
                 </ul>
               </div>
@@ -468,7 +686,8 @@ export default function DriverOnboarding() {
               (step === "personal" && !canProceedPersonal) ||
               (step === "vehicle" && !canProceedVehicle) ||
               (step === "license" && !canProceedLicense) ||
-              (step === "documents" && !canProceedDocs)
+              (step === "documents" && !canProceedDocs) ||
+              (step === "banking" && !canProceedBanking)
             }
             data-testid="btn-next-step"
           >

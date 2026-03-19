@@ -52,6 +52,25 @@ export const users = pgTable("users", {
   currentLat: real("current_lat"),
   currentLng: real("current_lng"),
   locationUpdatedAt: timestamp("location_updated_at"),
+  // Banking details for earnings payouts
+  bankName: text("bank_name"),
+  bankAccountNumber: text("bank_account_number"),
+  bankAccountType: text("bank_account_type"),
+  bankBranchCode: text("bank_branch_code"),
+  bankAccountHolder: text("bank_account_holder"),
+  // Statement delivery
+  statementEmail: text("statement_email"),
+  statementPhone: text("statement_phone"),
+  // Nominated financial viewers (nominee 1)
+  nominee1Name: text("nominee1_name"),
+  nominee1Phone: text("nominee1_phone"),
+  nominee1Email: text("nominee1_email"),
+  nominee1Relation: text("nominee1_relation"),
+  // Nominated financial viewers (nominee 2 — optional)
+  nominee2Name: text("nominee2_name"),
+  nominee2Phone: text("nominee2_phone"),
+  nominee2Email: text("nominee2_email"),
+  nominee2Relation: text("nominee2_relation"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
