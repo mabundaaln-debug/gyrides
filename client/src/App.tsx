@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/lib/auth";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
+import IOSInstallBanner from "@/components/IOSInstallBanner";
 import RiderApp from "@/pages/RiderApp";
 import DriverApp from "@/pages/DriverApp";
 import DriverOnboarding from "@/pages/DriverOnboarding";
@@ -77,6 +78,7 @@ function App() {
       <AuthProvider>
         <TooltipProvider>
           <Toaster />
+          <IOSInstallBanner />
           <Router />
         </TooltipProvider>
       </AuthProvider>
