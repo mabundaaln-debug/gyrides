@@ -29,6 +29,18 @@ export async function setupVite(server: Server, app: Express) {
     appType: "custom",
   });
 
+  // Serve sw.js and manifest.json without caching so PWA updates propagate immediately
+  app.get("/sw.js", (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    next();
+  });
+  app.get("/manifest.json", (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    next();
+  });
+
   app.use(vite.middlewares);
 
   app.use("/{*path}", async (req, res, next) => {
