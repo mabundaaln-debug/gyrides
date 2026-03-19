@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { Users, Car, DollarSign, LogOut, ChevronRight, ChevronLeft, Star, MapPin, TrendingUp, Activity, AlertCircle, CheckCircle, Shield, XCircle, FileText, Eye, User as UserIcon, AlertTriangle, Phone, MessageCircle, KeyRound, ShieldCheck, ShieldX, Lock, EyeOff, Clock, Download, BarChart3, Navigation } from "lucide-react";
+import { Users, Car, DollarSign, LogOut, ChevronRight, ChevronLeft, Star, MapPin, TrendingUp, Activity, AlertCircle, CheckCircle, Shield, XCircle, FileText, Eye, User as UserIcon, AlertTriangle, Phone, MessageCircle, KeyRound, ShieldCheck, ShieldX, Lock, EyeOff, Clock, Download, BarChart3, Navigation, ClipboardList, Award, Zap, ThumbsUp, ThumbsDown } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -133,8 +133,29 @@ function SosLiveMap({ alert }: { alert: SosAlert }) {
 export default function AdminApp() {
   const { user, logout } = useAuth();
   const [, setLocation] = useLocation();
-  const [view, setView] = useState<"dashboard" | "drivers" | "trips" | "pricing" | "approvals" | "review-driver" | "sos" | "users" | "statements">("dashboard");
+  const [view, setView] = useState<"dashboard" | "drivers" | "trips" | "pricing" | "approvals" | "review-driver" | "sos" | "users" | "statements" | "inspect-driver">("dashboard");
   const [reviewingDriver, setReviewingDriver] = useState<User | null>(null);
+  const [inspectingDriver, setInspectingDriver] = useState<User | null>(null);
+  const [inspSubmitting, setInspSubmitting] = useState(false);
+
+  // Inspection checklist state
+  const [inspExterior, setInspExterior] = useState(3);
+  const [inspInterior, setInspInterior] = useState(3);
+  const [inspCleanliness, setInspCleanliness] = useState(3);
+  const [inspSeats, setInspSeats] = useState(3);
+  const [inspAC, setInspAC] = useState<"working" | "not_working" | "none">("working");
+  const [inspVehicleType, setInspVehicleType] = useState("Sedan");
+  const [inspSeatingCapacity, setInspSeatingCapacity] = useState(4);
+  const [inspVehicleAge, setInspVehicleAge] = useState<"<3" | "3-5" | "5-10" | ">10">("<3");
+  const [inspEntertainment, setInspEntertainment] = useState<"none" | "bluetooth" | "full">("none");
+  const [inspCharging, setInspCharging] = useState(false);
+  const [inspTinting, setInspTinting] = useState(false);
+  const [inspABS, setInspABS] = useState(true);
+  const [inspAirbags, setInspAirbags] = useState(true);
+  const [inspSeatbelts, setInspSeatbelts] = useState(true);
+  const [inspBodyDamage, setInspBodyDamage] = useState<"none" | "minor" | "major">("none");
+  const [inspNotes, setInspNotes] = useState("");
+  const [inspCategoryOverride, setInspCategoryOverride] = useState<"standard" | "premium" | "xl" | "">("");
   const [rejectReason, setRejectReason] = useState("");
   const [showRejectInput, setShowRejectInput] = useState(false);
   const [viewedDocs, setViewedDocs] = useState<Set<string>>(new Set());
@@ -241,6 +262,285 @@ export default function AdminApp() {
       toast({ title: "Failed to reject", variant: "destructive" });
     }
   };
+
+  // ── Inspection scoring ──
+  const computeInspectionScore = () => {
+    let s = 0;
+    s += inspExterior * 8;
+    s += inspInterior * 8;
+    s += inspCleanliness * 7;
+    s += inspSeats * 5;
+    if (inspBodyDamage === "none") s += 10; else if (inspBodyDamage === "major") s -= 20;
+    if (inspAC === "working") s += 25;
+    if (inspVehicleAge === "<3") s += 25; else if (inspVehicleAge === "3-5") s += 15; else if (inspVehicleAge === "5-10") s += 5;
+    if (inspEntertainment === "bluetooth") s += 8; else if (inspEntertainment === "full") s += 18;
+    if (inspCharging) s += 5;
+    if (inspTinting) s += 5;
+    if (inspABS) s += 8;
+    if (inspAirbags) s += 8;
+    if (inspSeatbelts) s += 8;
+    return Math.max(0, Math.min(s, 210));
+  };
+
+  const computeSuggestedCategory = (): "standard" | "premium" | "xl" => {
+    const score = computeInspectionScore();
+    const bigVehicle = ["SUV", "Crossover", "Minivan", "Minibus"].includes(inspVehicleType);
+    if (inspSeatingCapacity >= 6 && bigVehicle && score >= 60) return "xl";
+    if (score >= 110 && inspAC === "working" && inspExterior >= 3 && inspInterior >= 3) return "premium";
+    return "standard";
+  };
+
+  const handleSubmitInspection = async () => {
+    if (!inspectingDriver) return;
+    setInspSubmitting(true);
+    try {
+      const score = computeInspectionScore();
+      const suggested = computeSuggestedCategory();
+      const category = inspCategoryOverride || suggested;
+      const checklistData = {
+        exterior: inspExterior, interior: inspInterior, cleanliness: inspCleanliness,
+        seats: inspSeats, bodyDamage: inspBodyDamage, ac: inspAC,
+        vehicleType: inspVehicleType, seatingCapacity: inspSeatingCapacity,
+        vehicleAge: inspVehicleAge, entertainment: inspEntertainment,
+        charging: inspCharging, tinting: inspTinting, abs: inspABS,
+        airbags: inspAirbags, seatbelts: inspSeatbelts,
+      };
+      const res = await fetch("/api/inspections", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ driverId: inspectingDriver.id, inspectorId: user?.id, category, score, checklistData, notes: inspNotes, passed: true }),
+      });
+      if (!res.ok) throw new Error("Failed to save inspection");
+      queryClient.invalidateQueries({ queryKey: ["/api/users/role/driver"] });
+      toast({ title: "Inspection saved!", description: `Vehicle categorised as GY ${category.charAt(0).toUpperCase() + category.slice(1)} (score: ${score}/210)` });
+      setView("drivers");
+      setInspectingDriver(null);
+    } catch (e: any) {
+      toast({ title: "Error saving inspection", description: e.message, variant: "destructive" });
+    } finally {
+      setInspSubmitting(false);
+    }
+  };
+
+  const resetInspectionForm = () => {
+    setInspExterior(3); setInspInterior(3); setInspCleanliness(3); setInspSeats(3);
+    setInspAC("working"); setInspVehicleType("Sedan"); setInspSeatingCapacity(4);
+    setInspVehicleAge("<3"); setInspEntertainment("none"); setInspCharging(false);
+    setInspTinting(false); setInspABS(true); setInspAirbags(true); setInspSeatbelts(true);
+    setInspBodyDamage("none"); setInspNotes(""); setInspCategoryOverride("");
+  };
+
+  // ── Inspect Driver View ──
+  if (view === "inspect-driver" && inspectingDriver) {
+    const score = computeInspectionScore();
+    const suggested = computeSuggestedCategory();
+    const finalCategory = inspCategoryOverride || suggested;
+    const catColor = finalCategory === "xl" ? "bg-purple-500" : finalCategory === "premium" ? "bg-yellow-500" : "bg-blue-500";
+    const catLabel = finalCategory === "xl" ? "GY XL" : finalCategory === "premium" ? "GY Premium" : "GY Standard";
+    const ScoreRow = ({ label, value, max }: { label: string; value: number; max: number }) => (
+      <div className="flex items-center justify-between text-xs text-gray-500 py-1 border-b border-gray-50">
+        <span>{label}</span>
+        <span className="font-bold text-gray-700">{value} / {max}</span>
+      </div>
+    );
+    const StarPicker = ({ value, onChange }: { value: number; onChange: (v: number) => void }) => (
+      <div className="flex gap-1">
+        {[1,2,3,4,5].map(n => (
+          <button key={n} onClick={() => onChange(n)}
+            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${n <= value ? "bg-yellow-400 text-black" : "bg-gray-100 text-gray-400"}`}
+            data-testid={`star-${n}`}>
+            <Star className="h-4 w-4 fill-current" />
+          </button>
+        ))}
+      </div>
+    );
+    const ToggleGroup = ({ options, value, onChange, testPrefix }: { options: {val: string; label: string}[]; value: string; onChange: (v: string) => void; testPrefix: string }) => (
+      <div className="flex flex-wrap gap-2">
+        {options.map(o => (
+          <button key={o.val} onClick={() => onChange(o.val)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${value === o.val ? "bg-yellow-400 text-black" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+            data-testid={`${testPrefix}-${o.val}`}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+    );
+    const Toggle = ({ value, onChange, label }: { value: boolean; onChange: (v: boolean) => void; label: string }) => (
+      <button onClick={() => onChange(!value)}
+        className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 transition-colors ${value ? "border-green-400 bg-green-50 text-green-700" : "border-gray-200 bg-white text-gray-500"}`}>
+        {value ? <ThumbsUp className="h-4 w-4" /> : <ThumbsDown className="h-4 w-4" />}
+        <span className="text-xs font-bold">{label}: {value ? "Yes" : "No"}</span>
+      </button>
+    );
+
+    return (
+      <div className="min-h-[100dvh] bg-gray-50 flex flex-col">
+        <div className="bg-black text-white px-4 pt-8 pb-4 shrink-0">
+          <div className="flex items-center gap-3 mb-3">
+            <Button variant="ghost" size="icon" className="text-gray-400 h-8 w-8" onClick={() => { setView("drivers"); setInspectingDriver(null); }}>
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex-1">
+              <h1 className="font-black text-lg leading-tight">Vehicle Inspection</h1>
+              <p className="text-gray-400 text-xs">{inspectingDriver.fullName} · {inspectingDriver.vehicleColor} {inspectingDriver.vehicleMake} {inspectingDriver.vehicleModel}</p>
+            </div>
+            <div className={`${catColor} text-white px-3 py-1 rounded-xl text-xs font-black`} data-testid="insp-category-badge">{catLabel}</div>
+          </div>
+          <div className="bg-white/10 rounded-2xl p-3 flex items-center justify-between">
+            <div>
+              <p className="text-gray-400 text-[10px] uppercase tracking-wider">Score</p>
+              <p className="text-2xl font-black">{score}<span className="text-sm text-gray-400">/210</span></p>
+            </div>
+            <div className="text-right">
+              <p className="text-gray-400 text-[10px] uppercase tracking-wider">Suggested</p>
+              <p className="font-bold text-yellow-400 text-sm">{suggested === "xl" ? "GY XL" : suggested === "premium" ? "GY Premium" : "GY Standard"}</p>
+            </div>
+            <div className="w-16 h-16 relative">
+              <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#ffffff20" strokeWidth="3" />
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#facc15" strokeWidth="3"
+                  strokeDasharray={`${(score / 210) * 100} 100`} strokeLinecap="round" />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-[10px] font-bold text-white">{Math.round((score / 210) * 100)}%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+
+          {/* Section 1: Vehicle Classification */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
+            <h3 className="font-bold text-sm flex items-center gap-2"><Car className="h-4 w-4 text-yellow-500" /> Vehicle Classification</h3>
+            <div>
+              <p className="text-xs text-gray-500 mb-2">Vehicle Type</p>
+              <ToggleGroup testPrefix="vtype" options={[
+                {val:"Sedan",label:"Sedan"},{val:"Hatchback",label:"Hatchback"},{val:"SUV",label:"SUV"},
+                {val:"Crossover",label:"Crossover"},{val:"Minivan",label:"Minivan"},{val:"Minibus",label:"Minibus"},
+              ]} value={inspVehicleType} onChange={setInspVehicleType} />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-2">Seating Capacity</p>
+              <ToggleGroup testPrefix="seats-cap" options={[
+                {val:"4",label:"4"},{val:"5",label:"5"},{val:"6",label:"6"},{val:"7",label:"7"},{val:"8",label:"8+"},{val:"10",label:"10+"},
+              ]} value={String(inspSeatingCapacity)} onChange={v => setInspSeatingCapacity(Number(v))} />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-2">Vehicle Age</p>
+              <ToggleGroup testPrefix="vage" options={[
+                {val:"<3",label:"< 3 years"},{val:"3-5",label:"3–5 years"},{val:"5-10",label:"5–10 years"},{val:">10",label:"> 10 years"},
+              ]} value={inspVehicleAge} onChange={v => setInspVehicleAge(v as any)} />
+            </div>
+          </div>
+
+          {/* Section 2: Exterior */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
+            <h3 className="font-bold text-sm flex items-center gap-2"><Shield className="h-4 w-4 text-yellow-500" /> Exterior Condition</h3>
+            <div>
+              <p className="text-xs text-gray-500 mb-2">Paint & Bodywork Quality</p>
+              <StarPicker value={inspExterior} onChange={setInspExterior} />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-2">Body Damage</p>
+              <ToggleGroup testPrefix="damage" options={[{val:"none",label:"None"},{val:"minor",label:"Minor dents/scratches"},{val:"major",label:"Major damage"}]} value={inspBodyDamage} onChange={v => setInspBodyDamage(v as any)} />
+            </div>
+          </div>
+
+          {/* Section 3: Interior */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
+            <h3 className="font-bold text-sm flex items-center gap-2"><Star className="h-4 w-4 text-yellow-500" /> Interior Condition</h3>
+            <div>
+              <p className="text-xs text-gray-500 mb-2">Overall Cleanliness</p>
+              <StarPicker value={inspCleanliness} onChange={setInspCleanliness} />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-2">Interior Condition (dash, panels)</p>
+              <StarPicker value={inspInterior} onChange={setInspInterior} />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-2">Seat Condition</p>
+              <StarPicker value={inspSeats} onChange={setInspSeats} />
+            </div>
+          </div>
+
+          {/* Section 4: Features */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
+            <h3 className="font-bold text-sm flex items-center gap-2"><Zap className="h-4 w-4 text-yellow-500" /> Features & Amenities</h3>
+            <div>
+              <p className="text-xs text-gray-500 mb-2">Air Conditioning</p>
+              <ToggleGroup testPrefix="ac" options={[{val:"working",label:"Working"},{val:"not_working",label:"Not Working"},{val:"none",label:"None"}]} value={inspAC} onChange={v => setInspAC(v as any)} />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-2">Entertainment System</p>
+              <ToggleGroup testPrefix="ent" options={[{val:"none",label:"None"},{val:"bluetooth",label:"Bluetooth / AUX"},{val:"full",label:"Full System"}]} value={inspEntertainment} onChange={v => setInspEntertainment(v as any)} />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Toggle value={inspCharging} onChange={setInspCharging} label="USB Charging" />
+              <Toggle value={inspTinting} onChange={setInspTinting} label="Window Tinting" />
+            </div>
+          </div>
+
+          {/* Section 5: Safety */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
+            <h3 className="font-bold text-sm flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-yellow-500" /> Safety Compliance</h3>
+            <div className="flex flex-wrap gap-2">
+              <Toggle value={inspABS} onChange={setInspABS} label="ABS Brakes" />
+              <Toggle value={inspAirbags} onChange={setInspAirbags} label="Airbags" />
+              <Toggle value={inspSeatbelts} onChange={setInspSeatbelts} label="All Seatbelts" />
+            </div>
+          </div>
+
+          {/* Score breakdown */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <h3 className="font-bold text-sm mb-3 flex items-center gap-2"><BarChart3 className="h-4 w-4 text-yellow-500" /> Score Breakdown</h3>
+            <ScoreRow label="Exterior (×8)" value={inspExterior * 8} max={40} />
+            <ScoreRow label="Interior (×8)" value={inspInterior * 8} max={40} />
+            <ScoreRow label="Cleanliness (×7)" value={inspCleanliness * 7} max={35} />
+            <ScoreRow label="Seat Condition (×5)" value={inspSeats * 5} max={25} />
+            <ScoreRow label="Air Conditioning" value={inspAC === "working" ? 25 : 0} max={25} />
+            <ScoreRow label="Vehicle Age" value={inspVehicleAge === "<3" ? 25 : inspVehicleAge === "3-5" ? 15 : inspVehicleAge === "5-10" ? 5 : 0} max={25} />
+            <ScoreRow label="Features & Safety" value={(inspCharging?5:0)+(inspTinting?5:0)+(inspABS?8:0)+(inspAirbags?8:0)+(inspSeatbelts?8:0)+(inspEntertainment==="bluetooth"?8:inspEntertainment==="full"?18:0)} max={52} />
+          </div>
+
+          {/* Category override */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
+            <h3 className="font-bold text-sm flex items-center gap-2"><Award className="h-4 w-4 text-yellow-500" /> Category Assignment</h3>
+            <p className="text-xs text-gray-500">System suggests <strong>{suggested === "xl" ? "GY XL" : suggested === "premium" ? "GY Premium" : "GY Standard"}</strong> based on the checklist. You can override below.</p>
+            <div className="grid grid-cols-3 gap-2">
+              {([["","Use Suggested"],["standard","GY Standard"],["premium","GY Premium"],["xl","GY XL"]] as [string,string][]).map(([val, label]) => (
+                <button key={val} onClick={() => setInspCategoryOverride(val as any)}
+                  className={`py-2 px-2 rounded-xl text-xs font-bold border-2 transition-colors ${inspCategoryOverride === val ? "border-yellow-400 bg-yellow-50 text-yellow-800" : "border-gray-200 bg-white text-gray-500"} ${val === "" ? "col-span-3" : ""}`}
+                  data-testid={`override-${val || "auto"}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-2">
+            <h3 className="font-bold text-sm flex items-center gap-2"><FileText className="h-4 w-4 text-yellow-500" /> Inspector Notes</h3>
+            <textarea
+              className="w-full text-sm border border-gray-200 rounded-xl p-3 resize-none min-h-[80px]"
+              placeholder="Any observations, defects, or remarks..."
+              value={inspNotes}
+              onChange={e => setInspNotes(e.target.value)}
+              data-testid="input-insp-notes"
+            />
+          </div>
+        </div>
+
+        <div className="shrink-0 bg-white border-t border-gray-100 p-4">
+          <Button onClick={handleSubmitInspection} disabled={inspSubmitting}
+            className="w-full h-14 rounded-2xl bg-black text-yellow-400 hover:bg-gray-900 font-black text-base"
+            data-testid="btn-submit-inspection">
+            {inspSubmitting ? "Saving..." : `Save Inspection — ${catLabel} (${score}/210)`}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   // ── Review Driver Application ──
   if (view === "review-driver" && reviewingDriver) {
@@ -503,29 +803,56 @@ export default function AdminApp() {
           <h1 className="text-xl font-bold">Drivers ({drivers.length})</h1>
         </div>
         <div className="p-4 space-y-2 overflow-auto">
-          {drivers.map(d => (
-            <div key={d.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center gap-3" data-testid={`driver-card-${d.id}`}>
-              <Avatar className="h-11 w-11 border-2 border-yellow-400">
-                <AvatarFallback className="bg-yellow-400 text-black font-bold">{d.fullName[0]}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm">{d.fullName}</span>
-                  {d.approvalStatus === "approved" && <CheckCircle className="h-3.5 w-3.5 text-green-500" />}
+          {drivers.map(d => {
+            const catLabel = d.vehicleCategory === "xl" ? "GY XL" : d.vehicleCategory === "premium" ? "GY Premium" : "GY Standard";
+            const catColor = d.vehicleCategory === "xl" ? "bg-purple-100 text-purple-700" : d.vehicleCategory === "premium" ? "bg-yellow-100 text-yellow-700" : "bg-blue-100 text-blue-700";
+            const needsInspection = d.approvalStatus === "approved" && d.inspectionStatus !== "inspected";
+            return (
+              <div key={d.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100" data-testid={`driver-card-${d.id}`}>
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-11 w-11 border-2 border-yellow-400">
+                    <AvatarFallback className="bg-yellow-400 text-black font-bold">{d.fullName[0]}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-sm">{d.fullName}</span>
+                      {d.approvalStatus === "approved" && <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />}
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${catColor}`}>{catLabel}</span>
+                    </div>
+                    <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                      <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" /> {d.rating?.toFixed(1)} · {d.totalTrips} trips
+                      {d.inspectionScore != null && <span className="ml-1 text-gray-400">· Score {d.inspectionScore}/210</span>}
+                    </div>
+                    <div className="text-[10px] text-gray-400 mt-0.5">{d.vehicleColor} {d.vehicleMake} {d.vehicleModel} · {d.licensePlate}</div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${d.approvalStatus === "approved" ? (d.isOnline ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500") : d.approvalStatus === "pending" ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"}`}>
+                      {d.approvalStatus === "approved" ? (d.isOnline ? "Online" : "Offline") : d.approvalStatus}
+                    </span>
+                    <div className="text-sm font-bold mt-1">R{(d.earnings ?? 0).toLocaleString()}</div>
+                  </div>
                 </div>
-                <div className="text-xs text-gray-500 flex items-center gap-1">
-                  <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" /> {d.rating?.toFixed(1)} · {d.totalTrips} trips
-                </div>
-                <div className="text-[10px] text-gray-400 mt-0.5">{d.vehicleColor} {d.vehicleMake} {d.vehicleModel} · {d.licensePlate}</div>
+                {needsInspection && (
+                  <button
+                    onClick={() => { resetInspectionForm(); setInspectingDriver(d); setView("inspect-driver"); }}
+                    className="mt-3 w-full flex items-center justify-center gap-2 bg-yellow-400 hover:bg-yellow-500 text-black font-bold text-xs rounded-xl py-2 transition-colors"
+                    data-testid={`btn-inspect-${d.id}`}
+                  >
+                    <ClipboardList className="h-3.5 w-3.5" /> Inspect Vehicle
+                  </button>
+                )}
+                {d.inspectionStatus === "inspected" && (
+                  <button
+                    onClick={() => { resetInspectionForm(); setInspectingDriver(d); setView("inspect-driver"); }}
+                    className="mt-3 w-full flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-xs rounded-xl py-2 transition-colors"
+                    data-testid={`btn-re-inspect-${d.id}`}
+                  >
+                    <ClipboardList className="h-3.5 w-3.5" /> Re-Inspect Vehicle
+                  </button>
+                )}
               </div>
-              <div className="text-right shrink-0">
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${d.approvalStatus === "approved" ? (d.isOnline ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500") : d.approvalStatus === "pending" ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"}`}>
-                  {d.approvalStatus === "approved" ? (d.isOnline ? "Online" : "Offline") : d.approvalStatus}
-                </span>
-                <div className="text-sm font-bold mt-1">R{(d.earnings ?? 0).toLocaleString()}</div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );

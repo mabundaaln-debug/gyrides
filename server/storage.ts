@@ -1,7 +1,7 @@
 import { eq, desc, and, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
-  users, trips, savedPlaces, vehicleTypes, taxiRoutes, messages, sosAlerts, passwordResetRequests, webauthnCredentials,
+  users, trips, savedPlaces, vehicleTypes, taxiRoutes, messages, sosAlerts, passwordResetRequests, webauthnCredentials, vehicleInspections,
   type User, type InsertUser,
   type Trip, type InsertTrip,
   type SavedPlace, type InsertSavedPlace,
@@ -11,6 +11,7 @@ import {
   type SosAlert, type InsertSosAlert,
   type PasswordResetRequest, type InsertPasswordResetRequest,
   type WebauthnCredential, type InsertWebauthnCredential,
+  type VehicleInspection, type InsertVehicleInspection,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -68,6 +69,11 @@ export interface IStorage {
   deleteWebauthnCredential(id: string): Promise<void>;
 
   getStats(): Promise<{ totalDrivers: number; totalRiders: number; totalTrips: number; totalRevenue: number; onlineDrivers: number; activeTrips: number; activeSosAlerts: number }>;
+
+  createInspection(data: InsertVehicleInspection): Promise<VehicleInspection>;
+  getInspectionsByDriver(driverId: string): Promise<VehicleInspection[]>;
+  getLatestInspection(driverId: string): Promise<VehicleInspection | undefined>;
+  getOnlineDriversByCategory(category?: string): Promise<User[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -289,6 +295,34 @@ export class DatabaseStorage implements IStorage {
       activeTrips: activeTrips.length,
       activeSosAlerts: activeSos.length,
     };
+  }
+
+  async createInspection(data: InsertVehicleInspection): Promise<VehicleInspection> {
+    const [insp] = await db.insert(vehicleInspections).values(data).returning();
+    return insp;
+  }
+
+  async getInspectionsByDriver(driverId: string): Promise<VehicleInspection[]> {
+    return db.select().from(vehicleInspections).where(eq(vehicleInspections.driverId, driverId)).orderBy(desc(vehicleInspections.inspectedAt));
+  }
+
+  async getLatestInspection(driverId: string): Promise<VehicleInspection | undefined> {
+    const [insp] = await db.select().from(vehicleInspections).where(eq(vehicleInspections.driverId, driverId)).orderBy(desc(vehicleInspections.inspectedAt)).limit(1);
+    return insp;
+  }
+
+  async getOnlineDriversByCategory(category?: string): Promise<User[]> {
+    const base = and(eq(users.role, "driver"), eq(users.isOnline, true), eq(users.approvalStatus, "approved"));
+    if (!category || category === "standard") {
+      return db.select().from(users).where(base);
+    }
+    if (category === "xl") {
+      return db.select().from(users).where(and(base, eq(users.vehicleCategory, "xl")));
+    }
+    if (category === "premium") {
+      return db.select().from(users).where(and(base, sql`${users.vehicleCategory} IN ('premium','xl')`));
+    }
+    return db.select().from(users).where(base);
   }
 }
 

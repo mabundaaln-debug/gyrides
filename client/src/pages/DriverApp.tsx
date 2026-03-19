@@ -130,9 +130,14 @@ export default function DriverApp() {
     }
   }, [user]);
 
+  const driverCategory = (user as any)?.vehicleCategory || "standard";
   const { data: requestedTrips = [], refetch: refetchRequested } = useQuery<Trip[]>({
-    queryKey: ["/api/trips/requested"],
-    queryFn: getQueryFn({ on401: "throw" }),
+    queryKey: ["/api/trips/requested", driverCategory],
+    queryFn: async () => {
+      const res = await fetch(`/api/trips/requested?driverCategory=${driverCategory}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch trips");
+      return res.json();
+    },
     refetchInterval: 5000,
   });
 
@@ -285,6 +290,11 @@ export default function DriverApp() {
                 <Star className="h-3 w-3 fill-current" /> {user.rating?.toFixed(1)} · {user.totalTrips} trips
               </div>
               {user.vehicleMake && <div className="text-xs text-gray-400 mt-1">{user.vehicleColor} {user.vehicleMake} {user.vehicleModel} · {user.licensePlate}</div>}
+              {user.vehicleCategory && (
+                <div className={`inline-flex mt-1 text-[10px] font-black px-2.5 py-0.5 rounded-full ${user.vehicleCategory === "xl" ? "bg-purple-500 text-white" : user.vehicleCategory === "premium" ? "bg-yellow-400 text-black" : "bg-blue-500 text-white"}`} data-testid="driver-category-badge">
+                  {user.vehicleCategory === "xl" ? "GY XL" : user.vehicleCategory === "premium" ? "GY Premium" : "GY Standard"}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -962,7 +972,14 @@ export default function DriverApp() {
 
       <div className="relative z-10 px-5 pt-2">
         <div className="bg-white/95 backdrop-blur-md rounded-2xl px-4 py-3 shadow-sm">
-          <h2 className="text-lg font-bold mb-0.5">Hey, {user.fullName.split(" ")[0]}</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold mb-0.5">Hey, {user.fullName.split(" ")[0]}</h2>
+            {user.vehicleCategory && (
+              <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${user.vehicleCategory === "xl" ? "bg-purple-500 text-white" : user.vehicleCategory === "premium" ? "bg-yellow-400 text-black" : "bg-blue-500 text-white"}`} data-testid="home-category-badge">
+                {user.vehicleCategory === "xl" ? "GY XL" : user.vehicleCategory === "premium" ? "GY Premium" : "GY Standard"}
+              </span>
+            )}
+          </div>
           <p className="text-gray-500 text-sm">{isOnline ? "You're online and ready for trips" : "Go online to start earning"}</p>
         </div>
       </div>

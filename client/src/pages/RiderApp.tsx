@@ -82,6 +82,7 @@ export default function RiderApp() {
   const [rideStatus, setRideStatus] = useState<"searching" | "on_the_way" | "arrived" | "in_progress">("searching");
   const [activeTab, setActiveTab] = useState<"home" | "activity" | "profile">("home");
   const [rideType, setRideType] = useState<RideType>("private");
+  const [preferredCategory, setPreferredCategory] = useState<"standard" | "premium" | "xl">("standard");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [sharedSeats, setSharedSeats] = useState(1);
   const [medicalNotes, setMedicalNotes] = useState("");
@@ -583,6 +584,7 @@ export default function RiderApp() {
         parcelDescription: rideType === "parcel" ? parcelDescription : null,
         rideNote,
         tripPin: pin,
+        requestedCategory: preferredCategory,
       } as any);
       setCurrentTrip(trip);
       // Polling effect (below) watches this trip and reacts when a driver accepts
@@ -1541,6 +1543,32 @@ export default function RiderApp() {
           )}
 
           <h3 className="font-bold text-base mb-2">Choose your ride</h3>
+
+          {(rideType === "private" || rideType === "medical") && (
+            <div className="mb-3">
+              <p className="text-xs text-gray-500 mb-2 font-medium">Service Tier</p>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { val: "standard", label: "GY Standard", desc: "Affordable", color: "bg-blue-500" },
+                  { val: "premium", label: "GY Premium", desc: "Comfort+", color: "bg-yellow-400" },
+                  { val: "xl", label: "GY XL", desc: "Spacious", color: "bg-purple-500" },
+                ] as {val:"standard"|"premium"|"xl";label:string;desc:string;color:string}[]).map(tier => (
+                  <button key={tier.val}
+                    onClick={() => setPreferredCategory(tier.val)}
+                    className={`flex flex-col items-center gap-1 py-2.5 px-2 rounded-xl border-2 transition-all ${preferredCategory === tier.val ? "border-black shadow-md bg-white" : "border-gray-100 bg-white/80"}`}
+                    data-testid={`tier-${tier.val}`}>
+                    <div className={`${tier.color} rounded-lg w-8 h-8 flex items-center justify-center`}>
+                      <Car className="h-4 w-4 text-white" />
+                    </div>
+                    <span className="text-[10px] font-black leading-tight">{tier.label}</span>
+                    <span className="text-[9px] text-gray-400">{tier.desc}</span>
+                    {preferredCategory === tier.val && <div className="w-4 h-1 bg-black rounded-full" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {isRuralTrip() && (
             <div className="bg-orange-50 border border-orange-200 rounded-xl px-3 py-2 mb-3 flex items-center gap-2">
               <MapPin className="h-3.5 w-3.5 text-orange-600 shrink-0" />

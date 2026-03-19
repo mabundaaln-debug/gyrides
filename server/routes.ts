@@ -553,8 +553,37 @@ export async function registerRoutes(
   });
 
   app.get("/api/drivers/online", async (req, res) => {
-    const drivers = await storage.getOnlineDrivers();
+    const category = req.query.category as string | undefined;
+    const drivers = category
+      ? await storage.getOnlineDriversByCategory(category)
+      : await storage.getOnlineDrivers();
     return res.json(drivers);
+  });
+
+  // ── Vehicle Inspections ──
+  app.post("/api/inspections", async (req, res) => {
+    try {
+      const { driverId, inspectorId, category, score, checklistData, notes, passed } = req.body;
+      if (!driverId || !category) return res.status(400).json({ message: "driverId and category are required" });
+      const insp = await storage.createInspection({
+        driverId, inspectorId: inspectorId || null, category, score: score ?? 0,
+        checklistData: checklistData ? JSON.stringify(checklistData) : null,
+        notes: notes || null, passed: passed !== false,
+      });
+      await storage.updateUser(driverId, {
+        vehicleCategory: category as any,
+        inspectionStatus: passed !== false ? "inspected" : "failed",
+        inspectionScore: score ?? 0,
+      });
+      return res.status(201).json(insp);
+    } catch (e: any) {
+      return res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.get("/api/inspections/driver/:id", async (req, res) => {
+    const inspections = await storage.getInspectionsByDriver(req.params.id);
+    return res.json(inspections);
   });
 
   // ── Trips ──
@@ -576,7 +605,17 @@ export async function registerRoutes(
   });
 
   app.get("/api/trips/requested", async (req, res) => {
+    const { driverCategory } = req.query;
     const trips = await storage.getRequestedTrips();
+    if (driverCategory && typeof driverCategory === "string") {
+      const filtered = trips.filter(t => {
+        const req = (t as any).requestedCategory || "standard";
+        if (driverCategory === "xl") return req === "xl";
+        if (driverCategory === "premium") return req === "premium" || req === "standard";
+        return true; // standard drivers see all
+      });
+      return res.json(filtered);
+    }
     return res.json(trips);
   });
 

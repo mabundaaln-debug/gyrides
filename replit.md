@@ -28,8 +28,8 @@ client/src/
                          WhatsApp fallback, wallet, safety center, taxi routes
   pages/DriverApp.tsx  - Driver dashboard with verified badge, ride type indicators,
                          medical/parcel trip handling, earnings breakdown
-  pages/DriverOnboarding.tsx - Multi-step driver registration (5 steps)
-  pages/AdminApp.tsx   - Admin panel with approvals, stats, driver management
+  pages/DriverOnboarding.tsx - Multi-step driver registration (6 steps: personal, vehicle, license, docs, banking, review)
+  pages/AdminApp.tsx   - Admin panel with approvals, stats, driver management, vehicle inspection
   components/GiyaniMap.tsx - Leaflet map with OSRM routing, pin-on-map, driver markers
   lib/auth.tsx         - Auth context (localStorage-based)
   lib/api.ts           - API helper functions
@@ -56,6 +56,17 @@ shared/
 - **Platform commission**: 15% (driver keeps 85%)
 - **Driver bonuses**: R100 for 20 rides/day, R500 for 100 rides/week
 - **Fare breakdown**: Shown on confirm screen (base + distance + time + rural surcharge)
+
+### Vehicle Inspection & Categorization System
+- **3 tiers**: GY Standard (blue), GY Premium (yellow), GY XL (purple)
+- **Admin inspection checklist**: Exterior (★1-5), Interior (★1-5), Cleanliness (★1-5), Seat Condition (★1-5), Body Damage (none/minor/major), AC (working/not/none), Entertainment, USB Charging, Window Tinting, ABS, Airbags, Seatbelts, Vehicle Type, Seating Capacity, Vehicle Age
+- **Scoring** (max 210): Stars weighted ×5–8, plus condition/feature bonuses; major body damage −20
+- **Auto-suggest category**: XL if ≥6 seats + SUV/Minivan + score≥60; Premium if score≥110 + AC + stars≥3; else Standard
+- **Admin override**: Admin can override suggested category before saving
+- **"Inspect Vehicle"** button on all approved drivers in admin drivers list; **"Re-Inspect"** for already-inspected
+- **Category badges** shown in admin driver list, DriverApp home screen, and driver menu profile
+- **requestedCategory** field on trips: rider chooses service tier (GY Standard/Premium/XL) during booking
+- **Driver trip filtering**: XL drivers only see XL trips; Premium drivers see Standard+Premium; Standard drivers see all
 
 ### Ride Types (5 modes)
 - **Private**: Standard one-to-one rides

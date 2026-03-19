@@ -9,6 +9,8 @@ export const paymentMethodEnum = pgEnum("payment_method", ["cash", "card", "ewal
 export const approvalStatusEnum = pgEnum("approval_status", ["pending", "approved", "rejected"]);
 export const paymentStatusEnum = pgEnum("payment_status", ["pending", "paid", "failed"]);
 export const rideTypeEnum = pgEnum("ride_type", ["private", "shared", "taxi", "parcel", "medical"]);
+export const vehicleCategoryEnum = pgEnum("vehicle_category", ["standard", "premium", "xl"]);
+export const inspectionStatusEnum = pgEnum("inspection_status", ["pending", "inspected", "failed"]);
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -71,6 +73,10 @@ export const users = pgTable("users", {
   nominee2Phone: text("nominee2_phone"),
   nominee2Email: text("nominee2_email"),
   nominee2Relation: text("nominee2_relation"),
+  // Vehicle category assigned after physical inspection
+  vehicleCategory: vehicleCategoryEnum("vehicle_category").default("standard"),
+  inspectionStatus: inspectionStatusEnum("inspection_status").default("pending"),
+  inspectionScore: integer("inspection_score"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -104,6 +110,7 @@ export const trips = pgTable("trips", {
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
   tripPin: varchar("trip_pin", { length: 4 }),
+  requestedCategory: vehicleCategoryEnum("requested_category").default("standard"),
 });
 
 export const savedPlaces = pgTable("saved_places", {
@@ -199,6 +206,22 @@ export const passwordResetRequests = pgTable("password_reset_requests", {
 export const insertPasswordResetRequestSchema = createInsertSchema(passwordResetRequests).omit({ id: true, createdAt: true, resolvedAt: true });
 export type InsertPasswordResetRequest = z.infer<typeof insertPasswordResetRequestSchema>;
 export type PasswordResetRequest = typeof passwordResetRequests.$inferSelect;
+
+export const vehicleInspections = pgTable("vehicle_inspections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  driverId: varchar("driver_id").notNull().references(() => users.id),
+  inspectorId: varchar("inspector_id").references(() => users.id),
+  category: vehicleCategoryEnum("category").notNull().default("standard"),
+  score: integer("score").notNull().default(0),
+  checklistData: text("checklist_data"),
+  notes: text("notes"),
+  passed: boolean("passed").notNull().default(true),
+  inspectedAt: timestamp("inspected_at").defaultNow(),
+});
+
+export const insertVehicleInspectionSchema = createInsertSchema(vehicleInspections).omit({ id: true, inspectedAt: true });
+export type InsertVehicleInspection = z.infer<typeof insertVehicleInspectionSchema>;
+export type VehicleInspection = typeof vehicleInspections.$inferSelect;
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertTripSchema = createInsertSchema(trips).omit({ id: true, createdAt: true, completedAt: true });
