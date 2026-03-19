@@ -555,8 +555,10 @@ export default function Home() {
                   >
                     Terms &amp; Conditions
                   </button>
-                  {" "}and acknowledge the liability waiver. I confirm I have read and understood GY Rides' POPIA compliance policy.
-                  {role === "driver" && " As a driver, I accept full responsibility for passengers and vehicle compliance."}
+                  {role === "driver"
+                    ? <>{" "}Driver Terms and Conditions. I understand my responsibilities, including maintaining service standards, and accept full liability for my conduct, vehicle, and activities while using the platform.</>
+                    : <>{" "}and acknowledge the liability waiver. I confirm I have read and understood GY Rides' POPIA compliance policy.</>
+                  }
                 </p>
               </div>
             )}
@@ -641,9 +643,12 @@ export default function Home() {
           <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6 text-sm text-gray-300">
 
             <div className="bg-yellow-400/10 border border-yellow-400/30 rounded-2xl p-4">
-              <p className="text-yellow-300 font-bold text-xs uppercase tracking-widest mb-1">Effective Date</p>
-              <p className="text-white font-semibold">Please read these terms carefully before creating your account.</p>
+              <p className="text-yellow-300 font-bold text-xs uppercase tracking-widest mb-1">Please read carefully</p>
+              <p className="text-white font-semibold">These terms apply to all GY Rides users. {role === "driver" ? "Additional driver-specific clauses are listed below the general terms." : ""}</p>
             </div>
+
+            {/* General Terms — apply to all users */}
+            <p className="text-yellow-400 font-black text-xs uppercase tracking-widest">General Terms</p>
 
             {[
               {
@@ -686,9 +691,64 @@ export default function Home() {
               </div>
             ))}
 
+            {/* Driver-specific additional clauses */}
+            {role === "driver" && (
+              <>
+                <div className="border-t border-white/10 pt-4">
+                  <p className="text-yellow-400 font-black text-xs uppercase tracking-widest mb-4">Driver Additional Clauses</p>
+
+                  {[
+                    {
+                      num: "A", title: "ACCEPTANCE OF TERMS",
+                      body: "By registering and using the GY Rides platform, the Driver:\n• Confirms that they have read, understood, and agreed to all GY Rides Terms and Conditions\n• Agrees to uphold the quality, professionalism, and service standards of GY Rides at all times\n• Acknowledges that failure to comply may result in suspension or termination"
+                    },
+                    {
+                      num: "B", title: "SERVICE STANDARDS & PERFORMANCE",
+                      body: "Drivers are required to:\n• Maintain professional conduct\n• Ensure cleanliness and roadworthiness of their vehicle\n• Treat passengers with respect and courtesy\n• Provide safe and reliable transport\n\nPerformance Monitoring: Drivers are subject to passenger ratings and reviews. If a driver consistently receives poor ratings or complaints, GY Rides reserves the right to suspend the driver account temporarily, require mandatory retraining, and reinstate the driver only once minimum standards are met."
+                    },
+                    {
+                      num: "C", title: "FRAUD, MISCONDUCT & LEGAL COMPLIANCE",
+                      body: "Drivers must not engage in fraudulent activity, misrepresentation of trips, or criminal conduct of any nature.\n\nLegal Disclosure: GY Rides reserves the right to provide relevant driver, trip, and platform records to law enforcement authorities upon lawful request, including a court order or legal process."
+                    },
+                    {
+                      num: "D", title: "CONFIDENTIALITY OF RECORDS",
+                      body: "All financial and operational records are treated as confidential and may only be disclosed to authorized individuals, designated representatives, or regulatory/legal authorities where required. Drivers agree to maintain confidentiality of any sensitive platform information."
+                    },
+                    {
+                      num: "E", title: "LOSS, DAMAGE & THEFT DISCLAIMER",
+                      body: "GY Rides shall not be liable for loss of personal property, theft of goods or belongings, or damage occurring during or after a trip. This applies to passengers, drivers, and third parties. All use of the platform is at own risk."
+                    },
+                    {
+                      num: "F", title: "VEHICLE INSURANCE DISCLAIMER",
+                      body: "Drivers are strongly advised to maintain valid and appropriate vehicle insurance. However, insurance is not a mandatory requirement to use the platform. The absence of insurance shall not impose any liability on GY Rides or affect GY Rides' legal position in any way. Drivers accept full personal responsibility for their vehicle, any incidents, and any financial or legal consequences arising therefrom."
+                    },
+                    {
+                      num: "G", title: "INDEPENDENT CONTRACTOR STATUS",
+                      body: "Drivers operate as independent contractors. Nothing in this agreement creates employment, partnership, or agency relationship. Drivers are solely responsible for their own taxes, licenses, and compliance with applicable laws."
+                    },
+                  ].map(s => (
+                    <div key={s.num} className="mb-5">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-6 h-6 bg-white/10 border border-yellow-400/40 rounded-lg flex items-center justify-center shrink-0">
+                          <span className="text-yellow-400 font-black text-xs">{s.num}</span>
+                        </div>
+                        <h3 className="text-white font-bold text-sm">{s.title}</h3>
+                      </div>
+                      <p className="text-gray-400 leading-relaxed whitespace-pre-line pl-8">{s.body}</p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
             <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-              <p className="text-white font-bold text-sm mb-2">APP CHECKBOX DECLARATION</p>
-              <p className="text-gray-400 text-sm">By checking "I agree" on the sign-up screen, you confirm that you have read, understood, and accepted these Terms and Conditions in their entirety, including the liability waiver and POPIA consent.</p>
+              <p className="text-white font-bold text-sm mb-2">YOUR DECLARATION</p>
+              <p className="text-gray-400 text-sm">
+                {role === "driver"
+                  ? "By signing up, I confirm that I have read and agree to the GY Rides Driver Terms and Conditions. I understand my responsibilities, including maintaining service standards, and accept full liability for my conduct, vehicle, and activities while using the platform."
+                  : "By checking \"I agree\" on the sign-up screen, you confirm that you have read, understood, and accepted these Terms and Conditions in their entirety, including the liability waiver and POPIA consent."
+                }
+              </p>
             </div>
 
             <div className="h-4" />
