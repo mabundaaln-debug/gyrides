@@ -752,7 +752,43 @@ export default function DriverOnboarding() {
       <div className="bg-white border-t border-gray-100 p-4 space-y-2">
         {step === "personal" && !canProceedPersonal && (
           <p className="text-xs text-center text-amber-600 font-medium">
-            {!profilePhotoDoc ? "📷 Please take your profile photo to continue" : "Please fill in all required fields above"}
+            {!profilePhotoDoc ? "📷 Please take your profile photo to continue"
+              : !fullName ? "Please enter your full name"
+              : !idNumber ? "Please enter your SA ID number"
+              : !phone ? "Please enter your phone number"
+              : "Please enter your residential address"}
+          </p>
+        )}
+        {step === "vehicle" && !canProceedVehicle && (
+          <p className="text-xs text-center text-amber-600 font-medium">
+            {!vehicleMake ? "Please enter your vehicle make (e.g. Toyota)"
+              : !vehicleModel ? "Please enter your vehicle model"
+              : !vehicleColor ? "Please enter the vehicle colour"
+              : !vehicleYear ? "Please enter the vehicle year"
+              : "Please enter your licence plate number"}
+          </p>
+        )}
+        {step === "license" && !canProceedLicense && (
+          <p className="text-xs text-center text-amber-600 font-medium">
+            {!driverLicenseNumber ? "Please enter your licence number"
+              : !driverLicenseExpiry ? "Please select your licence expiry date"
+              : "Please select your licence code"}
+          </p>
+        )}
+        {step === "documents" && !canProceedDocs && (
+          <p className="text-xs text-center text-amber-600 font-medium">
+            {!driverLicenseDoc ? "📄 Please upload your Driver's Licence"
+              : !vehicleLicenseDoc ? "📄 Please upload your Vehicle Licence Disc"
+              : "📄 Please upload your Roadworthy Certificate"}
+          </p>
+        )}
+        {step === "banking" && !canProceedBanking && (
+          <p className="text-xs text-center text-amber-600 font-medium">
+            {!bankName ? "Please select your bank"
+              : !bankAccountHolder ? "Please enter the account holder name"
+              : !bankAccountNumber ? "Please enter your account number"
+              : !bankBranchCode ? "Please enter your branch code"
+              : "Please select your account type"}
           </p>
         )}
         <div className="flex gap-3">
