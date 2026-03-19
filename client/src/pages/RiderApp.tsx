@@ -588,9 +588,16 @@ export default function RiderApp() {
       } as any);
       setCurrentTrip(trip);
       // Polling effect (below) watches this trip and reacts when a driver accepts
-    } catch {
+    } catch (err: any) {
       setView("home");
-      toast({ title: "Booking failed", description: "Please check your connection and try again.", variant: "destructive" });
+      const isAuthErr = err?.message?.includes("not found") || err?.message?.includes("401") || err?.message?.includes("404");
+      toast({
+        title: "Booking failed",
+        description: isAuthErr
+          ? "Your session has expired. Please sign out and sign in again."
+          : "Something went wrong. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
