@@ -272,12 +272,12 @@ export default function DriverOnboarding() {
   const currentYear = new Date().getFullYear();
 
   const SADatePicker = ({ value, onChange, testId, minYear, maxYear }: { value: string; onChange: (v: string) => void; testId?: string; minYear?: number; maxYear?: number }) => {
-    const parts = value ? value.split("-") : ["", "", ""];
-    const yr = parts[0] || "";
-    const mo = parts[1] || "";
-    const dy = parts[2] || "";
+    const init = value ? value.split("-") : ["","",""];
+    const [yr, setYr] = useState(init[0] || "");
+    const [mo, setMo] = useState(init[1] || "");
+    const [dy, setDy] = useState(init[2] || "");
 
-    const update = (y: string, m: string, d: string) => {
+    const commit = (y: string, m: string, d: string) => {
       if (y && m && d) onChange(`${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`);
       else onChange("");
     };
@@ -288,19 +288,19 @@ export default function DriverOnboarding() {
     const sel = "h-12 rounded-xl border border-gray-200 bg-white px-2 text-sm flex-1 min-w-0";
     return (
       <div className="flex gap-2" data-testid={testId}>
-        <select value={dy} onChange={e => update(yr, mo, e.target.value)} className={sel} aria-label="Day">
+        <select value={dy} onChange={e => { setDy(e.target.value); commit(yr, mo, e.target.value); }} className={sel} aria-label="Day">
           <option value="">Day</option>
           {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => (
             <option key={d} value={String(d).padStart(2,"0")}>{String(d).padStart(2,"0")}</option>
           ))}
         </select>
-        <select value={mo} onChange={e => update(yr, e.target.value, dy)} className={sel} aria-label="Month">
+        <select value={mo} onChange={e => { setMo(e.target.value); commit(yr, e.target.value, dy); }} className={sel} aria-label="Month">
           <option value="">Month</option>
           {SA_MONTHS.map((m, i) => (
             <option key={m} value={String(i+1).padStart(2,"0")}>{m}</option>
           ))}
         </select>
-        <select value={yr} onChange={e => update(e.target.value, mo, dy)} className={sel} aria-label="Year">
+        <select value={yr} onChange={e => { setYr(e.target.value); commit(e.target.value, mo, dy); }} className={sel} aria-label="Year">
           <option value="">Year</option>
           {years.map(y => <option key={y} value={String(y)}>{y}</option>)}
         </select>
