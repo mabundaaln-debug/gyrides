@@ -443,41 +443,6 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/auth/google", async (req, res) => {
-    try {
-      const { googleId, email, fullName, avatarUrl } = req.body;
-      if (!googleId || !email) {
-        return res.status(400).json({ message: "Google ID and email are required" });
-      }
-      let user = await storage.getUserByUsername(`google_${googleId}`);
-      if (user) {
-        if (avatarUrl && avatarUrl !== user.avatarUrl) {
-          user = (await storage.updateUser(user.id, { avatarUrl }))!;
-        }
-        return res.json(user);
-      }
-      const existingEmail = await storage.getUserByUsername(email);
-      if (existingEmail) {
-        if (avatarUrl && !existingEmail.avatarUrl) {
-          await storage.updateUser(existingEmail.id, { avatarUrl });
-        }
-        return res.json(existingEmail);
-      }
-      user = await storage.createUser({
-        username: `google_${googleId}`,
-        password: crypto.randomUUID(),
-        fullName: fullName || email.split("@")[0],
-        phone: "",
-        email,
-        role: "rider",
-        avatarUrl: avatarUrl || null,
-      });
-      return res.status(201).json(user);
-    } catch (e: any) {
-      return res.status(500).json({ message: e.message });
-    }
-  });
-
   app.post("/api/webauthn/register-options", async (req, res) => {
     try {
       const { userId } = req.body;
