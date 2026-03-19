@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useLocation } from "wouter";
-import { Car, User, FileText, ChevronRight, ChevronLeft, CheckCircle, Clock, XCircle, Upload, Shield, CreditCard, LogOut, MessageCircle, Landmark, Users, Plus, Trash2 } from "lucide-react";
+import { Car, User, FileText, ChevronRight, ChevronLeft, CheckCircle, Clock, XCircle, Upload, Shield, CreditCard, LogOut, MessageCircle, Landmark, Users, Plus, Trash2, Camera, RefreshCw, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
@@ -83,7 +83,7 @@ export default function DriverOnboarding() {
 
   const stepIndex = STEPS.findIndex(s => s.key === step);
 
-  const canProceedPersonal = fullName && phone && idNumber && address;
+  const canProceedPersonal = fullName && phone && idNumber && address && profilePhotoDoc;
   const canProceedVehicle = vehicleMake && vehicleModel && vehicleColor && vehicleYear && licensePlate;
   const canProceedLicense = driverLicenseNumber && driverLicenseExpiry && driverLicenseCode;
   const canProceedDocs = driverLicenseDoc && vehicleLicenseDoc && roadworthyCertDoc;
@@ -102,6 +102,24 @@ export default function DriverOnboarding() {
   };
 
   const [uploading, setUploading] = useState<string | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePhotoUpload = async (file: File) => {
+    setUploading("profilePhotoDoc");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
+      if (!res.ok) throw new Error("Upload failed");
+      const { url } = await res.json();
+      setProfilePhotoDoc(url);
+    } catch (err: any) {
+      toast({ title: "Photo upload failed", description: err.message || "Please try again", variant: "destructive" });
+    } finally {
+      setUploading(null);
+    }
+  };
 
   const handleFileUpload = (fieldName: string, setter: (val: string) => void) => {
     const input = document.createElement("input");
@@ -304,9 +322,106 @@ export default function DriverOnboarding() {
 
       <div className="flex-1 p-5 overflow-auto">
         {step === "personal" && (
-          <div className="space-y-4">
-            <h2 className="text-lg font-bold">Personal Information</h2>
-            <p className="text-sm text-gray-500">We need your personal details to verify your identity.</p>
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-lg font-bold">Personal Information</h2>
+              <p className="text-sm text-gray-500 mt-1">Start with your profile photo — riders will see this during every trip.</p>
+            </div>
+
+            {/* ── Profile Photo Capture ── */}
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+              <div className="flex items-center gap-2 mb-4">
+                <Camera className="h-4 w-4 text-yellow-500" />
+                <span className="text-sm font-bold">Profile Photo <span className="text-red-500">*</span></span>
+                {!profilePhotoDoc && <span className="text-[10px] text-red-500 font-medium ml-auto">Required</span>}
+                {profilePhotoDoc && <span className="text-[10px] text-green-600 font-bold ml-auto flex items-center gap-1"><CheckCircle className="h-3 w-3" /> Done</span>}
+              </div>
+
+              {/* Hidden inputs */}
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="user"
+                className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); e.target.value = ""; }}
+                data-testid="input-camera-capture"
+              />
+              <input
+                ref={galleryInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); e.target.value = ""; }}
+                data-testid="input-gallery-upload"
+              />
+
+              {profilePhotoDoc ? (
+                /* Photo preview */
+                <div className="flex flex-col items-center gap-3">
+                  <div className="relative">
+                    <img
+                      src={profilePhotoDoc}
+                      alt="Profile photo"
+                      className="w-36 h-36 rounded-full object-cover border-4 border-yellow-400 shadow-lg"
+                      data-testid="img-profile-preview"
+                    />
+                    <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center border-2 border-white shadow">
+                      <CheckCircle className="h-4 w-4 text-white" />
+                    </div>
+                  </div>
+                  <p className="text-sm font-medium text-gray-700">Looking good! This is what riders will see.</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => cameraInputRef.current?.click()}
+                      disabled={uploading === "profilePhotoDoc"}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black text-yellow-400 text-xs font-bold"
+                      data-testid="btn-retake-camera"
+                    >
+                      <Camera className="h-3.5 w-3.5" /> Retake
+                    </button>
+                    <button
+                      onClick={() => galleryInputRef.current?.click()}
+                      disabled={uploading === "profilePhotoDoc"}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-100 text-gray-700 text-xs font-bold"
+                      data-testid="btn-choose-gallery"
+                    >
+                      <ImagePlus className="h-3.5 w-3.5" /> Gallery
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Camera capture prompt */
+                <div className="flex flex-col items-center gap-4">
+                  <button
+                    onClick={() => cameraInputRef.current?.click()}
+                    disabled={uploading === "profilePhotoDoc"}
+                    className="w-36 h-36 rounded-full border-4 border-dashed border-yellow-400 bg-yellow-50 flex flex-col items-center justify-center gap-2 transition-colors hover:bg-yellow-100 active:scale-95"
+                    data-testid="btn-take-photo"
+                  >
+                    {uploading === "profilePhotoDoc" ? (
+                      <RefreshCw className="h-10 w-10 text-yellow-500 animate-spin" />
+                    ) : (
+                      <>
+                        <Camera className="h-10 w-10 text-yellow-500" />
+                        <span className="text-xs font-bold text-yellow-700">Tap to take photo</span>
+                      </>
+                    )}
+                  </button>
+                  <p className="text-xs text-gray-500 text-center">Take a clear selfie — face must be visible.<br />Good lighting makes a big difference.</p>
+                  <button
+                    onClick={() => galleryInputRef.current?.click()}
+                    disabled={uploading === "profilePhotoDoc"}
+                    className="flex items-center gap-2 text-xs text-gray-500 font-medium underline"
+                    data-testid="btn-upload-gallery"
+                  >
+                    <ImagePlus className="h-3.5 w-3.5" /> Choose from gallery instead
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Personal details */}
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Full Name *</label>
@@ -418,7 +533,6 @@ export default function DriverOnboarding() {
               <DocUploadButton label="Vehicle License Disc" fieldName="vehicleLicenseDoc" value={vehicleLicenseDoc} setter={setVehicleLicenseDoc} />
               <DocUploadButton label="Roadworthy Certificate" fieldName="roadworthyCertDoc" value={roadworthyCertDoc} setter={setRoadworthyCertDoc} />
               <DocUploadButton label="Proof of Insurance" fieldName="proofOfInsuranceDoc" value={proofOfInsuranceDoc} setter={setProofOfInsuranceDoc} required={false} />
-              <DocUploadButton label="Profile Photo" fieldName="profilePhotoDoc" value={profilePhotoDoc} setter={setProfilePhotoDoc} required={false} />
             </div>
           </div>
         )}
@@ -574,8 +688,17 @@ export default function DriverOnboarding() {
             <h2 className="text-lg font-bold">Review Your Application</h2>
             <p className="text-sm text-gray-500">Please review all your details before submitting.</p>
 
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-2">
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-3">
               <h3 className="font-bold text-sm text-yellow-600 flex items-center gap-2"><User className="h-4 w-4" /> Personal Details</h3>
+              {profilePhotoDoc && (
+                <div className="flex items-center gap-4 pb-2 border-b border-gray-100">
+                  <img src={profilePhotoDoc} alt="Profile" className="w-16 h-16 rounded-full object-cover border-2 border-yellow-400" data-testid="img-review-photo" />
+                  <div>
+                    <p className="text-sm font-bold">{fullName}</p>
+                    <p className="text-xs text-green-600 font-medium flex items-center gap-1"><CheckCircle className="h-3 w-3" /> Profile photo uploaded</p>
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                 <span className="text-gray-500">Name</span><span className="font-medium">{fullName}</span>
                 <span className="text-gray-500">ID Number</span><span className="font-medium">{idNumber}</span>
