@@ -102,6 +102,13 @@ export default function DriverApp() {
     return () => clearInterval(interval);
   }, [tripPhase, tripStartedAt]);
 
+  // Auto-bypass PIN if this trip has no PIN set (e.g. parcel or legacy trip)
+  useEffect(() => {
+    if (tripPhase === "pickup" && onTrip && !(onTrip as any).tripPin) {
+      setPinVerified(true);
+    }
+  }, [tripPhase, onTrip]);
+
   // ── Poll rider's live GPS every 4 seconds while on a trip ──
   useEffect(() => {
     if (!onTrip?.riderId) { setRiderPos(null); return; }
@@ -193,39 +200,54 @@ export default function DriverApp() {
   const advanceTrip = async () => {
     if (!onTrip) return;
     const tripIsParcel = onTrip.rideType === "parcel";
-    if (tripPhase === "arriving") {
-      await updateTrip(onTrip.id, { status: "arriving" });
-      setTripPhase("pickup");
-      setPinEntry("");
-      setPinVerified(false);
-      setPinError("");
-      toast({ title: "Arrived at pickup", description: tripIsParcel ? "Collect the parcel." : "Ask the rider for their Trip PIN." });
-    } else if (tripPhase === "pickup") {
-      // Parcel trips don't need a PIN — no rider in the car
-      if (!tripIsParcel && !pinVerified) {
-        toast({ title: "PIN required", description: "Enter the rider's 4-digit Trip PIN first.", variant: "destructive" });
-        return;
+    try {
+      if (tripPhase === "arriving") {
+        await updateTrip(onTrip.id, { status: "arriving" });
+        setTripPhase("pickup");
+        setPinEntry("");
+        setPinVerified(false);
+        setPinError("");
+        toast({ title: "Arrived at pickup", description: tripIsParcel ? "Collect the parcel." : "Ask the rider for their Trip PIN." });
+
+      } else if (tripPhase === "pickup") {
+        // Parcel trips don't need a PIN — no rider in the car
+        if (!tripIsParcel && !pinVerified) {
+          toast({ title: "PIN required", description: "Enter the rider's 4-digit Trip PIN first.", variant: "destructive" });
+          return;
+        }
+        const now = new Date().toISOString();
+        await updateTrip(onTrip.id, { status: "in_progress", startedAt: now });
+        const startTime = new Date(now);
+        setTripStartedAt(startTime);
+        setElapsedSeconds(0);
+        setTripPhase("inprogress");
+        toast({ title: "Trip started!", description: "Timer running. Drive safely." });
+
+      } else {
+        const completedAt = new Date().toISOString();
+        const startMs = tripStartedAt ? tripStartedAt.getTime() : Date.now();
+        const actualMins = Math.max(1, Math.round((Date.now() - startMs) / 60000));
+        await updateTrip(onTrip.id, { status: "completed", completedAt, duration: actualMins });
+        const fareDisplay = `R${onTrip.fare}`;
+        const durationText = actualMins >= 1 ? `${actualMins} min` : `${elapsedSeconds}s`;
+        setOnTrip(null);
+        setTripRider(null);
+        setTripStartedAt(null);
+        setElapsedSeconds(0);
+        setPinVerified(false);
+        setPinEntry("");
+        setTripPhase("arriving");
+        setView("home");
+        queryClient.invalidateQueries({ queryKey: ["/api/trips/driver"] });
+        toast({ title: "Trip completed!", description: `Fare: ${fareDisplay} · Duration: ${durationText}` });
       }
-      const now = new Date();
-      await updateTrip(onTrip.id, { status: "in_progress", startedAt: now } as any);
-      setTripStartedAt(now);
-      setElapsedSeconds(0);
-      setTripPhase("inprogress");
-      toast({ title: "Trip started!", description: "Timer running. Drive safely." });
-    } else {
-      const completedAt = new Date();
-      const actualMins = tripStartedAt
-        ? Math.round((completedAt.getTime() - tripStartedAt.getTime()) / 60000)
-        : onTrip.duration ?? 0;
-      await updateTrip(onTrip.id, { status: "completed", completedAt, duration: actualMins } as any);
-      setOnTrip(null);
-      setTripRider(null);
-      setTripStartedAt(null);
-      setElapsedSeconds(0);
-      setView("home");
-      queryClient.invalidateQueries({ queryKey: ["/api/trips/driver"] });
-      const durationText = actualMins >= 1 ? `${actualMins} min` : `${elapsedSeconds}s`;
-      toast({ title: "Trip completed!", description: `Fare: R${onTrip.fare} · Duration: ${durationText}` });
+    } catch (err: any) {
+      console.error("advanceTrip error:", err);
+      toast({
+        title: "Action failed",
+        description: err?.message || "Could not update trip status. Please check your connection and try again.",
+        variant: "destructive",
+      });
     }
   };
 

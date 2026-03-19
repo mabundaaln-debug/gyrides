@@ -625,11 +625,12 @@ export async function registerRoutes(
   app.post("/api/trips/:id/verify-pin", async (req, res) => {
     const trip = await storage.getTrip(req.params.id);
     if (!trip) return res.status(404).json({ message: "Trip not found" });
+    // If no PIN was set on this trip, verification passes automatically
+    if (!trip.tripPin) return res.json({ success: true, noPinRequired: true });
     const { pin } = req.body;
     if (!pin) return res.status(400).json({ message: "PIN required" });
-    if (!trip.tripPin) return res.status(400).json({ message: "No PIN set for this trip" });
     if (String(pin).trim() !== String(trip.tripPin).trim()) {
-      return res.status(401).json({ message: "Incorrect PIN" });
+      return res.status(401).json({ message: "Incorrect PIN — ask the rider to check their app" });
     }
     return res.json({ success: true });
   });
