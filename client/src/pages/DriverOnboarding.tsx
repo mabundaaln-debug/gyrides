@@ -262,6 +262,52 @@ export default function DriverOnboarding() {
     );
   }
 
+  const SA_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const fmtDate = (iso: string) => {
+    if (!iso) return "—";
+    const [y, m, d] = iso.split("-");
+    if (!y || !m || !d) return iso;
+    return `${d} ${SA_MONTHS[parseInt(m)-1]} ${y}`;
+  };
+  const currentYear = new Date().getFullYear();
+
+  const SADatePicker = ({ value, onChange, testId, minYear, maxYear }: { value: string; onChange: (v: string) => void; testId?: string; minYear?: number; maxYear?: number }) => {
+    const parts = value ? value.split("-") : ["", "", ""];
+    const yr = parts[0] || "";
+    const mo = parts[1] || "";
+    const dy = parts[2] || "";
+
+    const update = (y: string, m: string, d: string) => {
+      if (y && m && d) onChange(`${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`);
+      else onChange("");
+    };
+
+    const daysInMonth = yr && mo ? new Date(parseInt(yr), parseInt(mo), 0).getDate() : 31;
+    const years = Array.from({ length: (maxYear ?? currentYear + 30) - (minYear ?? currentYear) + 1 }, (_, i) => (minYear ?? currentYear) + i);
+
+    const sel = "h-12 rounded-xl border border-gray-200 bg-white px-2 text-sm flex-1 min-w-0";
+    return (
+      <div className="flex gap-2" data-testid={testId}>
+        <select value={dy} onChange={e => update(yr, mo, e.target.value)} className={sel} aria-label="Day">
+          <option value="">Day</option>
+          {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => (
+            <option key={d} value={String(d).padStart(2,"0")}>{String(d).padStart(2,"0")}</option>
+          ))}
+        </select>
+        <select value={mo} onChange={e => update(yr, e.target.value, dy)} className={sel} aria-label="Month">
+          <option value="">Month</option>
+          {SA_MONTHS.map((m, i) => (
+            <option key={m} value={String(i+1).padStart(2,"0")}>{m}</option>
+          ))}
+        </select>
+        <select value={yr} onChange={e => update(e.target.value, mo, dy)} className={sel} aria-label="Year">
+          <option value="">Year</option>
+          {years.map(y => <option key={y} value={String(y)}>{y}</option>)}
+        </select>
+      </div>
+    );
+  };
+
   const DocUploadButton = ({ label, fieldName, value, setter, required = true }: { label: string; fieldName: string; value: string; setter: (v: string) => void; required?: boolean }) => {
     const isLoading = uploading === fieldName;
     const isImage = value && !value.endsWith(".pdf") && !value.startsWith("data:application/pdf");
@@ -455,33 +501,31 @@ export default function DriverOnboarding() {
                 <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">License Number *</label>
                 <Input value={driverLicenseNumber} onChange={e => setDriverLicenseNumber(e.target.value)} placeholder="Your license number" className="h-12 rounded-xl" data-testid="input-onboard-license-num" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Expiry Date *</label>
-                  <Input type="date" value={driverLicenseExpiry} onChange={e => setDriverLicenseExpiry(e.target.value)} className="h-12 rounded-xl" data-testid="input-onboard-license-exp" />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">License Code *</label>
-                  <select value={driverLicenseCode} onChange={e => setDriverLicenseCode(e.target.value)} className="h-12 rounded-xl border border-gray-200 bg-white px-3 w-full" data-testid="select-license-code">
-                    <option value="A">A - Motorcycle</option>
-                    <option value="A1">A1 - Light Motorcycle</option>
-                    <option value="B">B - Light Motor Vehicle</option>
-                    <option value="C">C - Heavy Vehicle</option>
-                    <option value="C1">C1 - Heavy Vehicle</option>
-                    <option value="EB">EB - Articulated</option>
-                    <option value="EC">EC - Extra Heavy</option>
-                    <option value="EC1">EC1 - Extra Heavy</option>
-                  </select>
-                </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Expiry Date * <span className="text-gray-400 font-normal normal-case">(DD / Month / Year)</span></label>
+                <SADatePicker value={driverLicenseExpiry} onChange={setDriverLicenseExpiry} testId="input-onboard-license-exp" />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">License Code *</label>
+                <select value={driverLicenseCode} onChange={e => setDriverLicenseCode(e.target.value)} className="h-12 rounded-xl border border-gray-200 bg-white px-3 w-full" data-testid="select-license-code">
+                  <option value="A">A - Motorcycle</option>
+                  <option value="A1">A1 - Light Motorcycle</option>
+                  <option value="B">B - Light Motor Vehicle</option>
+                  <option value="C">C - Heavy Vehicle</option>
+                  <option value="C1">C1 - Heavy Vehicle</option>
+                  <option value="EB">EB - Articulated</option>
+                  <option value="EC">EC - Extra Heavy</option>
+                  <option value="EC1">EC1 - Extra Heavy</option>
+                </select>
               </div>
               <h3 className="font-bold text-sm mt-4">Vehicle License & Roadworthy</h3>
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Vehicle License Disc Expiry</label>
-                <Input type="date" value={vehicleLicenseExpiry} onChange={e => setVehicleLicenseExpiry(e.target.value)} className="h-12 rounded-xl" data-testid="input-onboard-vehicle-exp" />
+                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Vehicle License Disc Expiry <span className="text-gray-400 font-normal normal-case">(DD / Month / Year)</span></label>
+                <SADatePicker value={vehicleLicenseExpiry} onChange={setVehicleLicenseExpiry} testId="input-onboard-vehicle-exp" minYear={currentYear - 1} maxYear={currentYear + 10} />
               </div>
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Roadworthy Certificate Expiry</label>
-                <Input type="date" value={roadworthyCertExpiry} onChange={e => setRoadworthyCertExpiry(e.target.value)} className="h-12 rounded-xl" data-testid="input-onboard-roadworthy-exp" />
+                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Roadworthy Certificate Expiry <span className="text-gray-400 font-normal normal-case">(DD / Month / Year)</span></label>
+                <SADatePicker value={roadworthyCertExpiry} onChange={setRoadworthyCertExpiry} testId="input-onboard-roadworthy-exp" minYear={currentYear - 1} maxYear={currentYear + 10} />
               </div>
             </div>
           </div>
@@ -685,9 +729,9 @@ export default function DriverOnboarding() {
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                 <span className="text-gray-500">License No.</span><span className="font-medium">{driverLicenseNumber}</span>
                 <span className="text-gray-500">Code</span><span className="font-medium">{driverLicenseCode}</span>
-                <span className="text-gray-500">Expires</span><span className="font-medium">{driverLicenseExpiry}</span>
-                {vehicleLicenseExpiry && <><span className="text-gray-500">Vehicle Disc</span><span className="font-medium">{vehicleLicenseExpiry}</span></>}
-                {roadworthyCertExpiry && <><span className="text-gray-500">Roadworthy</span><span className="font-medium">{roadworthyCertExpiry}</span></>}
+                <span className="text-gray-500">Expires</span><span className="font-medium">{fmtDate(driverLicenseExpiry)}</span>
+                {vehicleLicenseExpiry && <><span className="text-gray-500">Vehicle Disc</span><span className="font-medium">{fmtDate(vehicleLicenseExpiry)}</span></>}
+                {roadworthyCertExpiry && <><span className="text-gray-500">Roadworthy</span><span className="font-medium">{fmtDate(roadworthyCertExpiry)}</span></>}
               </div>
             </div>
 
