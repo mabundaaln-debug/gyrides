@@ -270,16 +270,20 @@ export async function registerRoutes(
       if (!googleId || !email) {
         return res.status(400).json({ message: "Missing Google account info" });
       }
-      let user = await storage.getUserByGoogleId(googleId);
-      if (user) return res.json(user);
 
+      // Existing user matched by Google ID
+      let user = await storage.getUserByGoogleId(googleId);
+      if (user) return res.json({ ...user, isNewUser: false });
+
+      // Existing user matched by email — link Google account
       user = await storage.getUserByEmail(email);
       if (user) {
         const updated = await storage.updateUser(user.id, { googleId, avatarUrl: avatarUrl || user.avatarUrl });
-        return res.json(updated);
+        return res.json({ ...updated, isNewUser: false });
       }
 
-      const username = email.split("@")[0] + "_g" + googleId.slice(-4);
+      // Brand new user — create with placeholder data, mark as needing profile completion
+      const username = email.split("@")[0].replace(/[^a-z0-9]/gi, "") + "_g" + googleId.slice(-4);
       const randomPass = crypto.randomBytes(16).toString("hex");
       user = await storage.createUser({
         username,
@@ -291,7 +295,7 @@ export async function registerRoutes(
         avatarUrl: avatarUrl || null,
         role: "rider",
       });
-      return res.status(201).json(user);
+      return res.status(201).json({ ...user, isNewUser: true });
     } catch (e: any) {
       return res.status(500).json({ message: e.message });
     }

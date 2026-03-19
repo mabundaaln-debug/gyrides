@@ -96,20 +96,56 @@ export default function Home() {
     } else setLocation("/admin");
   };
 
-  const [googleReady, setGoogleReady] = useState(false);
+  const handleGoogleComplete = async () => {
+    if (!googlePhone.trim()) {
+      toast({ title: "Phone number required", description: "Please enter your phone number to continue", variant: "destructive" });
+      return;
+    }
+    if (!googleTerms) {
+      toast({ title: "Terms & Conditions required", description: "Please accept the Terms and Conditions to continue", variant: "destructive" });
+      return;
+    }
+    setGoogleCompleting(true);
+    try {
+      const updated = await fetch(`/api/users/${googleUser.id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: googlePhone.trim(), role: googleRole }),
+      });
+      if (!updated.ok) throw new Error("Failed to update profile");
+      const u = await updated.json();
+      setUser(u);
+      setShowGoogleComplete(false);
+      toast({ title: `Welcome to GY Rides, ${u.fullName.split(" ")[0]}!`, description: "Your account has been created with Google" });
+      navigateByRole(u);
+    } catch {
+      toast({ title: "Failed to complete profile", description: "Please try again", variant: "destructive" });
+    }
+    setGoogleCompleting(false);
+  };
 
-  const googleBtnRef = useRef<HTMLDivElement>(null);
+  const [googleReady, setGoogleReady] = useState(false);
+  const [googleBtnRef, setGoogleBtnRef] = useState<HTMLDivElement | null>(null);
   const [googleBtnRendered, setGoogleBtnRendered] = useState(false);
 
+  // Google profile completion
+  const [showGoogleComplete, setShowGoogleComplete] = useState(false);
+  const [googleUser, setGoogleUser] = useState<any>(null);
+  const [googleRole, setGoogleRole] = useState<"rider" | "driver">("rider");
+  const [googlePhone, setGooglePhone] = useState("");
+  const [googleTerms, setGoogleTerms] = useState(false);
+  const [googleCompleting, setGoogleCompleting] = useState(false);
+
   useEffect(() => {
-    if (googleReady && googleBtnRef.current && !googleBtnRendered) {
+    if (googleReady && googleBtnRef && !googleBtnRendered) {
       (window as any).google.accounts.id.renderButton(
-        googleBtnRef.current,
-        { theme: "outline", size: "large", width: googleBtnRef.current.offsetWidth || 320, text: "signin_with", shape: "rectangular" }
+        googleBtnRef,
+        { theme: "outline", size: "large", width: googleBtnRef.offsetWidth || 320, text: "signin_with", shape: "rectangular" }
       );
       setGoogleBtnRendered(true);
     }
-  }, [googleReady, googleBtnRendered]);
+  }, [googleReady, googleBtnRef, googleBtnRendered]);
 
   const handleGoogleSignIn = async () => {
     if (!(window as any).google?.accounts?.id || !googleReady) {
@@ -172,17 +208,27 @@ export default function Home() {
               callback: async (response: any) => {
                 try {
                   const payload = JSON.parse(atob(response.credential.split(".")[1]));
-                  const u = await googleAuth({
+                  const result = await googleAuth({
                     googleId: payload.sub,
                     email: payload.email,
                     fullName: payload.name,
                     avatarUrl: payload.picture,
                   });
-                  setUser(u);
-                  navigateByRole(u);
-                  toast({ title: "Welcome!", description: `Signed in with Google as ${u.fullName}` });
+                  if (result.isNewUser) {
+                    // New user — show profile completion screen
+                    setGoogleUser(result);
+                    setGoogleRole("rider");
+                    setGooglePhone("");
+                    setGoogleTerms(false);
+                    setShowGoogleComplete(true);
+                    setShowLogin(false);
+                  } else {
+                    setUser(result);
+                    navigateByRole(result);
+                    toast({ title: `Welcome back, ${result.fullName.split(" ")[0]}!`, description: "Signed in with Google" });
+                  }
                 } catch {
-                  toast({ title: "Google Sign-In failed", variant: "destructive" });
+                  toast({ title: "Google Sign-In failed", description: "Please try again", variant: "destructive" });
                 }
               },
             });
@@ -194,6 +240,124 @@ export default function Home() {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // ── Google Profile Completion Screen ──
+  if (showGoogleComplete && googleUser) {
+    return (
+      <div className="min-h-[100dvh] bg-black flex flex-col">
+        <div className="bg-black px-6 pt-12 pb-6">
+          <div className="flex items-center gap-4 mb-2">
+            <div className="relative">
+              {googleUser.avatarUrl ? (
+                <img src={googleUser.avatarUrl} alt={googleUser.fullName} className="w-16 h-16 rounded-2xl object-cover border-2 border-yellow-400" />
+              ) : (
+                <div className="w-16 h-16 rounded-2xl bg-yellow-400 flex items-center justify-center text-2xl font-black text-black">{googleUser.fullName?.[0]}</div>
+              )}
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-white rounded-full flex items-center justify-center shadow">
+                <svg viewBox="0 0 24 24" className="w-4 h-4">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                </svg>
+              </div>
+            </div>
+            <div>
+              <h1 className="text-white font-black text-xl leading-tight">Almost there!</h1>
+              <p className="text-gray-400 text-sm">Complete your GY Rides profile</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 bg-gray-50 rounded-t-3xl px-6 py-6 space-y-5">
+          {/* Pre-filled from Google */}
+          <div className="bg-white rounded-2xl p-4 border border-gray-100 space-y-3">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">From your Google Account</p>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center shrink-0">
+                <svg viewBox="0 0 24 24" className="w-5 h-5"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="#6B7280" strokeWidth="2" fill="none"/><circle cx="12" cy="7" r="4" stroke="#6B7280" strokeWidth="2" fill="none"/></svg>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Full Name</p>
+                <p className="font-bold text-gray-800">{googleUser.fullName}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center shrink-0">
+                <svg viewBox="0 0 24 24" className="w-5 h-5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="#6B7280" strokeWidth="2" fill="none"/><polyline points="22,6 12,13 2,6" stroke="#6B7280" strokeWidth="2" fill="none"/></svg>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Email</p>
+                <p className="font-bold text-gray-800">{googleUser.email}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Phone number */}
+          <div className="bg-white rounded-2xl p-4 border border-gray-100">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Your Phone Number</p>
+            <input
+              type="tel"
+              placeholder="e.g. 0812345678"
+              value={googlePhone}
+              onChange={e => setGooglePhone(e.target.value)}
+              className="w-full h-12 rounded-xl border-2 border-gray-200 px-4 text-base font-medium focus:border-yellow-400 outline-none"
+              data-testid="input-google-phone"
+            />
+          </div>
+
+          {/* Role */}
+          <div className="bg-white rounded-2xl p-4 border border-gray-100">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">I want to</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                className={`h-20 rounded-2xl flex flex-col items-center justify-center gap-1.5 border-2 font-bold text-sm transition-all ${googleRole === "rider" ? "bg-yellow-400 border-yellow-400 text-black" : "bg-white border-gray-200 text-gray-500"}`}
+                onClick={() => setGoogleRole("rider")}
+                data-testid="btn-google-role-rider"
+              >
+                <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                Book Rides
+              </button>
+              <button
+                className={`h-20 rounded-2xl flex flex-col items-center justify-center gap-1.5 border-2 font-bold text-sm transition-all ${googleRole === "driver" ? "bg-yellow-400 border-yellow-400 text-black" : "bg-white border-gray-200 text-gray-500"}`}
+                onClick={() => setGoogleRole("driver")}
+                data-testid="btn-google-role-driver"
+              >
+                <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                Drive & Earn
+              </button>
+            </div>
+            {googleRole === "driver" && (
+              <p className="text-xs text-gray-500 mt-2 text-center">You'll need to complete driver onboarding after signup</p>
+            )}
+          </div>
+
+          {/* Terms */}
+          <div
+            className={`flex items-start gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all ${googleTerms ? "bg-yellow-50 border-yellow-400" : "bg-white border-gray-200"}`}
+            onClick={() => setGoogleTerms(v => !v)}
+            data-testid="google-terms-row"
+          >
+            <div className={`w-6 h-6 rounded-lg shrink-0 flex items-center justify-center mt-0.5 transition-all ${googleTerms ? "bg-yellow-400" : "bg-gray-100 border border-gray-300"}`}>
+              {googleTerms && <svg viewBox="0 0 24 24" className="w-4 h-4"><polyline points="20 6 9 17 4 12" stroke="black" strokeWidth="3" fill="none" strokeLinecap="round"/></svg>}
+            </div>
+            <p className="text-sm text-gray-600 leading-relaxed">
+              I agree to the <strong>Terms & Conditions</strong> and acknowledge GY Rides' POPIA compliance policy.
+            </p>
+          </div>
+
+          <button
+            onClick={handleGoogleComplete}
+            disabled={googleCompleting}
+            className="w-full h-14 rounded-2xl bg-black text-yellow-400 font-black text-base disabled:opacity-50"
+            data-testid="btn-google-complete"
+          >
+            {googleCompleting ? "Creating your account..." : "Get Started →"}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (user) {
     return (
@@ -580,7 +744,7 @@ export default function Home() {
 
             <div className="flex gap-3">
               {googleReady ? (
-                <div ref={googleBtnRef} className="flex-1 h-12 rounded-2xl overflow-hidden" data-testid="btn-google-signin" />
+                <div ref={el => { if (el && el !== googleBtnRef) { setGoogleBtnRef(el); setGoogleBtnRendered(false); } }} className="flex-1 h-12 rounded-2xl overflow-hidden" data-testid="btn-google-signin" />
               ) : (
                 <button
                   className="flex-1 h-12 rounded-2xl flex items-center justify-center gap-2 font-bold text-sm bg-white text-gray-800 hover:bg-gray-100 transition-colors opacity-50"
