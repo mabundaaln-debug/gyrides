@@ -1825,25 +1825,62 @@ export default function RiderApp() {
           </div>
 
           {driver && (
-            <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
-              <Avatar className="h-12 w-12 border-2 border-yellow-400">
-                <AvatarFallback className="bg-yellow-400 text-black font-bold text-lg">{driver.fullName[0]}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <h3 className="font-bold">{driver.fullName}</h3>
-                  {driver.isVerified && <BadgeCheck className="h-4 w-4 text-blue-500" />}
+            <div className="pb-4 border-b border-gray-100">
+              <div className="flex items-center gap-4">
+                {/* Driver photo — large and prominent */}
+                <div className="relative shrink-0">
+                  <Avatar className="h-20 w-20 border-[3px] border-yellow-400 shadow-md">
+                    {(driver.profilePhotoDoc || driver.avatarUrl) && (
+                      <AvatarImage
+                        src={driver.profilePhotoDoc || driver.avatarUrl || ""}
+                        alt={driver.fullName}
+                        className="object-cover"
+                      />
+                    )}
+                    <AvatarFallback className="bg-yellow-400 text-black font-black text-3xl">
+                      {driver.fullName[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  {driver.isVerified && (
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center border-2 border-white shadow">
+                      <BadgeCheck className="h-3.5 w-3.5 text-white" />
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center text-xs text-gray-500 gap-1">
-                  <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                  <span className="font-medium text-black">{driver.rating?.toFixed(1)}</span>
-                  · {driver.vehicleColor} {driver.vehicleModel} · {driver.licensePlate}
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <h3 className="font-black text-base">{driver.fullName}</h3>
+                  </div>
+                  <div className="flex items-center text-sm gap-1 mb-1">
+                    <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+                    <span className="font-bold text-black">{driver.rating?.toFixed(1)}</span>
+                    <span className="text-gray-400">· {driver.totalTrips} trips</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs bg-gray-100 text-gray-700 font-bold px-2 py-0.5 rounded-lg">{driver.vehicleColor} {driver.vehicleMake} {driver.vehicleModel}</span>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1 font-bold tracking-wider">{driver.licensePlate}</div>
+                </div>
+
+                <div className="flex flex-col gap-2 shrink-0">
+                  <button className="w-10 h-10 bg-green-100 rounded-2xl flex items-center justify-center" data-testid="btn-call-driver">
+                    <Phone className="h-4 w-4 text-green-700" />
+                  </button>
+                  <button onClick={() => setShowChat(true)} className="w-10 h-10 bg-yellow-100 rounded-2xl flex items-center justify-center" data-testid="btn-chat-driver">
+                    <MessageCircle className="h-4 w-4 text-yellow-700" />
+                  </button>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <button className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center" data-testid="btn-call-driver"><Phone className="h-4 w-4 text-green-700" /></button>
-                <button onClick={() => setShowChat(true)} className="w-9 h-9 bg-yellow-100 rounded-full flex items-center justify-center" data-testid="btn-chat-driver"><MessageCircle className="h-4 w-4 text-yellow-700" /></button>
-              </div>
+
+              {/* Vehicle category badge */}
+              {(driver as any).vehicleCategory && (
+                <div className="mt-3">
+                  <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${(driver as any).vehicleCategory === "xl" ? "bg-purple-100 text-purple-700" : (driver as any).vehicleCategory === "premium" ? "bg-yellow-100 text-yellow-700" : "bg-blue-100 text-blue-700"}`} data-testid="tracking-driver-category">
+                    {(driver as any).vehicleCategory === "xl" ? "GY XL" : (driver as any).vehicleCategory === "premium" ? "GY Premium" : "GY Standard"}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
