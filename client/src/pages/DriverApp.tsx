@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
-import { MapPin, DollarSign, Star, Check, X, Menu, LogOut, Navigation, Car, Clock, TrendingUp, User, ChevronLeft, History, Phone, MessageCircle, AlertTriangle, Shield, ExternalLink, BadgeCheck, Heart, Package, Users, Bus, Upload, Banknote, FileText } from "lucide-react";
+import { MapPin, DollarSign, Star, Check, X, Menu, LogOut, Navigation, Car, Clock, TrendingUp, User, ChevronLeft, History, Phone, MessageCircle, AlertTriangle, Shield, ExternalLink, BadgeCheck, Heart, Package, Users, Bus, Upload, Banknote, FileText, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth";
@@ -25,6 +25,7 @@ export default function DriverApp() {
   const [activeTab, setActiveTab] = useState<"home" | "trips" | "earnings" | "profile">("home");
   const [cashConfirming, setCashConfirming] = useState(false);
   const [cashConfirmed, setCashConfirmed] = useState(false);
+  const [downloadingReceiptId, setDownloadingReceiptId] = useState<string | null>(null);
   const [tripStartedAt, setTripStartedAt] = useState<Date | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [driverGps, setDriverGps] = useState<{ lat: number; lng: number } | null>(null);
@@ -413,44 +414,84 @@ export default function DriverApp() {
 
   // ── Trip History ──
   if (view === "history") {
+    const downloadDriverReceipt = async (tripId: string) => {
+      setDownloadingReceiptId(tripId);
+      try {
+        const receiptData = await getTripReceipt(tripId);
+        await generateReceiptPDF(receiptData);
+        toast({ title: "Receipt downloaded!", description: "Check your downloads folder." });
+      } catch (err: any) {
+        toast({ title: "Download failed", description: err?.message || "Could not generate receipt.", variant: "destructive" });
+      } finally {
+        setDownloadingReceiptId(null);
+      }
+    };
+
     return (
       <div className="min-h-[100dvh] bg-gray-50 flex flex-col">
         <div className="bg-white p-4 flex items-center gap-3 border-b">
           <Button variant="ghost" size="icon" onClick={() => setView("home")} className="rounded-full"><ChevronLeft className="h-6 w-6" /></Button>
           <h1 className="text-xl font-bold">Trip History</h1>
         </div>
-        <div className="flex-1 p-4 space-y-2 overflow-auto pb-20">
+        <div className="flex-1 p-4 space-y-3 overflow-auto pb-20">
           {myTrips.map(trip => {
             const pStatus = (trip as any).paymentStatus || (trip.paymentMethod === "cash" ? "paid" : trip.status === "completed" ? "pending" : null);
             return (
-              <div key={trip.id} className="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500">{trip.createdAt ? new Date(trip.createdAt).toLocaleDateString("en-ZA") : ""}</span>
-                    {trip.rideType && trip.rideType !== "private" && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">{trip.rideType}</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    {trip.status === "completed" && pStatus && (
-                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${pStatus === "paid" ? "bg-green-100 text-green-700" : pStatus === "failed" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
-                        {pStatus === "paid" ? "✓ Paid" : pStatus === "failed" ? "⚠ Failed" : "⏳ Pending"}
+              <div key={trip.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-gray-500">{trip.createdAt ? new Date(trip.createdAt).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : ""}</span>
+                      {trip.rideType && trip.rideType !== "private" && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 capitalize">{trip.rideType}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {trip.status === "completed" && pStatus && (
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${pStatus === "paid" ? "bg-green-100 text-green-700" : pStatus === "failed" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
+                          {pStatus === "paid" ? "✓ Paid" : pStatus === "failed" ? "⚠ Failed" : "⏳ Pending"}
+                        </span>
+                      )}
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${trip.status === "completed" ? "bg-green-100 text-green-700" : trip.status === "cancelled" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
+                        {trip.status}
                       </span>
-                    )}
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${trip.status === "completed" ? "bg-green-100 text-green-700" : trip.status === "cancelled" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
-                      {trip.status}
-                    </span>
+                    </div>
+                  </div>
+                  <div className="space-y-1 mb-2">
+                    <div className="flex items-center gap-2 text-sm"><div className="w-2 h-2 bg-green-500 rounded-full shrink-0" /><span className="font-medium truncate">{trip.pickupName}</span></div>
+                    <div className="flex items-center gap-2 text-sm"><div className="w-2 h-2 bg-black rounded-full shrink-0" /><span className="font-medium truncate">{trip.dropoffName}</span></div>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-gray-500">{trip.vehicleType} · {trip.distance?.toFixed(1)} km · {trip.paymentMethod}</span>
+                    <span className={`text-sm font-bold ${pStatus === "failed" ? "text-red-500 line-through" : ""}`}>R{trip.fare}</span>
                   </div>
                 </div>
-                <div className="font-medium text-sm">{trip.pickupName} → {trip.dropoffName}</div>
-                <div className="flex justify-between items-center mt-1">
-                  <span className="text-[10px] text-gray-500">{trip.vehicleType} · {trip.distance?.toFixed(1)} km · {trip.paymentMethod}</span>
-                  <span className={`text-sm font-bold ${pStatus === "failed" ? "text-red-500 line-through" : ""}`}>R{trip.fare}</span>
-                </div>
+
+                {/* Receipt download — completed trips only */}
+                {trip.status === "completed" && (
+                  <div className="border-t border-gray-100 px-4 py-2.5 flex items-center justify-between bg-gray-50">
+                    <span className="text-xs text-gray-500">Trip receipt</span>
+                    <button
+                      data-testid={`btn-driver-receipt-${trip.id}`}
+                      disabled={downloadingReceiptId === trip.id}
+                      onClick={() => downloadDriverReceipt(trip.id)}
+                      className="flex items-center gap-1.5 text-xs font-bold text-black bg-yellow-400 hover:bg-yellow-300 disabled:opacity-50 px-3 py-1.5 rounded-xl transition-colors active:scale-95"
+                    >
+                      <Download className="h-3 w-3" />
+                      {downloadingReceiptId === trip.id ? "Generating..." : "Download PDF"}
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
-          {myTrips.length === 0 && <div className="text-center py-16 text-gray-400 text-sm">No trips yet</div>}
+          {myTrips.length === 0 && (
+            <div className="text-center py-16 text-gray-400 text-sm">
+              <History className="h-12 w-12 mx-auto mb-4 opacity-40" />
+              <p className="font-medium">No trips yet</p>
+              <p>Completed trips will appear here</p>
+            </div>
+          )}
         </div>
         <BottomNav />
       </div>

@@ -106,6 +106,7 @@ export default function RiderApp() {
   const [tipSubmitting, setTipSubmitting] = useState(false);
   const [pendingBalance, setPendingBalance] = useState(0);
   const [downloadingReceipt, setDownloadingReceipt] = useState(false);
+  const [downloadingReceiptId, setDownloadingReceiptId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -1059,6 +1060,19 @@ export default function RiderApp() {
     );
   }
 
+  const downloadHistoryReceipt = async (tripId: string) => {
+    setDownloadingReceiptId(tripId);
+    try {
+      const receiptData = await getTripReceipt(tripId);
+      await generateReceiptPDF(receiptData);
+      toast({ title: "Receipt downloaded!", description: "Check your downloads folder." });
+    } catch (err: any) {
+      toast({ title: "Download failed", description: err?.message || "Could not generate receipt.", variant: "destructive" });
+    } finally {
+      setDownloadingReceiptId(null);
+    }
+  };
+
   // ── Trip History ──
   if (view === "history") {
     return (
@@ -1075,44 +1089,61 @@ export default function RiderApp() {
               <p className="text-sm">Your completed rides will appear here</p>
             </div>
           ) : tripHistory.map((trip) => (
-            <button
-              key={trip.id}
-              className="w-full text-left bg-white rounded-2xl p-4 shadow-sm border border-gray-100"
-              data-testid={`trip-history-${trip.id}`}
-              onClick={() => {
-                const loc = GIYANI_LOCATIONS.find(l => l.name === trip.dropoffName);
-                if (loc) {
-                  setDropoff(loc);
-                  const pickLoc = GIYANI_LOCATIONS.find(l => l.name === trip.pickupName);
-                  if (pickLoc) setPickup(pickLoc);
-                  setRideType((trip.rideType as RideType) || "private");
-                  setView("confirm");
-                }
-              }}
-            >
-              <div className="flex justify-between items-start mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500">{trip.createdAt ? new Date(trip.createdAt).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : ""}</span>
-                  {trip.rideType && trip.rideType !== "private" && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">{trip.rideType}</span>
-                  )}
+            <div key={trip.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden" data-testid={`trip-history-${trip.id}`}>
+              {/* Main card — tap to re-book */}
+              <button
+                className="w-full text-left p-4"
+                onClick={() => {
+                  const loc = GIYANI_LOCATIONS.find(l => l.name === trip.dropoffName);
+                  if (loc) {
+                    setDropoff(loc);
+                    const pickLoc = GIYANI_LOCATIONS.find(l => l.name === trip.pickupName);
+                    if (pickLoc) setPickup(pickLoc);
+                    setRideType((trip.rideType as RideType) || "private");
+                    setView("confirm");
+                  }
+                }}
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm text-gray-500">{trip.createdAt ? new Date(trip.createdAt).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : ""}</span>
+                    {trip.rideType && trip.rideType !== "private" && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 capitalize">{trip.rideType}</span>
+                    )}
+                  </div>
+                  <span className={`text-xs font-bold px-2 py-1 rounded-full shrink-0 ${trip.status === "completed" ? "bg-green-100 text-green-700" : trip.status === "cancelled" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
+                    {trip.status}
+                  </span>
                 </div>
-                <span className={`text-xs font-bold px-2 py-1 rounded-full ${trip.status === "completed" ? "bg-green-100 text-green-700" : trip.status === "cancelled" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
-                  {trip.status}
-                </span>
-              </div>
-              <div className="space-y-2 mb-3">
-                <div className="flex items-center gap-2 text-sm"><div className="w-2 h-2 bg-green-500 rounded-full" /><span className="font-medium">{trip.pickupName}</span></div>
-                <div className="flex items-center gap-2 text-sm"><div className="w-2 h-2 bg-black rounded-full" /><span className="font-medium">{trip.dropoffName}</span></div>
-              </div>
-              <div className="flex justify-between text-sm items-center">
-                <span className="text-gray-500">{trip.vehicleType} · {trip.distance?.toFixed(1)}km</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold">R{trip.fare}</span>
-                  <RotateCcw className="h-3.5 w-3.5 text-gray-400" />
+                <div className="space-y-1.5 mb-3">
+                  <div className="flex items-center gap-2 text-sm"><div className="w-2 h-2 bg-green-500 rounded-full shrink-0" /><span className="font-medium truncate">{trip.pickupName}</span></div>
+                  <div className="flex items-center gap-2 text-sm"><div className="w-2 h-2 bg-black rounded-full shrink-0" /><span className="font-medium truncate">{trip.dropoffName}</span></div>
                 </div>
-              </div>
-            </button>
+                <div className="flex justify-between text-sm items-center">
+                  <span className="text-gray-500">{trip.vehicleType} · {trip.distance?.toFixed(1)} km · {trip.paymentMethod}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold">R{trip.fare}</span>
+                    <RotateCcw className="h-3.5 w-3.5 text-gray-400" />
+                  </div>
+                </div>
+              </button>
+
+              {/* Receipt download — only for completed trips */}
+              {trip.status === "completed" && (
+                <div className="border-t border-gray-100 px-4 py-2.5 flex items-center justify-between bg-gray-50">
+                  <span className="text-xs text-gray-500">Receipt available</span>
+                  <button
+                    data-testid={`btn-receipt-${trip.id}`}
+                    disabled={downloadingReceiptId === trip.id}
+                    onClick={() => downloadHistoryReceipt(trip.id)}
+                    className="flex items-center gap-1.5 text-xs font-bold text-black bg-yellow-400 hover:bg-yellow-300 disabled:opacity-50 px-3 py-1.5 rounded-xl transition-colors active:scale-95"
+                  >
+                    <Download className="h-3 w-3" />
+                    {downloadingReceiptId === trip.id ? "Generating..." : "Download PDF"}
+                  </button>
+                </div>
+              )}
+            </div>
           ))}
         </div>
         <BottomNav />
