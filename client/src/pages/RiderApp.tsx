@@ -112,44 +112,56 @@ export default function RiderApp() {
   // ── Rider GPS tracking refs and state ──
   const riderGpsWatchRef = useRef<number | null>(null);
   const riderLastSentRef = useRef<number>(0);
+  const currentTripRef = useRef<typeof currentTrip>(null);
   const [riderOwnGps, setRiderOwnGps] = useState<{ lat: number; lng: number } | null>(null);
 
-  // ── Track rider GPS while a trip is active ──
+  // Keep ref in sync so GPS callback can read latest trip status without stale closure
+  useEffect(() => { currentTripRef.current = currentTrip; }, [currentTrip]);
+
+  // ── Persistent GPS — starts immediately on login, always live ──
   useEffect(() => {
     if (!user) return;
-    const tripIsActive = currentTrip && ["requested", "accepted", "on_the_way", "arrived", "in_progress"].includes(currentTrip.status ?? "");
+    if (!navigator.geolocation) return;
+    if (riderGpsWatchRef.current !== null) return; // already watching
 
-    if (tripIsActive) {
-      if (riderGpsWatchRef.current !== null) return;
-      if (!navigator.geolocation) return;
+    let firstFix = true;
 
-      riderGpsWatchRef.current = navigator.geolocation.watchPosition(
-        async (pos) => {
-          const { latitude: lat, longitude: lng } = pos.coords;
-          setRiderOwnGps({ lat, lng });
+    riderGpsWatchRef.current = navigator.geolocation.watchPosition(
+      async (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        setRiderOwnGps({ lat, lng });
 
-          const now = Date.now();
-          if (now - riderLastSentRef.current < 5000) return;
-          riderLastSentRef.current = now;
+        // Auto-fill pickup on the very first GPS fix (if none selected yet)
+        if (firstFix) {
+          firstFix = false;
           try {
-            await fetch(`/api/drivers/${user.id}/location`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              credentials: "include",
-              body: JSON.stringify({ lat, lng }),
-            });
-          } catch {}
-        },
-        () => {},
-        { enableHighAccuracy: true, maximumAge: 3000 }
-      );
-    } else {
-      if (riderGpsWatchRef.current !== null) {
-        navigator.geolocation.clearWatch(riderGpsWatchRef.current);
-        riderGpsWatchRef.current = null;
-      }
-      setRiderOwnGps(null);
-    }
+            const res = await fetch(`/api/geocode/reverse?lat=${lat}&lng=${lng}`);
+            const data = await res.json();
+            const name = data.name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+            setPickup(prev => prev ? prev : { name, address: data.address || name, lat, lng, rural: false });
+          } catch {
+            setPickup(prev => prev ? prev : { name: "My location", address: "Current location", lat, lng, rural: false });
+          }
+        }
+
+        // Send location to server only during active trips
+        const now = Date.now();
+        if (now - riderLastSentRef.current < 5000) return;
+        riderLastSentRef.current = now;
+        const tripActive = ["requested", "accepted", "arriving", "in_progress"].includes((currentTripRef.current?.status) ?? "");
+        if (!tripActive) return;
+        try {
+          await fetch(`/api/drivers/${user.id}/location`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ lat, lng }),
+          });
+        } catch {}
+      },
+      (err) => { console.warn("Rider GPS error:", err.message); },
+      { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 }
+    );
 
     return () => {
       if (riderGpsWatchRef.current !== null) {
@@ -157,7 +169,7 @@ export default function RiderApp() {
         riderGpsWatchRef.current = null;
       }
     };
-  }, [currentTrip?.id, currentTrip?.status, user?.id]);
+  }, [user?.id]); // Only re-run if user changes — GPS runs for the whole session
 
   // ── Real-time trip status polling ──
   // Polls every 3s whenever rider has an active trip (searching or tracking)

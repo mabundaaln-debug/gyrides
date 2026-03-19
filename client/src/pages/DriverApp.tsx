@@ -35,63 +35,48 @@ export default function DriverApp() {
   const [pinVerifying, setPinVerifying] = useState(false);
   const gpsWatchRef = useRef<number | null>(null);
   const lastSentRef = useRef<number>(0);
+  const isOnlineRef = useRef<boolean>(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // ── Continuous GPS tracking when online ──
+  // Keep isOnlineRef in sync so the GPS callback always reads the latest value
+  useEffect(() => { isOnlineRef.current = user?.isOnline ?? false; }, [user?.isOnline]);
+
+  // ── Continuous GPS — starts immediately on login, always live ──
+  // Location is sent to server only when driver is online
   useEffect(() => {
     if (!user) return;
+    if (!navigator.geolocation) return;
+    if (gpsWatchRef.current !== null) return; // already watching
 
-    const startGps = () => {
-      if (!navigator.geolocation) return;
-      if (gpsWatchRef.current !== null) return; // already watching
+    gpsWatchRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        setDriverGps({ lat, lng });
 
-      gpsWatchRef.current = navigator.geolocation.watchPosition(
-        (pos) => {
-          const { latitude: lat, longitude: lng } = pos.coords;
-          setDriverGps({ lat, lng });
+        // Only push to server (and show on rider maps) when online
+        if (!isOnlineRef.current) return;
+        const now = Date.now();
+        if (now - lastSentRef.current < 5000) return;
+        lastSentRef.current = now;
+        fetch(`/api/drivers/${user.id}/location`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ lat, lng }),
+        }).catch(() => {});
+      },
+      (err) => { console.warn("Driver GPS error:", err.message); },
+      { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 }
+    );
 
-          // Throttle server updates to max once every 5 seconds
-          const now = Date.now();
-          if (now - lastSentRef.current >= 5000) {
-            lastSentRef.current = now;
-            fetch(`/api/drivers/${user.id}/location`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              credentials: "include",
-              body: JSON.stringify({ lat, lng }),
-            }).catch(() => {});
-          }
-        },
-        (err) => {
-          console.warn("GPS error:", err.message);
-        },
-        {
-          enableHighAccuracy: true,
-          maximumAge: 3000,
-          timeout: 10000,
-        }
-      );
-    };
-
-    const stopGps = () => {
+    return () => {
       if (gpsWatchRef.current !== null) {
         navigator.geolocation.clearWatch(gpsWatchRef.current);
         gpsWatchRef.current = null;
       }
-      setDriverGps(null);
     };
-
-    if (user.isOnline) {
-      startGps();
-    } else {
-      stopGps();
-    }
-
-    return () => {
-      stopGps();
-    };
-  }, [user?.isOnline, user?.id]);
+  }, [user?.id]); // Only re-run if user changes — GPS is always on
 
   // Live elapsed timer when trip is in progress
   useEffect(() => {
