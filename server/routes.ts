@@ -609,10 +609,10 @@ export async function registerRoutes(
     const trips = await storage.getRequestedTrips();
     if (driverCategory && typeof driverCategory === "string") {
       const filtered = trips.filter(t => {
-        const req = (t as any).requestedCategory || "standard";
-        if (driverCategory === "xl") return req === "xl";
-        if (driverCategory === "premium") return req === "premium" || req === "standard";
-        return true; // standard drivers see all
+        const requested = (t as any).requestedCategory || "standard";
+        if (driverCategory === "xl") return true; // xl drivers see all tiers
+        if (driverCategory === "premium") return requested === "standard" || requested === "premium";
+        return requested === "standard"; // standard drivers only see standard trips
       });
       return res.json(filtered);
     }
