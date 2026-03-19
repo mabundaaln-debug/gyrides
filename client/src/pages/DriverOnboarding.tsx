@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { Car, User, FileText, ChevronRight, ChevronLeft, CheckCircle, Clock, XCircle, Upload, Shield, CreditCard, LogOut, MessageCircle, Landmark, Users, Plus, Trash2, Camera, RefreshCw, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -102,8 +102,6 @@ export default function DriverOnboarding() {
   };
 
   const [uploading, setUploading] = useState<string | null>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const handlePhotoUpload = async (file: File) => {
     setUploading("profilePhotoDoc");
@@ -337,25 +335,6 @@ export default function DriverOnboarding() {
                 {profilePhotoDoc && <span className="text-[10px] text-green-600 font-bold ml-auto flex items-center gap-1"><CheckCircle className="h-3 w-3" /> Done</span>}
               </div>
 
-              {/* Hidden inputs */}
-              <input
-                ref={cameraInputRef}
-                type="file"
-                accept="image/*"
-                capture="user"
-                className="hidden"
-                onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); e.target.value = ""; }}
-                data-testid="input-camera-capture"
-              />
-              <input
-                ref={galleryInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); e.target.value = ""; }}
-                data-testid="input-gallery-upload"
-              />
-
               {profilePhotoDoc ? (
                 /* Photo preview */
                 <div className="flex flex-col items-center gap-3">
@@ -372,33 +351,20 @@ export default function DriverOnboarding() {
                   </div>
                   <p className="text-sm font-medium text-gray-700">Looking good! This is what riders will see.</p>
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => cameraInputRef.current?.click()}
-                      disabled={uploading === "profilePhotoDoc"}
-                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black text-yellow-400 text-xs font-bold"
-                      data-testid="btn-retake-camera"
-                    >
+                    <label className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black text-yellow-400 text-xs font-bold cursor-pointer" data-testid="btn-retake-camera">
                       <Camera className="h-3.5 w-3.5" /> Retake
-                    </button>
-                    <button
-                      onClick={() => galleryInputRef.current?.click()}
-                      disabled={uploading === "profilePhotoDoc"}
-                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-100 text-gray-700 text-xs font-bold"
-                      data-testid="btn-choose-gallery"
-                    >
+                      <input type="file" accept="image/*" capture="user" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); e.target.value = ""; }} />
+                    </label>
+                    <label className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-100 text-gray-700 text-xs font-bold cursor-pointer" data-testid="btn-choose-gallery">
                       <ImagePlus className="h-3.5 w-3.5" /> Gallery
-                    </button>
+                      <input type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); e.target.value = ""; }} />
+                    </label>
                   </div>
                 </div>
               ) : (
                 /* Camera capture prompt */
                 <div className="flex flex-col items-center gap-4">
-                  <button
-                    onClick={() => cameraInputRef.current?.click()}
-                    disabled={uploading === "profilePhotoDoc"}
-                    className="w-36 h-36 rounded-full border-4 border-dashed border-yellow-400 bg-yellow-50 flex flex-col items-center justify-center gap-2 transition-colors hover:bg-yellow-100 active:scale-95"
-                    data-testid="btn-take-photo"
-                  >
+                  <label className="w-36 h-36 rounded-full border-4 border-dashed border-yellow-400 bg-yellow-50 flex flex-col items-center justify-center gap-2 transition-colors hover:bg-yellow-100 active:scale-95 cursor-pointer" data-testid="btn-take-photo">
                     {uploading === "profilePhotoDoc" ? (
                       <RefreshCw className="h-10 w-10 text-yellow-500 animate-spin" />
                     ) : (
@@ -407,16 +373,13 @@ export default function DriverOnboarding() {
                         <span className="text-xs font-bold text-yellow-700">Tap to take photo</span>
                       </>
                     )}
-                  </button>
+                    <input type="file" accept="image/*" capture="user" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); e.target.value = ""; }} data-testid="input-camera-capture" />
+                  </label>
                   <p className="text-xs text-gray-500 text-center">Take a clear selfie — face must be visible.<br />Good lighting makes a big difference.</p>
-                  <button
-                    onClick={() => galleryInputRef.current?.click()}
-                    disabled={uploading === "profilePhotoDoc"}
-                    className="flex items-center gap-2 text-xs text-gray-500 font-medium underline"
-                    data-testid="btn-upload-gallery"
-                  >
+                  <label className="flex items-center gap-2 text-xs text-gray-500 font-medium underline cursor-pointer" data-testid="btn-upload-gallery">
                     <ImagePlus className="h-3.5 w-3.5" /> Choose from gallery instead
-                  </button>
+                    <input type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); e.target.value = ""; }} data-testid="input-gallery-upload" />
+                  </label>
                 </div>
               )}
             </div>
@@ -786,7 +749,13 @@ export default function DriverOnboarding() {
         )}
       </div>
 
-      <div className="bg-white border-t border-gray-100 p-4 flex gap-3">
+      <div className="bg-white border-t border-gray-100 p-4 space-y-2">
+        {step === "personal" && !canProceedPersonal && (
+          <p className="text-xs text-center text-amber-600 font-medium">
+            {!profilePhotoDoc ? "📷 Please take your profile photo to continue" : "Please fill in all required fields above"}
+          </p>
+        )}
+        <div className="flex gap-3">
         {stepIndex > 0 && (
           <Button variant="outline" className="h-14 px-6 rounded-2xl" onClick={handleBack}>
             <ChevronLeft className="h-4 w-4 mr-1" /> Back
@@ -817,6 +786,7 @@ export default function DriverOnboarding() {
             Next <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
         )}
+        </div>
       </div>
     </div>
   );
