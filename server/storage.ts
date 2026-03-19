@@ -131,8 +131,19 @@ export class DatabaseStorage implements IStorage {
 
   async updateTrip(id: string, data: Partial<InsertTrip>): Promise<Trip | undefined> {
     const updateData: any = { ...data };
+    // Always set timestamps as proper Date objects on the server — never trust string values from clients
+    if (data.status === "in_progress") {
+      updateData.startedAt = new Date();
+    }
     if (data.status === "completed") {
       updateData.completedAt = new Date();
+    }
+    // Convert any string timestamps that slipped through to Date objects
+    if (updateData.startedAt && typeof updateData.startedAt === "string") {
+      updateData.startedAt = new Date(updateData.startedAt);
+    }
+    if (updateData.completedAt && typeof updateData.completedAt === "string") {
+      updateData.completedAt = new Date(updateData.completedAt);
     }
     const [t] = await db.update(trips).set(updateData).where(eq(trips.id, id)).returning();
     return t;
