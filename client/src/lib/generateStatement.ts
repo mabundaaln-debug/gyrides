@@ -83,10 +83,16 @@ export async function generateStatementPDF(data: StatementData): Promise<void> {
   doc.rect(0, 0, W, 52, "F");
 
   // Logo image (top-left)
+  let logoAdded = false;
   if (logoDataUrl) {
-    doc.addImage(logoDataUrl, "PNG", margin, 4, 40, 40);
-  } else {
-    // Fallback circle logo
+    try {
+      doc.addImage(logoDataUrl, "PNG", margin, 4, 40, 40);
+      logoAdded = true;
+    } catch {
+      logoAdded = false;
+    }
+  }
+  if (!logoAdded) {
     doc.setFillColor(250, 204, 21);
     doc.circle(margin + 10, 26, 10, "F");
     doc.setFont("helvetica", "bold");
