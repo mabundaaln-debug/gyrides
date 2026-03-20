@@ -1,15 +1,18 @@
 {
+  "id": "za.co.mpfunomedical.gyrides",
   "name": "GY Rides",
   "short_name": "GY Rides",
   "description": "Your local ride, anytime. Transport made easy in Giyani, South Africa.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "background_color": "#000000",
   "theme_color": "#000000",
   "orientation": "portrait-primary",
   "categories": ["transportation", "travel"],
   "lang": "en",
+  "dir": "ltr",
   "icons": [
     {
       "src": "/gy-logo-192.png",
@@ -37,5 +40,11 @@
     }
   ],
   "prefer_related_applications": false,
+  "related_applications": [
+    {
+      "platform": "play",
+      "id": "za.co.mpfunomedical.gyrides"
+    }
+  ],
   "screenshots": []
 }

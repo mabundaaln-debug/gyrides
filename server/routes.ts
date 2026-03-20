@@ -73,6 +73,23 @@ export async function registerRoutes(
     res.json({ clientId: process.env.GOOGLE_CLIENT_ID || "" });
   });
 
+  // Digital Asset Links — required for Android TWA / Trusted Web Activity verification
+  // After generating your APK, replace SHA256_FINGERPRINT with the actual cert fingerprint
+  app.get("/.well-known/assetlinks.json", (_req, res) => {
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.json([{
+      relation: ["delegate_permission/common.handle_all_urls"],
+      target: {
+        namespace: "android_app",
+        package_name: "za.co.mpfunomedical.gyrides",
+        sha256_cert_fingerprints: [
+          process.env.ANDROID_SHA256_FINGERPRINT || "REPLACE_WITH_APK_SHA256_FINGERPRINT"
+        ],
+      },
+    }]);
+  });
+
   app.get("/api/route-info", async (req, res) => {
     const { originLat, originLng, destLat, destLng } = req.query;
     if (!originLat || !originLng || !destLat || !destLng) {

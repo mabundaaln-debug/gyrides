@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">GY Rides</string>
+    <string name="title_activity_main">GY Rides</string>
+    <string name="package_name">za.co.mpfunomedical.gyrides</string>
+    <string name="custom_url_scheme">za.co.mpfunomedical.gyrides</string>
+</resources>
