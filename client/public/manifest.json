@@ -21,10 +21,10 @@
       "purpose": "any"
     },
     {
-      "src": "/gy-logo-192.png",
-      "sizes": "180x180",
+      "src": "/gy-logo-maskable.png",
+      "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "maskable"
     },
     {
       "src": "/gy-logo.png",
@@ -37,6 +37,21 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    },
+    {
+      "src": "/gy-logo-192.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/gy-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "GY Rides — Book a ride in Giyani"
     }
   ],
   "prefer_related_applications": false,
@@ -45,6 +60,5 @@
       "platform": "play",
       "id": "za.co.mpfunomedical.gyrides"
     }
-  ],
-  "screenshots": []
+  ]
 }

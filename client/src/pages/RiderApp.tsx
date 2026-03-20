@@ -240,7 +240,12 @@ export default function RiderApp() {
 
     poll();
     const interval = setInterval(poll, 3000);
-    return () => { cancelled = true; clearInterval(interval); };
+
+    // Resume polling immediately on Android foreground restore
+    const onVisible = () => { if (document.visibilityState === "visible") poll(); };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => { cancelled = true; clearInterval(interval); document.removeEventListener("visibilitychange", onVisible); };
   }, [currentTrip?.id, view, rideStatus]);
 
   // ── Wait timer displayed on searching screen ──
@@ -567,9 +572,22 @@ export default function RiderApp() {
     pollDriverLocation();
     const interval = setInterval(pollDriverLocation, 4000);
 
+    // ── Page Visibility API: immediately re-poll when Android screen wakes ──
+    // On Android, background JS timers are throttled/killed. When the rider
+    // unlocks their screen or switches back to the app, the interval may have
+    // missed several ticks. We catch the visibilitychange event and fire an
+    // immediate poll so the map snaps to the driver's real position right away.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        pollDriverLocation();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
     return () => {
       cancelled = true;
       clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [view, rideStatus, currentTrip?.id, assignedDriver?.id]);
 

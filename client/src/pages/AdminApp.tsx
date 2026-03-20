@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { Users, Car, DollarSign, LogOut, ChevronRight, ChevronLeft, Star, MapPin, TrendingUp, Activity, AlertCircle, CheckCircle, Shield, XCircle, FileText, Eye, User as UserIcon, AlertTriangle, Phone, MessageCircle, KeyRound, ShieldCheck, ShieldX, Lock, EyeOff, Clock, Download, BarChart3, Navigation, ClipboardList, Award, Zap, ThumbsUp, ThumbsDown, Banknote, Upload, CheckSquare, Square, ExternalLink, Plus, X, Headphones } from "lucide-react";
+import { Users, Car, DollarSign, LogOut, ChevronRight, ChevronLeft, Star, MapPin, TrendingUp, Activity, AlertCircle, CheckCircle, Shield, XCircle, FileText, Eye, User as UserIcon, AlertTriangle, Phone, MessageCircle, KeyRound, ShieldCheck, ShieldX, Lock, EyeOff, Clock, Download, BarChart3, Navigation, ClipboardList, Award, Zap, ThumbsUp, ThumbsDown, Banknote, Upload, CheckSquare, Square, ExternalLink, Plus, X, Headphones, Smartphone } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -174,7 +174,7 @@ function SosLiveMap({ alert }: { alert: SosAlert }) {
 export default function AdminApp() {
   const { user, logout } = useAuth();
   const [, setLocation] = useLocation();
-  const [view, setView] = useState<"dashboard" | "drivers" | "trips" | "pricing" | "approvals" | "review-driver" | "sos" | "users" | "statements" | "inspect-driver" | "reimbursements" | "verify" | "support">("dashboard");
+  const [view, setView] = useState<"dashboard" | "drivers" | "trips" | "pricing" | "approvals" | "review-driver" | "sos" | "users" | "statements" | "inspect-driver" | "reimbursements" | "verify" | "support" | "apk-guide">("dashboard");
   const [reviewingDriver, setReviewingDriver] = useState<User | null>(null);
   const [inspectingDriver, setInspectingDriver] = useState<User | null>(null);
   const [inspSubmitting, setInspSubmitting] = useState(false);
@@ -1577,6 +1577,120 @@ export default function AdminApp() {
     );
   }
 
+  // ── Android APK / PWABuilder Guide ──
+  if (view === "apk-guide") {
+    const appUrl = typeof window !== "undefined" ? window.location.origin : "https://your-gyrides-app.replit.app";
+    const steps = [
+      {
+        num: 1,
+        title: "Open PWABuilder",
+        body: "Go to pwabuilder.com on a desktop browser. It's free — no account required.",
+        cta: "pwabuilder.com",
+        url: "https://www.pwabuilder.com",
+      },
+      {
+        num: 2,
+        title: "Enter the GY Rides URL",
+        body: `Paste the live app URL into the search bar and click Start.\n\nURL: ${appUrl}`,
+        cta: null,
+        url: null,
+      },
+      {
+        num: 3,
+        title: "Score & Review",
+        body: "PWABuilder will scan the app. GY Rides should score above 130/180. Click Build My PWA.",
+        cta: null,
+        url: null,
+      },
+      {
+        num: 4,
+        title: "Download Android Package",
+        body: "Click the Android card → Download. You'll get a .zip file containing a signed APK and an AAB (Play Store bundle).",
+        cta: null,
+        url: null,
+      },
+      {
+        num: 5,
+        title: "Install on a phone (side-load)",
+        body: "Enable 'Install unknown apps' in Android Settings → Security. Transfer the APK to the phone and tap it to install.",
+        cta: null,
+        url: null,
+      },
+      {
+        num: 6,
+        title: "Publish to Play Store (optional)",
+        body: "Use the AAB file + a Google Play Developer account (once-off $25 fee). Submit via play.google.com/console.",
+        cta: "play.google.com/console",
+        url: "https://play.google.com/console",
+      },
+    ];
+
+    return (
+      <div className="min-h-[100dvh] bg-gray-50 flex flex-col">
+        <div className="bg-black text-white px-4 pt-8 pb-5 rounded-b-3xl">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => setView("dashboard")} className="text-white rounded-full hover:bg-white/20">
+              <ChevronLeft className="h-6 w-6" />
+            </Button>
+            <div>
+              <h1 className="text-xl font-bold">Android APK Guide</h1>
+              <p className="text-xs text-gray-400">Generate an installable Android app — no code needed</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-auto p-4 space-y-3 pb-10">
+          {/* Info banner */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4">
+            <div className="font-bold text-sm text-yellow-900 mb-1">What is PWABuilder?</div>
+            <div className="text-xs text-yellow-800 leading-relaxed">
+              PWABuilder (by Microsoft) wraps GY Rides — a Progressive Web App — into a native Android APK in under 5 minutes. The result is an installable Android app that auto-updates from the live web URL with zero code changes. Free, no developer account required to side-load.
+            </div>
+          </div>
+
+          {/* Steps */}
+          {steps.map(step => (
+            <div key={step.num} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex gap-3">
+              <div className="h-8 w-8 bg-black text-yellow-400 rounded-xl flex items-center justify-center text-sm font-black shrink-0">{step.num}</div>
+              <div className="flex-1">
+                <div className="font-bold text-sm mb-1">{step.title}</div>
+                <div className="text-xs text-gray-600 leading-relaxed whitespace-pre-line">{step.body}</div>
+                {step.cta && step.url && (
+                  <a href={step.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-2 text-xs font-bold text-black underline" data-testid={`link-apk-step-${step.num}`}>
+                    <ExternalLink className="h-3 w-3" /> {step.cta}
+                  </a>
+                )}
+              </div>
+            </div>
+          ))}
+
+          {/* App URL card */}
+          <div className="bg-black text-white rounded-2xl p-4">
+            <div className="text-xs text-gray-400 mb-1">GY Rides Live URL</div>
+            <div className="font-mono text-sm text-yellow-400 break-all" data-testid="text-app-url">{appUrl}</div>
+            <div className="text-[10px] text-gray-500 mt-2">Copy this URL and paste it into PWABuilder (Step 2)</div>
+          </div>
+
+          {/* Tips */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-2">
+            <div className="font-bold text-sm">Tips</div>
+            {[
+              "The APK size will be ~1–2 MB (it's just a wrapper — the real app loads from the web)",
+              "Updates to the app are instant — no APK re-build needed",
+              "If drivers report slow tracking on Android, ensure Location permission is set to 'Allow all the time'",
+              "The PWABuilder-generated APK works on Android 5.0+ (API 21+)",
+            ].map((tip, i) => (
+              <div key={i} className="flex gap-2 text-xs text-gray-600">
+                <span className="text-yellow-500 font-bold shrink-0">•</span>
+                {tip}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ── Support Inbox ──
   if (view === "support") {
     return <SupportChat userId={user.id} userRole="admin" userName={user.fullName} onBack={() => setView("dashboard")} />;
@@ -2255,6 +2369,17 @@ export default function AdminApp() {
           </Button>
 
           <SupportInboxButton onOpen={() => setView("support")} />
+
+          <Button variant="outline" className="w-full justify-between h-14 rounded-xl bg-white border-gray-100 shadow-sm px-4" onClick={() => setView("apk-guide")} data-testid="btn-apk-guide">
+            <div className="flex items-center gap-3">
+              <div className="bg-green-50 p-2 rounded-lg text-green-600"><Smartphone className="h-4 w-4" /></div>
+              <div className="text-left">
+                <div className="font-bold text-sm">Android APK Guide</div>
+                <div className="text-[10px] text-gray-500">Generate a free Android app via PWABuilder</div>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-gray-400" />
+          </Button>
 
           <Button variant="outline" className="w-full justify-between h-14 rounded-xl bg-white border-gray-100 shadow-sm px-4" onClick={() => { setView("verify"); setVerifyResult(null); setVerifyError(""); setVerifyCode(""); }} data-testid="btn-verify-document">
             <div className="flex items-center gap-3">
