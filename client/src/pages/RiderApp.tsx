@@ -12,6 +12,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useWakeLock } from "@/hooks/use-wake-lock";
+import { useGooglePlaces } from "@/hooks/use-google-places";
 import GiyaniMap from "@/components/GiyaniMap";
 import TripChat from "@/components/TripChat";
 import type { Trip, SavedPlace, VehicleType, User as UserType, TaxiRoute } from "@shared/schema";
@@ -116,6 +117,9 @@ export default function RiderApp() {
 
   // ── Wake Lock: only keep screen awake during active trip tracking ──
   useWakeLock(view === "tracking");
+
+  // ── Google Places search ──
+  const { ready: placesReady, searchPlaces } = useGooglePlaces();
 
   // ── Rider GPS tracking refs and state ──
   const riderGpsWatchRef = useRef<number | null>(null);
@@ -699,18 +703,28 @@ export default function RiderApp() {
   const filteredLocations = GIYANI_LOCATIONS.filter(l => l.name.toLowerCase().includes(searchQuery.toLowerCase()) || l.address.toLowerCase().includes(searchQuery.toLowerCase()));
 
   useEffect(() => {
-    if (searchQuery.length < 3) { setLiveSearchResults([]); return; }
+    if (searchQuery.length < 2) { setLiveSearchResults([]); return; }
+    let cancelled = false;
     const timer = setTimeout(async () => {
       setSearchingLive(true);
       try {
-        const res = await fetch(`/api/geocode/search?q=${encodeURIComponent(searchQuery + " Giyani")}`);
-        const data = await res.json();
-        setLiveSearchResults(data);
-      } catch { setLiveSearchResults([]); }
-      setSearchingLive(false);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
+        if (placesReady) {
+          // Google Places JS SDK (uses browser-side key, no CORS issues)
+          const results = await searchPlaces(searchQuery);
+          if (!cancelled) setLiveSearchResults(results.length > 0 ? results : []);
+        } else {
+          // Fallback to server-side text search while SDK loads
+          const res = await fetch(`/api/geocode/search?q=${encodeURIComponent(searchQuery)}`);
+          const data = await res.json();
+          if (!cancelled) setLiveSearchResults(Array.isArray(data) ? data : []);
+        }
+      } catch {
+        if (!cancelled) setLiveSearchResults([]);
+      }
+      if (!cancelled) setSearchingLive(false);
+    }, 300);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [searchQuery, placesReady, searchPlaces]);
 
   const handleBookRide = async () => {
     if (!pickup || !dropoff || !selectedVehicle || !user) return;
@@ -1529,12 +1543,12 @@ export default function RiderApp() {
               </Button>
             ))}
 
-            {searchQuery.length >= 3 && (
+            {searchQuery.length >= 2 && (
               <>
-                {searchingLive && <p className="text-xs text-gray-400 text-center py-3">Searching nearby places...</p>}
+                {searchingLive && <p className="text-xs text-gray-400 text-center py-3">Searching Google Places...</p>}
                 {liveSearchResults.length > 0 && (
                   <>
-                    <p className="text-xs text-gray-500 uppercase font-bold mb-2 px-1 mt-4">Nearby Places</p>
+                    <p className="text-xs text-gray-500 uppercase font-bold mb-2 px-1 mt-4">Google Places</p>
                     {liveSearchResults.map((loc, i) => (
                       <Button key={`live-${i}`} variant="ghost" className="w-full justify-start h-14 rounded-xl gap-3 text-base" onClick={() => {
                         const l = { name: loc.name, address: loc.address, lat: loc.lat, lng: loc.lng, rural: false };

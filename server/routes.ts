@@ -186,18 +186,39 @@ export async function registerRoutes(
     }
   });
 
+  // ── Google Places search (Text Search + bias towards Giyani) ──
   app.get("/api/geocode/search", async (req, res) => {
     const { q } = req.query;
-    if (!q) return res.json([]);
+    if (!q || !(q as string).trim()) return res.json([]);
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) return res.json([]);
+
     try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q as string)}&countrycodes=za&viewbox=30.3,-23.0,31.1,-23.7&bounded=0&limit=8`;
-      const response = await fetch(url, { headers: { "User-Agent": "GYRides/1.0" } });
+      // Google Places Text Search — biased to a 50 km circle around Giyani
+      const query = encodeURIComponent(`${q} Giyani Limpopo South Africa`);
+      const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${query}&location=-23.3058,30.7183&radius=80000&key=${apiKey}`;
+      const response = await fetch(url);
       const data = await response.json();
-      const results = data.map((item: any) => ({
-        name: item.display_name.split(",")[0],
-        address: item.display_name,
-        lat: parseFloat(item.lat),
-        lng: parseFloat(item.lon),
+
+      if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+        // Fallback: try Geocoding API
+        const geoUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent((q as string) + " Giyani South Africa")}&bounds=-23.7,30.3|-23.0,31.1&key=${apiKey}`;
+        const geoRes = await fetch(geoUrl);
+        const geoData = await geoRes.json();
+        const results = (geoData.results || []).slice(0, 8).map((item: any) => ({
+          name: item.address_components?.[0]?.long_name || item.formatted_address.split(",")[0],
+          address: item.formatted_address,
+          lat: item.geometry.location.lat,
+          lng: item.geometry.location.lng,
+        }));
+        return res.json(results);
+      }
+
+      const results = (data.results || []).slice(0, 8).map((item: any) => ({
+        name: item.name,
+        address: item.formatted_address,
+        lat: item.geometry.location.lat,
+        lng: item.geometry.location.lng,
       }));
       return res.json(results);
     } catch {
@@ -205,15 +226,63 @@ export async function registerRoutes(
     }
   });
 
+  // ── Google Places Autocomplete (faster suggestions while typing) ──
+  app.get("/api/geocode/autocomplete", async (req, res) => {
+    const { q } = req.query;
+    if (!q || !(q as string).trim()) return res.json([]);
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) return res.json([]);
+    try {
+      const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(q as string)}&location=-23.3058,30.7183&radius=80000&strictbounds=false&components=country:za&key=${apiKey}`;
+      const response = await fetch(url);
+      const data = await response.json();
+      if (data.status !== "OK") return res.json([]);
+      // Fetch place details for lat/lng
+      const predictions = (data.predictions || []).slice(0, 6);
+      const results = await Promise.all(predictions.map(async (p: any) => {
+        try {
+          const detailUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${p.place_id}&fields=name,formatted_address,geometry&key=${apiKey}`;
+          const detailRes = await fetch(detailUrl);
+          const detail = await detailRes.json();
+          const r = detail.result;
+          if (!r?.geometry?.location) return null;
+          return {
+            name: r.name || p.structured_formatting?.main_text || p.description.split(",")[0],
+            address: r.formatted_address || p.description,
+            lat: r.geometry.location.lat,
+            lng: r.geometry.location.lng,
+          };
+        } catch { return null; }
+      }));
+      return res.json(results.filter(Boolean));
+    } catch {
+      return res.json([]);
+    }
+  });
+
+  // ── Google Geocoding reverse lookup ──
   app.get("/api/geocode/reverse", async (req, res) => {
     const { lat, lng } = req.query;
     if (!lat || !lng) return res.json({ name: "Unknown", address: "Unknown location" });
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     try {
-      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18`;
-      const response = await fetch(url, { headers: { "User-Agent": "GYRides/1.0" } });
-      const data = await response.json();
-      const name = data.address?.road || data.address?.suburb || data.address?.village || data.address?.town || "Dropped Pin";
-      return res.json({ name, address: data.display_name || "Giyani area", lat: parseFloat(data.lat), lng: parseFloat(data.lon) });
+      if (apiKey) {
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        if (data.status === "OK" && data.results?.[0]) {
+          const result = data.results[0];
+          const comps = result.address_components || [];
+          const premise   = comps.find((c: any) => c.types.includes("premise"))?.long_name;
+          const route     = comps.find((c: any) => c.types.includes("route"))?.long_name;
+          const suburb    = comps.find((c: any) => c.types.includes("sublocality") || c.types.includes("neighborhood"))?.long_name;
+          const locality  = comps.find((c: any) => c.types.includes("locality"))?.long_name;
+          const name = premise || route || suburb || locality || "Dropped Pin";
+          return res.json({ name, address: result.formatted_address, lat: parseFloat(lat as string), lng: parseFloat(lng as string) });
+        }
+      }
+      // Fallback if no API key or Google fails
+      return res.json({ name: "Dropped Pin", address: "Giyani area", lat: parseFloat(lat as string), lng: parseFloat(lng as string) });
     } catch {
       return res.json({ name: "Dropped Pin", address: "Giyani area", lat: parseFloat(lat as string), lng: parseFloat(lng as string) });
     }
