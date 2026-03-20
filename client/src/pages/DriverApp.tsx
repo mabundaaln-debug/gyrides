@@ -281,6 +281,14 @@ export default function DriverApp() {
   };
 
   const acceptTrip = async (trip: Trip) => {
+    // Launch navigation immediately — must be before any `await` or browsers block it as a pop-up
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const navDest = `${trip.pickupLat},${trip.pickupLng}`;
+    const navUrl = isIOS
+      ? `maps://maps.apple.com/?daddr=${navDest}&dirflg=d`
+      : `https://www.google.com/maps/dir/?api=1&destination=${navDest}&travelmode=driving`;
+    window.open(navUrl, "_blank");
+
     const updated = await updateTrip(trip.id, { status: "accepted", driverId: user.id });
     setOnTrip(updated);
     setTripPhase("arriving");
@@ -310,6 +318,15 @@ export default function DriverApp() {
         if (!tripIsParcel && !pinVerified) {
           toast({ title: "PIN required", description: "Enter the rider's 4-digit Trip PIN first.", variant: "destructive" });
           return;
+        }
+        // Launch navigation to dropoff immediately (before await — keeps user gesture context)
+        if (onTrip.dropoffLat && onTrip.dropoffLng) {
+          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+          const dest = `${onTrip.dropoffLat},${onTrip.dropoffLng}`;
+          const navUrl = isIOS
+            ? `maps://maps.apple.com/?daddr=${dest}&dirflg=d`
+            : `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving`;
+          window.open(navUrl, "_blank");
         }
         const now = new Date().toISOString();
         await updateTrip(onTrip.id, { status: "in_progress", startedAt: now });
