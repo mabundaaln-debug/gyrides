@@ -260,32 +260,28 @@ export async function registerRoutes(
     }
   });
 
-  // ── Google Geocoding reverse lookup ──
+  // ── Reverse geocoding (Photon/OSM — no referrer restrictions) ──
   app.get("/api/geocode/reverse", async (req, res) => {
     const { lat, lng } = req.query;
     if (!lat || !lng) return res.json({ name: "Unknown", address: "Unknown location" });
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    const latNum = parseFloat(lat as string);
+    const lngNum = parseFloat(lng as string);
     try {
-      if (apiKey) {
-        const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`;
-        const response = await fetch(url);
+      // Photon reverse geocoding — free, no key, no referrer restrictions
+      const photonUrl = `https://photon.komoot.io/reverse?lat=${latNum}&lon=${lngNum}&limit=1`;
+      const response = await fetch(photonUrl, { headers: { "User-Agent": "GYRides/1.0" } });
+      if (response.ok) {
         const data = await response.json();
-        if (data.status === "OK" && data.results?.[0]) {
-          const result = data.results[0];
-          const comps = result.address_components || [];
-          const premise   = comps.find((c: any) => c.types.includes("premise"))?.long_name;
-          const route     = comps.find((c: any) => c.types.includes("route"))?.long_name;
-          const suburb    = comps.find((c: any) => c.types.includes("sublocality") || c.types.includes("neighborhood"))?.long_name;
-          const locality  = comps.find((c: any) => c.types.includes("locality"))?.long_name;
-          const name = premise || route || suburb || locality || "Dropped Pin";
-          return res.json({ name, address: result.formatted_address, lat: parseFloat(lat as string), lng: parseFloat(lng as string) });
+        const feat = data?.features?.[0];
+        if (feat?.properties) {
+          const p = feat.properties;
+          const name = p.name || p.street || p.suburb || p.city || "Dropped Pin";
+          const addrParts = [p.street, p.housenumber, p.suburb, p.city, p.state].filter(Boolean);
+          return res.json({ name, address: addrParts.join(", ") || name, lat: latNum, lng: lngNum });
         }
       }
-      // Fallback if no API key or Google fails
-      return res.json({ name: "Dropped Pin", address: "Giyani area", lat: parseFloat(lat as string), lng: parseFloat(lng as string) });
-    } catch {
-      return res.json({ name: "Dropped Pin", address: "Giyani area", lat: parseFloat(lat as string), lng: parseFloat(lng as string) });
-    }
+    } catch { /* fall through */ }
+    return res.json({ name: "Dropped Pin", address: "Giyani area", lat: latNum, lng: lngNum });
   });
 
   // ── Public config ──

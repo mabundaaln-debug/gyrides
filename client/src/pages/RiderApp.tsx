@@ -118,8 +118,8 @@ export default function RiderApp() {
   // ── Wake Lock: only keep screen awake during active trip tracking ──
   useWakeLock(view === "tracking");
 
-  // ── Google Places search ──
-  const { ready: placesReady, searchPlaces } = useGooglePlaces();
+  // ── Google Places (with Photon fallback) ──
+  const { searchPlaces } = useGooglePlaces();
 
   // ── Rider GPS tracking refs and state ──
   const riderGpsWatchRef = useRef<number | null>(null);
@@ -708,23 +708,15 @@ export default function RiderApp() {
     const timer = setTimeout(async () => {
       setSearchingLive(true);
       try {
-        if (placesReady) {
-          // Google Places JS SDK (uses browser-side key, no CORS issues)
-          const results = await searchPlaces(searchQuery);
-          if (!cancelled) setLiveSearchResults(results.length > 0 ? results : []);
-        } else {
-          // Fallback to server-side text search while SDK loads
-          const res = await fetch(`/api/geocode/search?q=${encodeURIComponent(searchQuery)}`);
-          const data = await res.json();
-          if (!cancelled) setLiveSearchResults(Array.isArray(data) ? data : []);
-        }
+        const results = await searchPlaces(searchQuery);
+        if (!cancelled) setLiveSearchResults(results);
       } catch {
         if (!cancelled) setLiveSearchResults([]);
       }
       if (!cancelled) setSearchingLive(false);
     }, 300);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [searchQuery, placesReady, searchPlaces]);
+  }, [searchQuery, searchPlaces]);
 
   const handleBookRide = async () => {
     if (!pickup || !dropoff || !selectedVehicle || !user) return;
