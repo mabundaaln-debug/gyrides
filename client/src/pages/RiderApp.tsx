@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
-import { MapPin, Search, Clock, CreditCard, ChevronLeft, Star, Home as HomeIcon, Briefcase, ShoppingBag, User, History, BookmarkPlus, Car, LogOut, Menu, X, Navigation, Share2, Crosshair, Phone, MessageCircle, Shield, AlertTriangle, Edit2, Tag, StickyNote, RotateCcw, Download, Users, Package, Heart, Bus, Banknote, Wallet, Upload, CheckCircle, UserPlus, Minus, Plus, BadgeCheck, LocateFixed } from "lucide-react";
+import { MapPin, Search, Clock, CreditCard, ChevronLeft, Star, Home as HomeIcon, Briefcase, ShoppingBag, User, History, BookmarkPlus, Car, LogOut, Menu, X, Navigation, Share2, Crosshair, Phone, MessageCircle, Shield, AlertTriangle, Edit2, Tag, StickyNote, RotateCcw, Download, Users, Package, Heart, Bus, Banknote, Wallet, Upload, CheckCircle, Check, UserPlus, Minus, Plus, BadgeCheck, LocateFixed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -95,6 +95,7 @@ export default function RiderApp() {
   const [driverPos, setDriverPos] = useState<{ lat: number; lng: number } | null>(null);
   const [tripEta, setTripEta] = useState<number | null>(null);
   const [tripStartTime, setTripStartTime] = useState<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [searchWaitSecs, setSearchWaitSecs] = useState(0);
   const searchStartRef = useRef<number | null>(null);
   const [yocoPublicKey, setYocoPublicKey] = useState("");
@@ -248,6 +249,19 @@ export default function RiderApp() {
     return () => clearInterval(interval);
   }, [view]);
 
+  // ── Live elapsed timer during in_progress ──
+  useEffect(() => {
+    if (rideStatus !== "in_progress") { setElapsedSeconds(0); return; }
+    const interval = setInterval(() => setElapsedSeconds(s => s + 1), 1000);
+    return () => clearInterval(interval);
+  }, [rideStatus]);
+
+  const formatElapsed = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+  };
+
   const useCurrentLocation = useCallback((target: "pickup" | "dropoff") => {
     if (!navigator.geolocation) {
       toast({ title: "Not supported", description: "GPS is not available on this device", variant: "destructive" });
@@ -300,6 +314,78 @@ export default function RiderApp() {
       setLocation("/");
     }
   }, [user]);
+
+  // ── Resume active trip on login / page reload ──
+  // If the rider has a non-completed trip (from a previous session), pick it up automatically
+  useEffect(() => {
+    if (!user?.id || currentTrip || view !== "home") return;
+    let cancelled = false;
+    const resume = async () => {
+      try {
+        const res = await fetch(`/api/trips/rider/${user.id}`, { credentials: "include" });
+        if (!res.ok || cancelled) return;
+        const trips: Trip[] = await res.json();
+        const active = trips.find(t =>
+          ["requested", "accepted", "arriving", "in_progress"].includes(t.status)
+        );
+        if (!active || cancelled) return;
+        setCurrentTrip(active);
+        // Map DB status → rideStatus
+        if (active.status === "requested") {
+          setRideStatus("searching");
+          setView("searching");
+        } else if (active.status === "accepted") {
+          setRideStatus("on_the_way");
+          setView("tracking");
+          if (active.driverId) {
+            try {
+              const dRes = await fetch(`/api/users/${active.driverId}`, { credentials: "include" });
+              const driver = await dRes.json();
+              if (!cancelled) {
+                setAssignedDriver(driver);
+                if (driver.currentLat && driver.currentLng) {
+                  setDriverPos({ lat: driver.currentLat, lng: driver.currentLng });
+                }
+              }
+            } catch {}
+          }
+          if ((active as any).tripPin) setTripPin((active as any).tripPin);
+          toast({ title: "Trip resumed", description: "Your driver is on the way." });
+        } else if (active.status === "arriving") {
+          setRideStatus("arrived");
+          setView("tracking");
+          if (active.driverId) {
+            try {
+              const dRes = await fetch(`/api/users/${active.driverId}`, { credentials: "include" });
+              const driver = await dRes.json();
+              if (!cancelled) setAssignedDriver(driver);
+            } catch {}
+          }
+          if ((active as any).tripPin) setTripPin((active as any).tripPin);
+          toast({ title: "Driver has arrived!", description: "Your driver is at the pickup point." });
+        } else if (active.status === "in_progress") {
+          setRideStatus("in_progress");
+          setView("tracking");
+          setTripStartTime(prev => prev ?? Date.now());
+          if (active.driverId) {
+            try {
+              const dRes = await fetch(`/api/users/${active.driverId}`, { credentials: "include" });
+              const driver = await dRes.json();
+              if (!cancelled) {
+                setAssignedDriver(driver);
+                if (driver.currentLat && driver.currentLng) {
+                  setDriverPos({ lat: driver.currentLat, lng: driver.currentLng });
+                }
+              }
+            } catch {}
+          }
+          toast({ title: "Trip in progress", description: "You're on your way!" });
+        }
+      } catch {}
+    };
+    resume();
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   // Load Yoco SDK, public key and pending balance
   useEffect(() => {
@@ -1789,6 +1875,53 @@ export default function RiderApp() {
         </div>
 
         <div className="bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.08)] p-5 space-y-4">
+
+          {/* ── Trip progress stepper ── */}
+          <div className="flex items-center" data-testid="trip-progress-stepper">
+            {[
+              { key: "on_the_way", label: "On the way" },
+              { key: "arrived",    label: "At pickup" },
+              { key: "in_progress", label: "Riding" },
+            ].map((step, i, arr) => {
+              const statusOrder: Record<string, number> = { on_the_way: 0, arrived: 1, in_progress: 2 };
+              const cur = statusOrder[rideStatus] ?? 0;
+              const done = i < cur;
+              const active = i === cur;
+              return (
+                <div key={step.key} className={`flex items-center ${i < arr.length - 1 ? "flex-1" : ""}`}>
+                  <div className="flex flex-col items-center gap-1">
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${done ? "bg-green-500 text-white" : active ? "bg-black text-yellow-400" : "bg-gray-100 text-gray-400"}`}>
+                      {done ? <Check className="h-3.5 w-3.5" /> : <span>{i + 1}</span>}
+                    </div>
+                    <span className={`text-[9px] font-semibold whitespace-nowrap ${active ? "text-black" : done ? "text-green-600" : "text-gray-400"}`}>{step.label}</span>
+                  </div>
+                  {i < arr.length - 1 && (
+                    <div className={`flex-1 h-0.5 mb-3.5 mx-1.5 transition-all ${done ? "bg-green-500" : "bg-gray-200"}`} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── In-progress live banner ── */}
+          {rideStatus === "in_progress" && (
+            <div className="bg-black rounded-2xl px-4 py-3 flex items-center justify-between" data-testid="inprogress-banner">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-yellow-400 rounded-xl flex items-center justify-center shrink-0">
+                  <Navigation className="h-5 w-5 text-black" />
+                </div>
+                <div>
+                  <p className="text-white text-sm font-bold">Trip in progress</p>
+                  <p className="text-gray-400 text-[11px]">Heading to {currentTrip?.dropoffName}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-yellow-400 font-black text-lg tabular-nums" data-testid="elapsed-time">{formatElapsed(elapsedSeconds)}</p>
+                <p className="text-gray-500 text-[10px]">elapsed</p>
+              </div>
+            </div>
+          )}
+
           {tripPin && (
             <div className="bg-black rounded-2xl px-4 py-3" data-testid="trip-pin-card">
               <div className="flex items-center justify-between mb-1">
@@ -1936,21 +2069,84 @@ export default function RiderApp() {
 
   // ── Trip Completed ──
   if (view === "completed") {
+    const isCash = currentTrip?.paymentMethod === "cash";
+    const isCard = currentTrip?.paymentMethod === "card";
+    const isPaid = currentTrip?.paymentStatus === "paid" || cardCharged;
+    const fare = currentTrip?.fare ?? 0;
+
     return (
-      <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center p-6">
-        <div className="w-full max-w-sm">
-          <div className="text-center mb-8">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Navigation className="h-10 w-10 text-green-600" />
+      <div className="min-h-[100dvh] bg-white flex flex-col p-6 overflow-y-auto">
+        <div className="w-full max-w-sm mx-auto">
+
+          {/* ── Payment section — top and prominent ── */}
+          <div className="mb-6">
+            {/* Arrival celebration header */}
+            <div className="text-center mb-5">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Navigation className="h-8 w-8 text-green-600" />
+              </div>
+              <h2 className="text-2xl font-bold mb-0.5">
+                {currentTrip?.rideType === "parcel" ? "Parcel Delivered!" : currentTrip?.rideType === "medical" ? "Medical Trip Complete!" : "You've arrived!"}
+              </h2>
+              <p className="text-gray-500 text-sm">
+                {currentTrip?.rideType === "parcel" ? "Your parcel has been delivered safely" : `Welcome to ${currentTrip?.dropoffName}`}
+              </p>
             </div>
-            <h2 className="text-2xl font-bold mb-1">
-              {currentTrip?.rideType === "parcel" ? "Parcel Delivered!" : currentTrip?.rideType === "medical" ? "Medical Trip Complete!" : "Trip Complete!"}
-            </h2>
-            <p className="text-gray-500">
-              {currentTrip?.rideType === "parcel" ? "Your parcel has been delivered" : "You've arrived at your destination"}
-            </p>
+
+            {/* Big payment card */}
+            {isCash && !isPaid && (
+              <div className="bg-black rounded-3xl p-5 text-center mb-4" data-testid="payment-due-card">
+                <p className="text-yellow-400 text-xs font-bold uppercase tracking-widest mb-1">Amount due</p>
+                <p className="text-white text-5xl font-black mb-1" data-testid="fare-amount">R{fare}</p>
+                <p className="text-gray-400 text-sm mb-4">Pay this amount in cash to your driver</p>
+                <div className="flex items-center justify-center gap-2 bg-yellow-400 rounded-2xl py-3 px-4">
+                  <Banknote className="h-5 w-5 text-black" />
+                  <span className="text-black font-bold text-base">Pay R{fare} cash to driver</span>
+                </div>
+              </div>
+            )}
+
+            {isCash && isPaid && (
+              <div className="bg-green-50 border-2 border-green-200 rounded-3xl p-5 text-center mb-4" data-testid="payment-confirmed-card">
+                <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-2" />
+                <p className="text-green-700 font-black text-xl mb-0.5">R{fare} paid</p>
+                <p className="text-green-600 text-sm">Cash payment confirmed by driver</p>
+              </div>
+            )}
+
+            {isCard && !isPaid && (
+              <div className="mb-4">
+                <div className="bg-black rounded-3xl p-5 text-center mb-3" data-testid="payment-due-card">
+                  <p className="text-yellow-400 text-xs font-bold uppercase tracking-widest mb-1">Amount due</p>
+                  <p className="text-white text-5xl font-black mb-1" data-testid="fare-amount">R{fare}</p>
+                  <p className="text-gray-400 text-sm">Pay with your card now</p>
+                </div>
+                <button
+                  className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-base flex items-center justify-center gap-2 transition-colors"
+                  data-testid="btn-pay-yoco"
+                  onClick={() => {
+                    if (!currentTrip) return;
+                    handleYocoVerify(currentTrip.fare || 0, () => {
+                      if (currentTrip?.id) updateTrip(currentTrip.id, { paymentStatus: "paid" as any }).catch(() => {});
+                    }, currentTrip?.id);
+                  }}
+                >
+                  <CreditCard className="h-5 w-5" />
+                  Pay R{fare} with Yoco
+                </button>
+              </div>
+            )}
+
+            {isCard && isPaid && (
+              <div className="bg-green-50 border-2 border-green-200 rounded-3xl p-5 text-center mb-4" data-testid="payment-confirmed-card">
+                <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-2" />
+                <p className="text-green-700 font-black text-xl mb-0.5">R{fare} paid by card</p>
+                <p className="text-green-600 text-sm">Payment confirmed</p>
+              </div>
+            )}
           </div>
 
+          {/* ── Trip summary ── */}
           <div className="bg-gray-50 rounded-2xl p-5 mb-6 space-y-3">
             <div className="flex justify-between text-sm"><span className="text-gray-500">From</span><span className="font-medium">{currentTrip?.pickupName}</span></div>
             <div className="flex justify-between text-sm"><span className="text-gray-500">To</span><span className="font-medium">{currentTrip?.dropoffName}</span></div>
@@ -1959,48 +2155,12 @@ export default function RiderApp() {
             {currentTrip?.rideType && currentTrip.rideType !== "private" && (
               <div className="flex justify-between text-sm"><span className="text-gray-500">Type</span><span className="font-medium capitalize">{currentTrip.rideType}</span></div>
             )}
-            <div className="flex justify-between text-sm border-t pt-3 border-gray-200"><span className="text-gray-500">Fare</span><span className="text-xl font-bold">R{currentTrip?.fare}</span></div>
+            <div className="flex justify-between text-sm border-t pt-3 border-gray-200"><span className="text-gray-500">Fare</span><span className="text-xl font-bold">R{fare}</span></div>
             <div className="flex justify-between text-sm items-center">
               <span className="text-gray-500">Payment</span>
               <span className="font-medium text-green-600 capitalize">{currentTrip?.paymentMethod === "card" ? "Yoco (card)" : currentTrip?.paymentMethod || "Cash"}</span>
             </div>
           </div>
-
-          {currentTrip?.paymentMethod === "cash" && (
-            currentTrip?.paymentStatus === "paid" ? (
-              <div className="w-full h-14 rounded-2xl bg-green-50 border border-green-200 flex items-center justify-center gap-2 mb-4">
-                <CheckCircle className="h-5 w-5 text-green-600" />
-                <span className="font-bold text-green-700">R{currentTrip?.fare} cash confirmed by driver</span>
-              </div>
-            ) : (
-              <div className="w-full h-14 rounded-2xl bg-yellow-50 border border-yellow-300 flex items-center justify-center gap-2 mb-4">
-                <Banknote className="h-5 w-5 text-yellow-700" />
-                <span className="font-bold text-yellow-800">Awaiting driver cash confirmation</span>
-              </div>
-            )
-          )}
-
-          {currentTrip?.paymentMethod === "card" && (
-            cardCharged ? (
-              <div className="w-full h-14 rounded-2xl bg-green-50 border border-green-200 flex items-center justify-center gap-2 mb-4">
-                <CheckCircle className="h-5 w-5 text-green-600" />
-                <span className="font-bold text-green-700">R{currentTrip?.fare} paid by card</span>
-              </div>
-            ) : (
-              <button
-                className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-base flex items-center justify-center gap-2 mb-4 transition-colors"
-                data-testid="btn-pay-yoco"
-                onClick={() => {
-                  handleYocoVerify(currentTrip.fare || 0, () => {
-                    if (currentTrip?.id) updateTrip(currentTrip.id, { paymentStatus: "paid" as any }).catch(() => {});
-                  }, currentTrip?.id);
-                }}
-              >
-                <CreditCard className="h-5 w-5" />
-                Pay R{currentTrip?.fare} with Yoco
-              </button>
-            )
-          )}
 
           {assignedDriver && (
             <div className="mb-6">
