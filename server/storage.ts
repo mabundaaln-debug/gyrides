@@ -1,7 +1,7 @@
 import { eq, desc, and, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
-  users, trips, savedPlaces, vehicleTypes, taxiRoutes, messages, sosAlerts, passwordResetRequests, webauthnCredentials, vehicleInspections,
+  users, trips, savedPlaces, vehicleTypes, taxiRoutes, messages, sosAlerts, passwordResetRequests, webauthnCredentials, vehicleInspections, driverReimbursements,
   type User, type InsertUser,
   type Trip, type InsertTrip,
   type SavedPlace, type InsertSavedPlace,
@@ -12,6 +12,7 @@ import {
   type PasswordResetRequest, type InsertPasswordResetRequest,
   type WebauthnCredential, type InsertWebauthnCredential,
   type VehicleInspection, type InsertVehicleInspection,
+  type DriverReimbursement, type InsertDriverReimbursement,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -74,6 +75,11 @@ export interface IStorage {
   getInspectionsByDriver(driverId: string): Promise<VehicleInspection[]>;
   getLatestInspection(driverId: string): Promise<VehicleInspection | undefined>;
   getOnlineDriversByCategory(category?: string): Promise<User[]>;
+
+  createReimbursement(data: InsertDriverReimbursement): Promise<DriverReimbursement>;
+  getReimbursements(): Promise<DriverReimbursement[]>;
+  getReimbursementsByDriver(driverId: string): Promise<DriverReimbursement[]>;
+  updateReimbursement(id: string, data: Partial<DriverReimbursement>): Promise<DriverReimbursement | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -334,6 +340,24 @@ export class DatabaseStorage implements IStorage {
       return db.select().from(users).where(and(base, sql`${users.vehicleCategory} IN ('premium','xl')`));
     }
     return db.select().from(users).where(base);
+  }
+
+  async createReimbursement(data: InsertDriverReimbursement): Promise<DriverReimbursement> {
+    const [r] = await db.insert(driverReimbursements).values(data).returning();
+    return r;
+  }
+
+  async getReimbursements(): Promise<DriverReimbursement[]> {
+    return db.select().from(driverReimbursements).orderBy(desc(driverReimbursements.createdAt));
+  }
+
+  async getReimbursementsByDriver(driverId: string): Promise<DriverReimbursement[]> {
+    return db.select().from(driverReimbursements).where(eq(driverReimbursements.driverId, driverId)).orderBy(desc(driverReimbursements.createdAt));
+  }
+
+  async updateReimbursement(id: string, data: Partial<DriverReimbursement>): Promise<DriverReimbursement | undefined> {
+    const [r] = await db.update(driverReimbursements).set(data as any).where(eq(driverReimbursements.id, id)).returning();
+    return r;
   }
 }
 

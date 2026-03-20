@@ -937,6 +937,58 @@ export async function registerRoutes(
     }
   });
 
+  // ── Driver Reimbursements ──
+  app.get("/api/admin/reimbursements", async (req, res) => {
+    try {
+      const { driverId } = req.query as { driverId?: string };
+      const records = driverId
+        ? await storage.getReimbursementsByDriver(driverId)
+        : await storage.getReimbursements();
+      return res.json(records);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/admin/reimbursements", async (req, res) => {
+    try {
+      const { driverId, amount, period, notes, createdByAdminId } = req.body;
+      if (!driverId || !amount || !period) return res.status(400).json({ message: "driverId, amount and period are required" });
+      const r = await storage.createReimbursement({ driverId, amount: parseFloat(amount), period, notes: notes || null, status: "pending", proofOfPaymentUrl: null, createdByAdminId: createdByAdminId || null });
+      return res.status(201).json(r);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/admin/reimbursements/:id", async (req, res) => {
+    try {
+      const { status, notes, proofOfPaymentUrl } = req.body;
+      const update: any = {};
+      if (status !== undefined) update.status = status;
+      if (notes !== undefined) update.notes = notes;
+      if (proofOfPaymentUrl !== undefined) update.proofOfPaymentUrl = proofOfPaymentUrl;
+      if (status === "reimbursed") update.reimbursedAt = new Date();
+      const r = await storage.updateReimbursement(req.params.id, update);
+      if (!r) return res.status(404).json({ message: "Reimbursement not found" });
+      return res.json(r);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/admin/reimbursements/:id/proof", docUpload.single("proof"), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+      const fileUrl = `/uploads/${req.file.filename}`;
+      const r = await storage.updateReimbursement(req.params.id, { proofOfPaymentUrl: fileUrl });
+      if (!r) return res.status(404).json({ message: "Reimbursement not found" });
+      return res.json(r);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── Messages ──
   app.get("/api/messages/:tripId", async (req, res) => {
     const msgs = await storage.getMessagesByTrip(req.params.tripId);

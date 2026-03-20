@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { Users, Car, DollarSign, LogOut, ChevronRight, ChevronLeft, Star, MapPin, TrendingUp, Activity, AlertCircle, CheckCircle, Shield, XCircle, FileText, Eye, User as UserIcon, AlertTriangle, Phone, MessageCircle, KeyRound, ShieldCheck, ShieldX, Lock, EyeOff, Clock, Download, BarChart3, Navigation, ClipboardList, Award, Zap, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Users, Car, DollarSign, LogOut, ChevronRight, ChevronLeft, Star, MapPin, TrendingUp, Activity, AlertCircle, CheckCircle, Shield, XCircle, FileText, Eye, User as UserIcon, AlertTriangle, Phone, MessageCircle, KeyRound, ShieldCheck, ShieldX, Lock, EyeOff, Clock, Download, BarChart3, Navigation, ClipboardList, Award, Zap, ThumbsUp, ThumbsDown, Banknote, Upload, CheckSquare, Square, ExternalLink, Plus, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -12,7 +12,7 @@ import { generateStatementPDF } from "@/lib/generateStatement";
 import { useToast } from "@/hooks/use-toast";
 import TripChat from "@/components/TripChat";
 import GiyaniMap from "@/components/GiyaniMap";
-import type { User, Trip, VehicleType, SosAlert } from "@shared/schema";
+import type { User, Trip, VehicleType, SosAlert, DriverReimbursement } from "@shared/schema";
 
 // ── Live location map for an SOS alert ──
 function SosLiveMap({ alert }: { alert: SosAlert }) {
@@ -133,7 +133,7 @@ function SosLiveMap({ alert }: { alert: SosAlert }) {
 export default function AdminApp() {
   const { user, logout } = useAuth();
   const [, setLocation] = useLocation();
-  const [view, setView] = useState<"dashboard" | "drivers" | "trips" | "pricing" | "approvals" | "review-driver" | "sos" | "users" | "statements" | "inspect-driver">("dashboard");
+  const [view, setView] = useState<"dashboard" | "drivers" | "trips" | "pricing" | "approvals" | "review-driver" | "sos" | "users" | "statements" | "inspect-driver" | "reimbursements">("dashboard");
   const [reviewingDriver, setReviewingDriver] = useState<User | null>(null);
   const [inspectingDriver, setInspectingDriver] = useState<User | null>(null);
   const [inspSubmitting, setInspSubmitting] = useState(false);
@@ -171,6 +171,18 @@ export default function AdminApp() {
   const [stmtYear, setStmtYear] = useState(() => new Date().getFullYear());
   const [stmtData, setStmtData] = useState<any>(null);
   const [stmtLoading, setStmtLoading] = useState(false);
+
+  // Reimbursements state
+  const [rmbDriverFilter, setRmbDriverFilter] = useState("");
+  const [rmbNewAmount, setRmbNewAmount] = useState("");
+  const [rmbNewPeriod, setRmbNewPeriod] = useState(() => { const n = new Date(); return `${n.toLocaleString("default", { month: "long" })} ${n.getFullYear()}`; });
+  const [rmbNewDriver, setRmbNewDriver] = useState("");
+  const [rmbNewNotes, setRmbNewNotes] = useState("");
+  const [rmbCreating, setRmbCreating] = useState(false);
+  const [rmbShowCreate, setRmbShowCreate] = useState(false);
+  const [rmbUploadingId, setRmbUploadingId] = useState<string | null>(null);
+  const [rmbMarkingId, setRmbMarkingId] = useState<string | null>(null);
+
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -224,6 +236,12 @@ export default function AdminApp() {
     queryKey: ["/api/password-reset-requests/pending"],
     queryFn: getQueryFn({ on401: "throw" }),
     refetchInterval: 10000,
+  });
+
+  const { data: reimbursements = [] } = useQuery<DriverReimbursement[]>({
+    queryKey: ["/api/admin/reimbursements"],
+    queryFn: getQueryFn({ on401: "throw" }),
+    refetchInterval: 30000,
   });
 
   const activeSosAlerts = sosAlerts.filter(a => a.status === "active" || a.status === "acknowledged");
@@ -1488,6 +1506,348 @@ export default function AdminApp() {
     );
   }
 
+  // ── Reimbursements ──
+  if (view === "reimbursements") {
+    const approvedDrivers = drivers.filter(d => d.approvalStatus === "approved");
+    const filtered = rmbDriverFilter
+      ? reimbursements.filter(r => r.driverId === rmbDriverFilter)
+      : reimbursements;
+
+    const pendingTotal = reimbursements.filter(r => r.status === "pending").reduce((s, r) => s + r.amount, 0);
+    const reimbursedTotal = reimbursements.filter(r => r.status === "reimbursed").reduce((s, r) => s + r.amount, 0);
+
+    const driverName = (id: string) => {
+      const d = drivers.find(d => d.id === id);
+      return d?.fullName || "Unknown Driver";
+    };
+
+    const handleCreate = async () => {
+      if (!rmbNewDriver || !rmbNewAmount || !rmbNewPeriod) {
+        toast({ title: "Please fill in driver, amount, and period", variant: "destructive" });
+        return;
+      }
+      setRmbCreating(true);
+      try {
+        const res = await fetch("/api/admin/reimbursements", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ driverId: rmbNewDriver, amount: parseFloat(rmbNewAmount), period: rmbNewPeriod, notes: rmbNewNotes || null, createdByAdminId: user.id }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        toast({ title: "Reimbursement record created" });
+        setRmbNewAmount(""); setRmbNewNotes(""); setRmbShowCreate(false);
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/reimbursements"] });
+      } catch (err: any) {
+        toast({ title: "Failed to create", description: err.message, variant: "destructive" });
+      } finally {
+        setRmbCreating(false);
+      }
+    };
+
+    const handleMarkReimbursed = async (id: string, current: string) => {
+      const newStatus = current === "reimbursed" ? "pending" : "reimbursed";
+      setRmbMarkingId(id);
+      try {
+        const res = await fetch(`/api/admin/reimbursements/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ status: newStatus }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        toast({ title: newStatus === "reimbursed" ? "Marked as reimbursed ✓" : "Marked as pending" });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/reimbursements"] });
+      } catch (err: any) {
+        toast({ title: "Update failed", description: err.message, variant: "destructive" });
+      } finally {
+        setRmbMarkingId(null);
+      }
+    };
+
+    const handleUploadProof = async (id: string, file: File) => {
+      setRmbUploadingId(id);
+      try {
+        const fd = new FormData();
+        fd.append("proof", file);
+        const res = await fetch(`/api/admin/reimbursements/${id}/proof`, {
+          method: "POST",
+          credentials: "include",
+          body: fd,
+        });
+        if (!res.ok) throw new Error(await res.text());
+        toast({ title: "Proof of payment uploaded ✓" });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/reimbursements"] });
+      } catch (err: any) {
+        toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+      } finally {
+        setRmbUploadingId(null);
+      }
+    };
+
+    return (
+      <div className="min-h-[100dvh] bg-gray-50 flex flex-col">
+        {/* Header */}
+        <div className="bg-black text-white px-4 pt-8 pb-5 rounded-b-3xl">
+          <div className="flex items-center gap-3 mb-4">
+            <Button variant="ghost" size="icon" onClick={() => setView("dashboard")} className="text-white rounded-full hover:bg-white/20"><ChevronLeft className="h-6 w-6" /></Button>
+            <div>
+              <h1 className="text-xl font-bold">Driver Reimbursements</h1>
+              <p className="text-xs text-gray-400">Track bank transfers to drivers</p>
+            </div>
+          </div>
+          {/* Summary cards */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white/10 rounded-2xl p-3">
+              <div className="text-xs text-yellow-400 font-bold mb-1">PENDING PAYOUT</div>
+              <div className="text-2xl font-black text-yellow-400">R{pendingTotal.toFixed(2)}</div>
+              <div className="text-[10px] text-gray-400">{reimbursements.filter(r => r.status === "pending").length} record{reimbursements.filter(r => r.status === "pending").length !== 1 ? "s" : ""}</div>
+            </div>
+            <div className="bg-white/10 rounded-2xl p-3">
+              <div className="text-xs text-green-400 font-bold mb-1">TOTAL PAID OUT</div>
+              <div className="text-2xl font-black text-green-400">R{reimbursedTotal.toFixed(2)}</div>
+              <div className="text-[10px] text-gray-400">{reimbursements.filter(r => r.status === "reimbursed").length} completed</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 p-4 space-y-4 overflow-auto pb-24">
+          {/* Controls */}
+          <div className="flex items-center gap-2">
+            <select
+              value={rmbDriverFilter}
+              onChange={e => setRmbDriverFilter(e.target.value)}
+              className="flex-1 h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm"
+              data-testid="select-rmb-driver-filter"
+            >
+              <option value="">All Drivers</option>
+              {approvedDrivers.map(d => <option key={d.id} value={d.id}>{d.fullName}</option>)}
+            </select>
+            <Button
+              size="sm"
+              className="bg-black text-white rounded-xl h-10 px-4 gap-1.5"
+              onClick={() => setRmbShowCreate(v => !v)}
+              data-testid="btn-rmb-create-toggle"
+            >
+              {rmbShowCreate ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              {rmbShowCreate ? "Cancel" : "New"}
+            </Button>
+          </div>
+
+          {/* Create form */}
+          {rmbShowCreate && (
+            <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm space-y-3">
+              <h3 className="font-bold text-sm">Create Reimbursement Record</h3>
+              <select
+                value={rmbNewDriver}
+                onChange={e => setRmbNewDriver(e.target.value)}
+                className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm"
+                data-testid="select-rmb-new-driver"
+              >
+                <option value="">Select driver…</option>
+                {approvedDrivers.map(d => <option key={d.id} value={d.id}>{d.fullName}</option>)}
+              </select>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] text-gray-500 font-medium">Amount (R)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={rmbNewAmount}
+                    onChange={e => setRmbNewAmount(e.target.value)}
+                    className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm mt-1"
+                    data-testid="input-rmb-amount"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-gray-500 font-medium">Period</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. March 2026"
+                    value={rmbNewPeriod}
+                    onChange={e => setRmbNewPeriod(e.target.value)}
+                    className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm mt-1"
+                    data-testid="input-rmb-period"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-[11px] text-gray-500 font-medium">Notes (optional)</label>
+                <input
+                  type="text"
+                  placeholder="Reference number, bank, etc."
+                  value={rmbNewNotes}
+                  onChange={e => setRmbNewNotes(e.target.value)}
+                  className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm mt-1"
+                  data-testid="input-rmb-notes"
+                />
+              </div>
+              <Button
+                className="w-full bg-black text-white rounded-xl h-11 font-bold"
+                onClick={handleCreate}
+                disabled={rmbCreating}
+                data-testid="btn-rmb-create-submit"
+              >
+                {rmbCreating ? "Creating…" : "Create Record"}
+              </Button>
+            </div>
+          )}
+
+          {/* Per-driver owed summary */}
+          {!rmbDriverFilter && (() => {
+            const pendingByDriver = approvedDrivers
+              .map(d => ({ driver: d, amount: reimbursements.filter(r => r.driverId === d.id && r.status === "pending").reduce((s, r) => s + r.amount, 0) }))
+              .filter(x => x.amount > 0)
+              .sort((a, b) => b.amount - a.amount);
+            if (pendingByDriver.length === 0) return null;
+            return (
+              <div className="bg-white rounded-2xl border border-yellow-200 shadow-sm overflow-hidden">
+                <div className="bg-yellow-50 px-4 py-2.5 border-b border-yellow-100">
+                  <h3 className="font-bold text-sm text-yellow-800">Outstanding Amounts Owed</h3>
+                </div>
+                {pendingByDriver.map(({ driver, amount }) => (
+                  <div key={driver.id} className="flex items-center justify-between px-4 py-3 border-b border-gray-50 last:border-0"
+                    onClick={() => setRmbDriverFilter(driver.id)} data-testid={`rmb-owed-${driver.id}`}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-600">
+                        {driver.fullName.charAt(0)}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-sm">{driver.fullName}</div>
+                        <div className="text-[10px] text-gray-400">{reimbursements.filter(r => r.driverId === driver.id && r.status === "pending").length} pending</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-black text-yellow-600">R{amount.toFixed(2)}</div>
+                      <ChevronRight className="h-3.5 w-3.5 text-gray-400 ml-auto" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* Records list */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-bold text-sm text-gray-700">
+                {rmbDriverFilter ? `${driverName(rmbDriverFilter)} — Records` : "All Records"}
+                <span className="text-gray-400 font-normal ml-1">({filtered.length})</span>
+              </h3>
+              {rmbDriverFilter && (
+                <button onClick={() => setRmbDriverFilter("")} className="text-xs text-blue-600 underline">Show all</button>
+              )}
+            </div>
+
+            {filtered.length === 0 ? (
+              <div className="bg-white rounded-2xl p-8 text-center text-gray-400 text-sm border border-gray-100">
+                No reimbursement records{rmbDriverFilter ? " for this driver" : ""} yet.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filtered.map(r => {
+                  const isPending = r.status === "pending";
+                  return (
+                    <div key={r.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${isPending ? "border-yellow-200" : "border-green-200"}`} data-testid={`rmb-card-${r.id}`}>
+                      {/* Status stripe */}
+                      <div className={`h-1 w-full ${isPending ? "bg-yellow-400" : "bg-green-500"}`} />
+
+                      <div className="p-4">
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <div>
+                            <div className="font-bold text-base">R{r.amount.toFixed(2)}</div>
+                            <div className="text-xs text-gray-500">{r.period} · {driverName(r.driverId)}</div>
+                            {r.notes && <div className="text-xs text-gray-400 mt-0.5 italic">"{r.notes}"</div>}
+                            <div className="text-[10px] text-gray-300 mt-0.5">Created {r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-ZA") : "—"}</div>
+                          </div>
+                          <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${isPending ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"}`}>
+                            {isPending ? "PENDING" : "REIMBURSED"}
+                          </span>
+                        </div>
+
+                        {/* Reimbursed timestamp */}
+                        {!isPending && r.reimbursedAt && (
+                          <div className="text-xs text-green-600 font-medium mb-3">
+                            ✓ Paid on {new Date(r.reimbursedAt).toLocaleDateString("en-ZA", { day: "2-digit", month: "short", year: "numeric" })}
+                          </div>
+                        )}
+
+                        {/* Proof of payment */}
+                        <div className="border border-gray-100 rounded-xl p-3 mb-3 bg-gray-50">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-bold text-gray-600">Proof of Payment</span>
+                            {r.proofOfPaymentUrl && (
+                              <a
+                                href={r.proofOfPaymentUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-xs text-blue-600 font-medium"
+                                data-testid={`rmb-proof-view-${r.id}`}
+                              >
+                                <ExternalLink className="h-3 w-3" /> View
+                              </a>
+                            )}
+                          </div>
+                          {r.proofOfPaymentUrl ? (
+                            <div className="text-xs text-green-600 font-medium flex items-center gap-1">
+                              <CheckCircle className="h-3.5 w-3.5" /> Document uploaded
+                            </div>
+                          ) : (
+                            <div className="text-xs text-gray-400 mb-2">No proof uploaded yet</div>
+                          )}
+                          <label className="cursor-pointer" data-testid={`rmb-proof-upload-${r.id}`}>
+                            <input
+                              type="file"
+                              accept="image/*,application/pdf"
+                              className="hidden"
+                              disabled={rmbUploadingId === r.id}
+                              onChange={e => {
+                                const file = e.target.files?.[0];
+                                if (file) handleUploadProof(r.id, file);
+                                e.target.value = "";
+                              }}
+                            />
+                            <div className={`flex items-center justify-center gap-2 h-9 rounded-lg border-2 border-dashed text-xs font-medium transition-colors ${
+                              rmbUploadingId === r.id ? "border-gray-200 text-gray-300" : "border-gray-300 text-gray-500 hover:border-blue-400 hover:text-blue-600"
+                            }`}>
+                              <Upload className="h-3.5 w-3.5" />
+                              {rmbUploadingId === r.id ? "Uploading…" : r.proofOfPaymentUrl ? "Replace proof" : "Upload proof (image or PDF)"}
+                            </div>
+                          </label>
+                        </div>
+
+                        {/* Mark reimbursed toggle */}
+                        <Button
+                          variant="outline"
+                          className={`w-full h-11 rounded-xl font-bold text-sm gap-2 ${
+                            !isPending ? "bg-green-50 border-green-300 text-green-700 hover:bg-green-100" : "border-gray-200 text-gray-700 hover:bg-gray-50"
+                          }`}
+                          disabled={rmbMarkingId === r.id}
+                          onClick={() => handleMarkReimbursed(r.id, r.status)}
+                          data-testid={`btn-rmb-mark-${r.id}`}
+                        >
+                          {rmbMarkingId === r.id ? (
+                            "Updating…"
+                          ) : !isPending ? (
+                            <><CheckSquare className="h-4.5 w-4.5" /> Mark as Pending (undo)</>
+                          ) : (
+                            <><Square className="h-4.5 w-4.5" /> Mark as Reimbursed</>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ── Dashboard ──
   return (
     <div className="min-h-[100dvh] bg-gray-50 flex flex-col">
@@ -1681,10 +2041,28 @@ export default function AdminApp() {
               <div className="bg-yellow-50 p-2 rounded-lg text-yellow-600"><BarChart3 className="h-4 w-4" /></div>
               <div className="text-left">
                 <div className="font-bold text-sm">Driver Statements</div>
-                <div className="text-[10px] text-gray-500">Monthly earnings & reimbursements</div>
+                <div className="text-[10px] text-gray-500">Monthly earnings & PDF export</div>
               </div>
             </div>
             <ChevronRight className="h-4 w-4 text-gray-400" />
+          </Button>
+
+          <Button variant="outline" className="w-full justify-between h-14 rounded-xl bg-white border-gray-100 shadow-sm px-4" onClick={() => { setView("reimbursements"); queryClient.invalidateQueries({ queryKey: ["/api/admin/reimbursements"] }); }} data-testid="btn-manage-reimbursements">
+            <div className="flex items-center gap-3">
+              <div className="bg-green-50 p-2 rounded-lg text-green-600"><Banknote className="h-4 w-4" /></div>
+              <div className="text-left">
+                <div className="font-bold text-sm">Reimbursements</div>
+                <div className="text-[10px] text-gray-500">Track bank transfers & proof of payment</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              {reimbursements.filter(r => r.status === "pending").length > 0 && (
+                <span className="bg-yellow-400 text-black text-[10px] font-black px-2 py-0.5 rounded-full">
+                  R{reimbursements.filter(r => r.status === "pending").reduce((s, r) => s + r.amount, 0).toFixed(0)} owed
+                </span>
+              )}
+              <ChevronRight className="h-4 w-4 text-gray-400" />
+            </div>
           </Button>
 
           <Button variant="outline" className="w-full justify-between h-14 rounded-xl bg-white border-gray-100 shadow-sm px-4" onClick={() => setView("users")} data-testid="btn-manage-users">

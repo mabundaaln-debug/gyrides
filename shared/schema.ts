@@ -207,6 +207,25 @@ export const insertPasswordResetRequestSchema = createInsertSchema(passwordReset
 export type InsertPasswordResetRequest = z.infer<typeof insertPasswordResetRequestSchema>;
 export type PasswordResetRequest = typeof passwordResetRequests.$inferSelect;
 
+export const reimbursementStatusEnum = pgEnum("reimbursement_status", ["pending", "reimbursed"]);
+
+export const driverReimbursements = pgTable("driver_reimbursements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  driverId: varchar("driver_id").notNull().references(() => users.id),
+  amount: real("amount").notNull(),
+  period: text("period").notNull(),
+  notes: text("notes"),
+  status: reimbursementStatusEnum("status").notNull().default("pending"),
+  proofOfPaymentUrl: text("proof_of_payment_url"),
+  createdByAdminId: varchar("created_by_admin_id").references(() => users.id),
+  reimbursedAt: timestamp("reimbursed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDriverReimbursementSchema = createInsertSchema(driverReimbursements).omit({ id: true, createdAt: true, reimbursedAt: true });
+export type InsertDriverReimbursement = z.infer<typeof insertDriverReimbursementSchema>;
+export type DriverReimbursement = typeof driverReimbursements.$inferSelect;
+
 export const vehicleInspections = pgTable("vehicle_inspections", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   driverId: varchar("driver_id").notNull().references(() => users.id),
