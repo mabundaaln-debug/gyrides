@@ -83,6 +83,7 @@ export async function generateReceiptPDF(data: ReceiptData): Promise<void> {
   doc.text("GY Rides — A Division of Mpfuno Medical Services (PTY) LTD", margin + 43, 34);
 
   // Receipt label right side
+  const receiptCode = `GYR-${trip.id.slice(-8).toUpperCase()}`;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(250, 204, 21);
@@ -90,7 +91,7 @@ export async function generateReceiptPDF(data: ReceiptData): Promise<void> {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(180, 180, 180);
-  doc.text(`#${trip.id.slice(-8).toUpperCase()}`, W - margin, 26, { align: "right" });
+  doc.text(receiptCode, W - margin, 26, { align: "right" });
 
   const tripDate = trip.completedAt || trip.createdAt;
   const dateStr = tripDate ? new Date(tripDate).toLocaleDateString("en-ZA", { day: "2-digit", month: "short", year: "numeric" }) : new Date().toLocaleDateString("en-ZA");
@@ -248,6 +249,23 @@ export async function generateReceiptPDF(data: ReceiptData): Promise<void> {
   }
 
   y += 38;
+
+  // ── Verification Code Box ──
+  if (y > 240) { doc.addPage(); y = 16; }
+  doc.setFillColor(0, 0, 0);
+  doc.roundedRect(margin, y, W - margin * 2, 22, 3, 3, "F");
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(150, 150, 150);
+  doc.text("DOCUMENT VERIFICATION CODE", margin + 5, y + 6);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(250, 204, 21);
+  doc.text(receiptCode, margin + 5, y + 16);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(120, 120, 120);
+  doc.text("Admin can verify this receipt at gyrides.com/admin → Verify Document", W - margin - 5, y + 16, { align: "right" });
 
   // ── Footer ──
   doc.setFillColor(0, 0, 0);

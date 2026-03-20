@@ -39,6 +39,7 @@ interface StatementData {
     cashTrips: number;
     cardTrips: number;
   };
+  verificationCode?: string;
 }
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -61,7 +62,7 @@ async function fetchLogoBase64(): Promise<string | null> {
 
 export async function generateStatementPDF(data: StatementData): Promise<void> {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  const { driver, month, year, trips, summary } = data;
+  const { driver, month, year, trips, summary, verificationCode } = data;
   const W = 210;
   const margin = 16;
   let y = 0;
@@ -317,6 +318,26 @@ export async function generateStatementPDF(data: StatementData): Promise<void> {
   const decl = `This statement confirms that ${driver.fullName} completed ${summary.completedTrips} trip${summary.completedTrips !== 1 ? "s" : ""} during ${MONTH_NAMES[month - 1]} ${year} on the GY Rides platform, generating gross fares of R ${summary.totalFare.toFixed(2)}. After deducting the platform commission of R ${summary.platformFee.toFixed(2)} (15%), the net driver payout is R ${summary.driverPayout.toFixed(2)} (85%).`;
   const declLines = doc.splitTextToSize(decl, W - margin * 2 - 10);
   doc.text(declLines, margin + 5, y + 16);
+
+  // ── Verification Code Box ──
+  if (verificationCode) {
+    y += 10;
+    if (y > 240) { doc.addPage(); y = 16; }
+    doc.setFillColor(0, 0, 0);
+    doc.roundedRect(margin, y, W - margin * 2, 22, 3, 3, "F");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(150, 150, 150);
+    doc.text("DOCUMENT VERIFICATION CODE", margin + 5, y + 6);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(250, 204, 21);
+    doc.text(verificationCode, margin + 5, y + 16);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(120, 120, 120);
+    doc.text("Admin can verify this statement at gyrides.com/admin → Verify Document", W - margin - 5, y + 16, { align: "right" });
+  }
 
   // ── Footer ──
   const pageCount = (doc as any).internal.pages.length - 1;

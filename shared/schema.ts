@@ -226,6 +226,25 @@ export const insertDriverReimbursementSchema = createInsertSchema(driverReimburs
 export type InsertDriverReimbursement = z.infer<typeof insertDriverReimbursementSchema>;
 export type DriverReimbursement = typeof driverReimbursements.$inferSelect;
 
+export const issuedStatements = pgTable("issued_statements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  verificationCode: text("verification_code").notNull().unique(),
+  driverId: varchar("driver_id").notNull().references(() => users.id),
+  driverName: text("driver_name").notNull(),
+  month: integer("month").notNull(),
+  year: integer("year").notNull(),
+  period: text("period").notNull(),
+  totalFare: real("total_fare").notNull(),
+  driverPayout: real("driver_payout").notNull(),
+  completedTrips: integer("completed_trips").notNull(),
+  issuedByAdminId: varchar("issued_by_admin_id").references(() => users.id),
+  issuedAt: timestamp("issued_at").defaultNow(),
+});
+
+export const insertIssuedStatementSchema = createInsertSchema(issuedStatements).omit({ id: true, issuedAt: true });
+export type InsertIssuedStatement = z.infer<typeof insertIssuedStatementSchema>;
+export type IssuedStatement = typeof issuedStatements.$inferSelect;
+
 export const vehicleInspections = pgTable("vehicle_inspections", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   driverId: varchar("driver_id").notNull().references(() => users.id),

@@ -1,7 +1,7 @@
 import { eq, desc, and, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
-  users, trips, savedPlaces, vehicleTypes, taxiRoutes, messages, sosAlerts, passwordResetRequests, webauthnCredentials, vehicleInspections, driverReimbursements,
+  users, trips, savedPlaces, vehicleTypes, taxiRoutes, messages, sosAlerts, passwordResetRequests, webauthnCredentials, vehicleInspections, driverReimbursements, issuedStatements,
   type User, type InsertUser,
   type Trip, type InsertTrip,
   type SavedPlace, type InsertSavedPlace,
@@ -13,6 +13,7 @@ import {
   type WebauthnCredential, type InsertWebauthnCredential,
   type VehicleInspection, type InsertVehicleInspection,
   type DriverReimbursement, type InsertDriverReimbursement,
+  type IssuedStatement, type InsertIssuedStatement,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -80,6 +81,10 @@ export interface IStorage {
   getReimbursements(): Promise<DriverReimbursement[]>;
   getReimbursementsByDriver(driverId: string): Promise<DriverReimbursement[]>;
   updateReimbursement(id: string, data: Partial<DriverReimbursement>): Promise<DriverReimbursement | undefined>;
+
+  createIssuedStatement(data: InsertIssuedStatement): Promise<IssuedStatement>;
+  getIssuedStatementByCode(code: string): Promise<IssuedStatement | undefined>;
+  getTripByCodeSuffix(suffix: string): Promise<Trip | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -358,6 +363,22 @@ export class DatabaseStorage implements IStorage {
   async updateReimbursement(id: string, data: Partial<DriverReimbursement>): Promise<DriverReimbursement | undefined> {
     const [r] = await db.update(driverReimbursements).set(data as any).where(eq(driverReimbursements.id, id)).returning();
     return r;
+  }
+
+  async createIssuedStatement(data: InsertIssuedStatement): Promise<IssuedStatement> {
+    const [r] = await db.insert(issuedStatements).values(data).returning();
+    return r;
+  }
+
+  async getIssuedStatementByCode(code: string): Promise<IssuedStatement | undefined> {
+    const [r] = await db.select().from(issuedStatements).where(eq(issuedStatements.verificationCode, code));
+    return r;
+  }
+
+  async getTripByCodeSuffix(suffix: string): Promise<Trip | undefined> {
+    const lower = suffix.toLowerCase();
+    const allTrips = await db.select().from(trips);
+    return allTrips.find(t => t.id.replace(/-/g, "").toLowerCase().endsWith(lower));
   }
 }
 

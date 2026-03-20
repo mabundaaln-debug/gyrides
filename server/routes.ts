@@ -937,6 +937,73 @@ export async function registerRoutes(
     }
   });
 
+  // ── Document Verification ──
+  // Issue a statement record and return a verification code
+  app.post("/api/admin/issue-statement", async (req, res) => {
+    try {
+      const { driverId, driverName, month, year, period, totalFare, driverPayout, completedTrips, issuedByAdminId } = req.body;
+      if (!driverId || !month || !year || !period) return res.status(400).json({ message: "driverId, month, year, period required" });
+      const code = "GYS-" + crypto.randomBytes(4).toString("hex").toUpperCase();
+      const stmt = await storage.createIssuedStatement({
+        verificationCode: code,
+        driverId,
+        driverName: driverName || "Driver",
+        month: parseInt(month),
+        year: parseInt(year),
+        period,
+        totalFare: parseFloat(totalFare) || 0,
+        driverPayout: parseFloat(driverPayout) || 0,
+        completedTrips: parseInt(completedTrips) || 0,
+        issuedByAdminId: issuedByAdminId || null,
+      });
+      return res.json(stmt);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Verify a document code (receipt or statement)
+  app.get("/api/admin/verify", async (req, res) => {
+    try {
+      const { code } = req.query as { code: string };
+      if (!code) return res.status(400).json({ message: "code is required" });
+      const upperCode = code.trim().toUpperCase();
+
+      if (upperCode.startsWith("GYR-")) {
+        const suffix = upperCode.slice(4).toLowerCase();
+        const trip = await storage.getTripByCodeSuffix(suffix);
+        if (!trip) return res.status(404).json({ message: "Receipt not found" });
+        const rider = trip.riderId ? await storage.getUser(trip.riderId) : null;
+        const driver = trip.driverId ? await storage.getUser(trip.driverId) : null;
+        return res.json({
+          type: "receipt",
+          code: upperCode,
+          trip,
+          riderName: rider?.fullName || "Unknown",
+          driverName: driver?.fullName || "Unknown",
+          valid: true,
+        });
+      }
+
+      if (upperCode.startsWith("GYS-")) {
+        const stmt = await storage.getIssuedStatementByCode(upperCode);
+        if (!stmt) return res.status(404).json({ message: "Statement not found" });
+        const driver = await storage.getUser(stmt.driverId);
+        return res.json({
+          type: "statement",
+          code: upperCode,
+          statement: stmt,
+          driver,
+          valid: true,
+        });
+      }
+
+      return res.status(400).json({ message: "Invalid code format. Must start with GYR- (receipt) or GYS- (statement)." });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── Driver Reimbursements ──
   app.get("/api/admin/reimbursements", async (req, res) => {
     try {

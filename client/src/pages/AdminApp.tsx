@@ -133,7 +133,7 @@ function SosLiveMap({ alert }: { alert: SosAlert }) {
 export default function AdminApp() {
   const { user, logout } = useAuth();
   const [, setLocation] = useLocation();
-  const [view, setView] = useState<"dashboard" | "drivers" | "trips" | "pricing" | "approvals" | "review-driver" | "sos" | "users" | "statements" | "inspect-driver" | "reimbursements">("dashboard");
+  const [view, setView] = useState<"dashboard" | "drivers" | "trips" | "pricing" | "approvals" | "review-driver" | "sos" | "users" | "statements" | "inspect-driver" | "reimbursements" | "verify">("dashboard");
   const [reviewingDriver, setReviewingDriver] = useState<User | null>(null);
   const [inspectingDriver, setInspectingDriver] = useState<User | null>(null);
   const [inspSubmitting, setInspSubmitting] = useState(false);
@@ -182,6 +182,12 @@ export default function AdminApp() {
   const [rmbShowCreate, setRmbShowCreate] = useState(false);
   const [rmbUploadingId, setRmbUploadingId] = useState<string | null>(null);
   const [rmbMarkingId, setRmbMarkingId] = useState<string | null>(null);
+
+  // Verify document state
+  const [verifyCode, setVerifyCode] = useState("");
+  const [verifyResult, setVerifyResult] = useState<any>(null);
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [verifyError, setVerifyError] = useState("");
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -1339,7 +1345,31 @@ export default function AdminApp() {
     const handleDownload = async () => {
       if (!stmtData) return;
       try {
-        await generateStatementPDF(stmtData);
+        // Register the statement to get a unique verification code
+        let verificationCode: string | undefined;
+        try {
+          const issueRes = await fetch("/api/admin/issue-statement", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              driverId: stmtDriverId,
+              driverName: stmtData.driver.fullName,
+              month: stmtMonth,
+              year: stmtYear,
+              period: `${MONTH_NAMES[stmtMonth - 1]} ${stmtYear}`,
+              totalFare: stmtData.summary.totalFare,
+              driverPayout: stmtData.summary.driverPayout,
+              completedTrips: stmtData.summary.completedTrips,
+              issuedByAdminId: user.id,
+            }),
+          });
+          if (issueRes.ok) {
+            const issued = await issueRes.json();
+            verificationCode = issued.verificationCode;
+          }
+        } catch {}
+        await generateStatementPDF({ ...stmtData, verificationCode });
       } catch (err: any) {
         toast({ title: "PDF error", description: err.message, variant: "destructive" });
       }
@@ -1500,6 +1530,137 @@ export default function AdminApp() {
                 Download PDF Statement
               </button>
             </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Verify Document ──
+  if (view === "verify") {
+    const handleVerify = async () => {
+      if (!verifyCode.trim()) return;
+      setVerifyLoading(true);
+      setVerifyResult(null);
+      setVerifyError("");
+      try {
+        const res = await fetch(`/api/admin/verify?code=${encodeURIComponent(verifyCode.trim())}`, { credentials: "include" });
+        if (!res.ok) {
+          const err = await res.json();
+          setVerifyError(err.message || "Document not found");
+        } else {
+          setVerifyResult(await res.json());
+        }
+      } catch {
+        setVerifyError("Network error. Please try again.");
+      } finally {
+        setVerifyLoading(false);
+      }
+    };
+
+    return (
+      <div className="min-h-[100dvh] bg-gray-50 flex flex-col">
+        <div className="bg-black text-white px-4 pt-8 pb-5 rounded-b-3xl">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => { setView("dashboard"); setVerifyResult(null); setVerifyError(""); setVerifyCode(""); }} className="text-white rounded-full hover:bg-white/20"><ChevronLeft className="h-6 w-6" /></Button>
+            <div>
+              <h1 className="text-xl font-bold">Verify Document</h1>
+              <p className="text-xs text-gray-400">Authenticate any GY Rides receipt or statement</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 p-4 space-y-4 overflow-auto pb-12">
+          {/* Search input */}
+          <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+            <label className="text-xs font-bold text-gray-600 block mb-2">Enter Verification Code</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="GYR-XXXXXXXX  or  GYS-XXXXXXXX"
+                value={verifyCode}
+                onChange={e => { setVerifyCode(e.target.value.toUpperCase()); setVerifyResult(null); setVerifyError(""); }}
+                onKeyDown={e => e.key === "Enter" && handleVerify()}
+                className="flex-1 h-11 rounded-xl border border-gray-200 px-3 text-sm font-mono tracking-wider"
+                data-testid="input-verify-code"
+              />
+              <Button
+                className="bg-black text-white rounded-xl h-11 px-5 font-bold"
+                onClick={handleVerify}
+                disabled={verifyLoading || !verifyCode.trim()}
+                data-testid="btn-verify-submit"
+              >
+                {verifyLoading ? "…" : "Verify"}
+              </Button>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-2">
+              Codes starting with <span className="font-mono font-bold">GYR-</span> are trip receipts · <span className="font-mono font-bold">GYS-</span> are driver statements
+            </p>
+          </div>
+
+          {/* Error */}
+          {verifyError && (
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start gap-3" data-testid="verify-error">
+              <XCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-bold text-sm text-red-700">Document Not Found</div>
+                <div className="text-xs text-red-600 mt-0.5">{verifyError}</div>
+              </div>
+            </div>
+          )}
+
+          {/* Receipt result */}
+          {verifyResult?.type === "receipt" && (
+            <div className="space-y-3" data-testid="verify-receipt-result">
+              <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-start gap-3">
+                <CheckCircle className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-bold text-sm text-green-800">✓ Authentic Receipt</div>
+                  <div className="text-xs text-green-700 font-mono mt-0.5">{verifyResult.code}</div>
+                </div>
+              </div>
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+                <h3 className="font-bold text-sm">Trip Details</h3>
+                <div className="grid grid-cols-2 gap-y-3 text-sm">
+                  <div><div className="text-[10px] text-gray-400 uppercase">Rider</div><div className="font-semibold">{verifyResult.riderName}</div></div>
+                  <div><div className="text-[10px] text-gray-400 uppercase">Driver</div><div className="font-semibold">{verifyResult.driverName}</div></div>
+                  <div className="col-span-2"><div className="text-[10px] text-gray-400 uppercase">From</div><div className="font-semibold">{verifyResult.trip.pickupName}</div></div>
+                  <div className="col-span-2"><div className="text-[10px] text-gray-400 uppercase">To</div><div className="font-semibold">{verifyResult.trip.dropoffName}</div></div>
+                  <div><div className="text-[10px] text-gray-400 uppercase">Fare</div><div className="font-black text-lg">R{verifyResult.trip.fare?.toFixed(2)}</div></div>
+                  <div><div className="text-[10px] text-gray-400 uppercase">Payment</div><div className="font-semibold capitalize">{verifyResult.trip.paymentMethod}</div></div>
+                  <div><div className="text-[10px] text-gray-400 uppercase">Status</div>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${verifyResult.trip.status === "completed" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                      {verifyResult.trip.status}
+                    </span>
+                  </div>
+                  <div><div className="text-[10px] text-gray-400 uppercase">Date</div><div className="font-semibold">{verifyResult.trip.completedAt ? new Date(verifyResult.trip.completedAt).toLocaleDateString("en-ZA", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</div></div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Statement result */}
+          {verifyResult?.type === "statement" && (
+            <div className="space-y-3" data-testid="verify-statement-result">
+              <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-start gap-3">
+                <CheckCircle className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-bold text-sm text-green-800">✓ Authentic Statement</div>
+                  <div className="text-xs text-green-700 font-mono mt-0.5">{verifyResult.code}</div>
+                </div>
+              </div>
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+                <h3 className="font-bold text-sm">Statement Details</h3>
+                <div className="grid grid-cols-2 gap-y-3 text-sm">
+                  <div className="col-span-2"><div className="text-[10px] text-gray-400 uppercase">Driver</div><div className="font-semibold">{verifyResult.statement.driverName}</div></div>
+                  <div><div className="text-[10px] text-gray-400 uppercase">Period</div><div className="font-semibold">{verifyResult.statement.period}</div></div>
+                  <div><div className="text-[10px] text-gray-400 uppercase">Trips</div><div className="font-semibold">{verifyResult.statement.completedTrips} completed</div></div>
+                  <div><div className="text-[10px] text-gray-400 uppercase">Gross Fares</div><div className="font-black text-lg">R{verifyResult.statement.totalFare?.toFixed(2)}</div></div>
+                  <div><div className="text-[10px] text-gray-400 uppercase">Driver Payout (85%)</div><div className="font-black text-lg text-green-600">R{verifyResult.statement.driverPayout?.toFixed(2)}</div></div>
+                  <div className="col-span-2"><div className="text-[10px] text-gray-400 uppercase">Issued On</div><div className="font-semibold">{verifyResult.statement.issuedAt ? new Date(verifyResult.statement.issuedAt).toLocaleDateString("en-ZA", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</div></div>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -2042,6 +2203,17 @@ export default function AdminApp() {
               <div className="text-left">
                 <div className="font-bold text-sm">Driver Statements</div>
                 <div className="text-[10px] text-gray-500">Monthly earnings & PDF export</div>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-gray-400" />
+          </Button>
+
+          <Button variant="outline" className="w-full justify-between h-14 rounded-xl bg-white border-gray-100 shadow-sm px-4" onClick={() => { setView("verify"); setVerifyResult(null); setVerifyError(""); setVerifyCode(""); }} data-testid="btn-verify-document">
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-50 p-2 rounded-lg text-blue-600"><ShieldCheck className="h-4 w-4" /></div>
+              <div className="text-left">
+                <div className="font-bold text-sm">Verify Document</div>
+                <div className="text-[10px] text-gray-500">Check authenticity of receipts & statements</div>
               </div>
             </div>
             <ChevronRight className="h-4 w-4 text-gray-400" />
