@@ -63,7 +63,6 @@ function ManeuverIcon({ maneuver, modifier }: { maneuver: string; modifier: stri
 }
 
 export default function DriverApp() {
-  useWakeLock();
   const { user, setUser, logout } = useAuth();
   const [, setLocation] = useLocation();
   const [view, setView] = useState<"home" | "trip" | "earnings" | "history" | "profile" | "menu" | "support">("home");
@@ -94,6 +93,9 @@ export default function DriverApp() {
   const isOnlineRef = useRef<boolean>(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // ── Wake Lock: keep screen awake only during active trip ──
+  useWakeLock(onTrip !== null);
 
   // Keep isOnlineRef in sync so the GPS callback always reads the latest value
   useEffect(() => { isOnlineRef.current = user?.isOnline ?? false; }, [user?.isOnline]);

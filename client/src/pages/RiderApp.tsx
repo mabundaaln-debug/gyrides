@@ -66,7 +66,6 @@ function generateTripPin(): string {
 }
 
 export default function RiderApp() {
-  useWakeLock();
   const { user, setUser, logout } = useAuth();
   const [, setLocation] = useLocation();
   const [view, setView] = useState<"home" | "search" | "pickmap" | "confirm" | "searching" | "tracking" | "completed" | "history" | "profile" | "menu" | "taxi" | "wallet" | "safety" | "support">("home");
@@ -114,6 +113,9 @@ export default function RiderApp() {
   const [downloadingReceiptId, setDownloadingReceiptId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // ── Wake Lock: only keep screen awake during active trip tracking ──
+  useWakeLock(view === "tracking");
 
   // ── Rider GPS tracking refs and state ──
   const riderGpsWatchRef = useRef<number | null>(null);
@@ -238,11 +240,25 @@ export default function RiderApp() {
       } catch {}
     };
 
-    poll();
-    const interval = setInterval(poll, 3000);
+    // Restart the interval timer (clears any stale/throttled timer first)
+    let interval: ReturnType<typeof setInterval>;
+    const startInterval = () => {
+      clearInterval(interval);
+      interval = setInterval(poll, 3000);
+    };
 
-    // Resume polling immediately on Android foreground restore
-    const onVisible = () => { if (document.visibilityState === "visible") poll(); };
+    poll();
+    startInterval();
+
+    // Page Visibility: on Android, background intervals can be killed or severely
+    // throttled. When the user returns to the app, immediately poll AND restart
+    // the interval so it runs at the correct cadence again.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        poll();
+        startInterval();
+      }
+    };
     document.addEventListener("visibilitychange", onVisible);
 
     return () => { cancelled = true; clearInterval(interval); document.removeEventListener("visibilitychange", onVisible); };
@@ -569,17 +585,24 @@ export default function RiderApp() {
       }
     };
 
-    pollDriverLocation();
-    const interval = setInterval(pollDriverLocation, 4000);
+    // Restart the interval timer (clears any stale/throttled timer first)
+    let interval: ReturnType<typeof setInterval>;
+    const startInterval = () => {
+      clearInterval(interval);
+      interval = setInterval(pollDriverLocation, 4000);
+    };
 
-    // ── Page Visibility API: immediately re-poll when Android screen wakes ──
-    // On Android, background JS timers are throttled/killed. When the rider
-    // unlocks their screen or switches back to the app, the interval may have
-    // missed several ticks. We catch the visibilitychange event and fire an
-    // immediate poll so the map snaps to the driver's real position right away.
+    pollDriverLocation();
+    startInterval();
+
+    // ── Page Visibility API: immediately re-poll AND restart the timer ──
+    // On Android, background JS intervals are throttled or killed entirely.
+    // When the rider returns to the app (screen unlock, app switch), we both
+    // fire an immediate poll AND recreate the interval at the correct 4s cadence.
     const onVisible = () => {
       if (document.visibilityState === "visible") {
         pollDriverLocation();
+        startInterval();
       }
     };
     document.addEventListener("visibilitychange", onVisible);

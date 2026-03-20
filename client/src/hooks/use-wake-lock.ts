@@ -1,19 +1,37 @@
 import { useEffect, useRef } from "react";
 
 /**
- * Keeps the device screen awake while the component is mounted.
+ * Keeps the device screen awake while `enabled` is true.
  * Uses the Screen Wake Lock API (supported on Chrome/Android/Safari 16.4+).
  * Automatically re-acquires the lock when the tab becomes visible again
  * (the browser releases it automatically on page hide).
+ *
+ * Pass `enabled = false` to release the lock immediately (e.g. when the
+ * active trip ends) so the screen can dim normally outside of tracking.
  */
-export function useWakeLock() {
+
+interface WakeLockSentinel extends EventTarget {
+  readonly released: boolean;
+  readonly type: "screen";
+  release(): Promise<void>;
+}
+
+interface NavigatorWithWakeLock extends Navigator {
+  wakeLock?: {
+    request(type: "screen"): Promise<WakeLockSentinel>;
+  };
+}
+
+export function useWakeLock(enabled: boolean = true) {
   const lockRef = useRef<WakeLockSentinel | null>(null);
 
   const acquire = async () => {
-    if (!("wakeLock" in navigator)) return;
+    const nav = navigator as NavigatorWithWakeLock;
+    if (!nav.wakeLock) return;
     if (document.visibilityState !== "visible") return;
+    if (lockRef.current && !lockRef.current.released) return;
     try {
-      lockRef.current = await (navigator as any).wakeLock.request("screen");
+      lockRef.current = await nav.wakeLock.request("screen");
     } catch {
       // Device denied or not supported — silently ignore
     }
@@ -25,12 +43,19 @@ export function useWakeLock() {
   };
 
   useEffect(() => {
+    if (!enabled) {
+      release();
+      return;
+    }
+
     acquire();
 
     // Re-acquire when tab becomes visible (browser auto-releases on hide)
     const onVisibility = () => {
       if (document.visibilityState === "visible") {
         acquire();
+      } else {
+        release();
       }
     };
 
@@ -39,5 +64,5 @@ export function useWakeLock() {
       document.removeEventListener("visibilitychange", onVisibility);
       release();
     };
-  }, []);
+  }, [enabled]);
 }
