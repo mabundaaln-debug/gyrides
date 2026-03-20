@@ -180,13 +180,24 @@ export default function RiderApp() {
   }, [user?.id]); // Only re-run if user changes — GPS runs for the whole session
 
   // ── Real-time trip status polling ──
-  // Polls every 3s whenever rider has an active trip (searching or tracking)
-  // This is how driver actions (accept, arrive, start, complete) reach the rider
+  // Polls every 3s whenever rider has an active trip (searching or tracking).
+  // The status machine is SERVER-DRIVEN: we always sync to the server's current
+  // status regardless of which transitions we may have missed. This handles the
+  // case where the driver accepts AND arrives before the next 3s poll fires,
+  // which would have left the passenger stuck on the searching screen with the
+  // old sequence-based approach.
   useEffect(() => {
     if (!currentTrip?.id) return;
     if (!["searching", "tracking"].includes(view)) return;
 
     let cancelled = false;
+
+    // Map server trip status → passenger-side rideStatus label
+    const serverToRideStatus: Record<string, "on_the_way" | "arrived" | "in_progress"> = {
+      accepted:    "on_the_way",
+      arriving:    "arrived",
+      in_progress: "in_progress",
+    };
 
     const poll = async () => {
       if (cancelled) return;
@@ -198,44 +209,64 @@ export default function RiderApp() {
 
         setCurrentTrip(updated);
 
-        // ── Status machine: react to server-side status changes ──
-        if (updated.status === "accepted" && rideStatus === "searching") {
-          // Driver has accepted — fetch their info and move to tracking
-          if (updated.driverId) {
-            try {
-              const dRes = await fetch(`/api/users/${updated.driverId}`, { credentials: "include" });
-              const driver = await dRes.json();
-              setAssignedDriver(driver);
-            } catch {}
-          }
-          setRideStatus("on_the_way");
-          setTripEta(updated.duration ?? null);
-          setView("tracking");
-          toast({ title: "Driver found!", description: "Your driver is on the way." });
-        } else if (updated.status === "arriving" && rideStatus === "on_the_way") {
-          setRideStatus("arrived");
-          toast({ title: "Driver arrived!", description: "Your driver is at the pickup point." });
-        } else if (updated.status === "in_progress" && rideStatus !== "in_progress") {
-          setRideStatus("in_progress");
-          setTripStartTime(prev => prev ?? Date.now());
-        } else if (updated.status === "completed" && view !== "completed") {
+        // ── Terminal states ──
+        if (updated.status === "completed" && view !== "completed") {
           cancelled = true;
           setView("completed");
-        } else if (updated.status === "cancelled" && view !== "home") {
+          return;
+        }
+        if (updated.status === "cancelled") {
           cancelled = true;
           setCurrentTrip(null);
           setAssignedDriver(null);
           setView("home");
           toast({ title: "Trip cancelled", variant: "destructive" });
+          return;
         }
 
-        // Timeout: no driver accepted after 5 minutes → auto-cancel
+        // ── Timeout: no driver after 5 min → auto-cancel ──
         if (view === "searching" && searchStartRef.current && Date.now() - searchStartRef.current > 300000) {
           cancelled = true;
           try { await updateTrip(currentTrip.id, { status: "cancelled" }); } catch {}
           setCurrentTrip(null);
           setView("home");
           toast({ title: "No drivers available", description: "Try again or book via WhatsApp.", variant: "destructive" });
+          return;
+        }
+
+        const targetRideStatus = serverToRideStatus[updated.status];
+        if (!targetRideStatus) return; // still "requested" — nothing to do yet
+
+        // ── If passenger is still on searching view, move to tracking ──
+        // This handles ANY active status (accepted, arriving, in_progress) so we
+        // never get stuck even if a poll missed an intermediate state.
+        if (view === "searching") {
+          if (updated.driverId && !assignedDriver) {
+            try {
+              const dRes = await fetch(`/api/users/${updated.driverId}`, { credentials: "include" });
+              const driver = await dRes.json();
+              if (!cancelled) setAssignedDriver(driver);
+            } catch {}
+          }
+          if (updated.tripPin) setTripPin(updated.tripPin);
+          setTripEta(updated.duration ?? null);
+          setView("tracking");
+          const toastMsg =
+            updated.status === "in_progress" ? { title: "Trip started!", description: "You're on your way!" } :
+            updated.status === "arriving"    ? { title: "Driver has arrived!", description: "Your driver is at the pickup point." } :
+            { title: "Driver found!", description: "Your driver is on the way." };
+          toast(toastMsg);
+        }
+
+        // ── Sync rideStatus to server state (only when it differs) ──
+        if (targetRideStatus !== rideStatus) {
+          setRideStatus(targetRideStatus);
+          if (targetRideStatus === "arrived" && view === "tracking") {
+            toast({ title: "Driver arrived!", description: "Your driver is at the pickup point." });
+          }
+          if (targetRideStatus === "in_progress") {
+            setTripStartTime(prev => prev ?? Date.now());
+          }
         }
       } catch {}
     };
@@ -244,7 +275,7 @@ export default function RiderApp() {
     let interval: ReturnType<typeof setInterval>;
     const startInterval = () => {
       clearInterval(interval);
-      interval = setInterval(poll, 3000);
+      interval = setInterval(poll, 2000); // 2s for faster status transitions
     };
 
     poll();
