@@ -10,6 +10,7 @@ import { generateReceiptPDF } from "@/lib/generateReceipt";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useWakeLock } from "@/hooks/use-wake-lock";
 import GiyaniMap from "@/components/GiyaniMap";
 import TripChat from "@/components/TripChat";
 import type { Trip, SavedPlace, VehicleType, User as UserType, TaxiRoute } from "@shared/schema";
@@ -64,6 +65,7 @@ function generateTripPin(): string {
 }
 
 export default function RiderApp() {
+  useWakeLock();
   const { user, setUser, logout } = useAuth();
   const [, setLocation] = useLocation();
   const [view, setView] = useState<"home" | "search" | "pickmap" | "confirm" | "searching" | "tracking" | "completed" | "history" | "profile" | "menu" | "taxi" | "wallet" | "safety">("home");
