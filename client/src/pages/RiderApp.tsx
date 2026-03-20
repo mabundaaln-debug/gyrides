@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth";
 import { createTrip, updateTrip, updateUser, sendSosAlert, uploadProfilePicture, getWebauthnRegisterOptions, verifyWebauthnRegistration, getWebauthnCredentials, deleteWebauthnCredential, createYocoCheckout, getPublicConfig, chargeYocoToken, getRiderPendingBalance, getTripReceipt } from "@/lib/api";
 import { generateReceiptPDF } from "@/lib/generateReceipt";
+import SupportChat from "@/components/SupportChat";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -68,7 +69,7 @@ export default function RiderApp() {
   useWakeLock();
   const { user, setUser, logout } = useAuth();
   const [, setLocation] = useLocation();
-  const [view, setView] = useState<"home" | "search" | "pickmap" | "confirm" | "searching" | "tracking" | "completed" | "history" | "profile" | "menu" | "taxi" | "wallet" | "safety">("home");
+  const [view, setView] = useState<"home" | "search" | "pickmap" | "confirm" | "searching" | "tracking" | "completed" | "history" | "profile" | "menu" | "taxi" | "wallet" | "safety" | "support">("home");
   const [pickup, setPickup] = useState<typeof GIYANI_LOCATIONS[0] | null>(null);
   const [dropoff, setDropoff] = useState<typeof GIYANI_LOCATIONS[0] | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -1112,6 +1113,11 @@ export default function RiderApp() {
     );
   }
 
+  // ── Support ──
+  if (view === "support") {
+    return <SupportChat userId={user.id} userRole="rider" userName={user.fullName} onBack={() => setView("menu")} />;
+  }
+
   // ── Side Menu ──
   if (view === "menu") {
     return (
@@ -1142,6 +1148,7 @@ export default function RiderApp() {
             { icon: <BookmarkPlus className="h-5 w-5" />, label: "Saved Places", action: () => setView("profile") },
             { icon: <Shield className="h-5 w-5" />, label: "Safety & Contacts", action: () => setView("safety") },
             { icon: <User className="h-5 w-5" />, label: "Profile", action: () => setView("profile") },
+            { icon: <MessageCircle className="h-5 w-5" />, label: "Support & Help", action: () => setView("support") },
           ].map((item, i) => (
             <Button key={i} variant="ghost" className="w-full justify-start h-14 text-base rounded-xl gap-4" onClick={item.action}>
               {item.icon} {item.label}

@@ -1102,6 +1102,153 @@ export async function registerRoutes(
     return res.json(alert);
   });
 
+  // ── Customer Support Tickets ──
+
+  // Create ticket (rider/driver)
+  app.post("/api/support/tickets", async (req, res) => {
+    try {
+      const { userId, userRole, subject, category, priority, message } = req.body;
+      if (!userId || !subject || !message) return res.status(400).json({ message: "userId, subject, message required" });
+      const ticket = await storage.createSupportTicket({
+        userId,
+        userRole: userRole || "rider",
+        subject,
+        category: category || "general",
+        status: "open",
+        priority: priority || "normal",
+        lastUserReplyAt: new Date(),
+      });
+      await storage.createSupportMessage({
+        ticketId: ticket.id,
+        senderId: userId,
+        senderRole: userRole || "rider",
+        content: message,
+        readByAdmin: false,
+        readByUser: true,
+      });
+      return res.json(ticket);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Get tickets for current user
+  app.get("/api/support/tickets/my/:userId", async (req, res) => {
+    try {
+      const tickets = await storage.getSupportTicketsByUser(req.params.userId);
+      return res.json(tickets);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Get all tickets (admin)
+  app.get("/api/admin/support/tickets", async (req, res) => {
+    try {
+      const tickets = await storage.getAllSupportTickets();
+      return res.json(tickets);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Get unread count for admin
+  app.get("/api/admin/support/unread", async (req, res) => {
+    try {
+      const count = await storage.getUnreadSupportCountForAdmin();
+      return res.json({ count });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Get unread count for user
+  app.get("/api/support/unread/:userId", async (req, res) => {
+    try {
+      const count = await storage.getUnreadSupportCountForUser(req.params.userId);
+      return res.json({ count });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Get messages for a ticket
+  app.get("/api/support/tickets/:ticketId/messages", async (req, res) => {
+    try {
+      const msgs = await storage.getSupportMessagesByTicket(req.params.ticketId);
+      return res.json(msgs);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Send message to ticket (rider/driver/admin)
+  app.post("/api/support/tickets/:ticketId/messages", async (req, res) => {
+    try {
+      const { senderId, senderRole, content } = req.body;
+      if (!senderId || !content) return res.status(400).json({ message: "senderId and content required" });
+      const ticket = await storage.getSupportTicket(req.params.ticketId);
+      if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+      const isAdmin = senderRole === "admin";
+      const msg = await storage.createSupportMessage({
+        ticketId: req.params.ticketId,
+        senderId,
+        senderRole,
+        content,
+        readByAdmin: isAdmin,
+        readByUser: !isAdmin,
+      });
+      // Update ticket timestamps and status
+      const ticketUpdate: Partial<any> = {
+        updatedAt: new Date(),
+      };
+      if (isAdmin) {
+        ticketUpdate.lastAdminReplyAt = new Date();
+        if (ticket.status === "open") ticketUpdate.status = "in_progress";
+      } else {
+        ticketUpdate.lastUserReplyAt = new Date();
+      }
+      await storage.updateSupportTicket(req.params.ticketId, ticketUpdate);
+      return res.json(msg);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Mark messages read by admin
+  app.post("/api/admin/support/tickets/:ticketId/read", async (req, res) => {
+    try {
+      await storage.markSupportMessagesReadByAdmin(req.params.ticketId);
+      return res.json({ ok: true });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Mark messages read by user
+  app.post("/api/support/tickets/:ticketId/read", async (req, res) => {
+    try {
+      await storage.markSupportMessagesReadByUser(req.params.ticketId);
+      return res.json({ ok: true });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Update ticket status (admin)
+  app.patch("/api/admin/support/tickets/:ticketId", async (req, res) => {
+    try {
+      const { status } = req.body;
+      const update: Partial<any> = { status };
+      if (status === "resolved") update.resolvedAt = new Date();
+      const ticket = await storage.updateSupportTicket(req.params.ticketId, update);
+      if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+      return res.json(ticket);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── Initialize App Data ──
   app.post("/api/seed", async (req, res) => {
     try {

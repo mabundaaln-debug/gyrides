@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { Users, Car, DollarSign, LogOut, ChevronRight, ChevronLeft, Star, MapPin, TrendingUp, Activity, AlertCircle, CheckCircle, Shield, XCircle, FileText, Eye, User as UserIcon, AlertTriangle, Phone, MessageCircle, KeyRound, ShieldCheck, ShieldX, Lock, EyeOff, Clock, Download, BarChart3, Navigation, ClipboardList, Award, Zap, ThumbsUp, ThumbsDown, Banknote, Upload, CheckSquare, Square, ExternalLink, Plus, X } from "lucide-react";
+import { Users, Car, DollarSign, LogOut, ChevronRight, ChevronLeft, Star, MapPin, TrendingUp, Activity, AlertCircle, CheckCircle, Shield, XCircle, FileText, Eye, User as UserIcon, AlertTriangle, Phone, MessageCircle, KeyRound, ShieldCheck, ShieldX, Lock, EyeOff, Clock, Download, BarChart3, Navigation, ClipboardList, Award, Zap, ThumbsUp, ThumbsDown, Banknote, Upload, CheckSquare, Square, ExternalLink, Plus, X, Headphones } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -11,8 +11,49 @@ import { approveDriver, rejectDriver, updateSosAlert, getUser, adminResetUserPas
 import { generateStatementPDF } from "@/lib/generateStatement";
 import { useToast } from "@/hooks/use-toast";
 import TripChat from "@/components/TripChat";
+import SupportChat from "@/components/SupportChat";
 import GiyaniMap from "@/components/GiyaniMap";
 import type { User, Trip, VehicleType, SosAlert, DriverReimbursement } from "@shared/schema";
+
+// ── Support Inbox Dashboard Button ──
+function SupportInboxButton({ onOpen }: { onOpen: () => void }) {
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    const fetchUnread = async () => {
+      try {
+        const res = await fetch("/api/admin/support/unread", { credentials: "include" });
+        if (res.ok) { const d = await res.json(); setUnread(d.count ?? 0); }
+      } catch {}
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <button
+      className="w-full justify-between h-14 rounded-xl bg-white border border-gray-100 shadow-sm px-4 flex items-center hover:bg-gray-50 transition-all"
+      onClick={onOpen}
+      data-testid="btn-support-inbox"
+    >
+      <div className="flex items-center gap-3">
+        <div className="relative bg-yellow-50 p-2 rounded-lg">
+          <Headphones className="h-4 w-4 text-yellow-600" />
+          {unread > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-black rounded-full h-4 w-4 flex items-center justify-center">
+              {unread > 9 ? "9+" : unread}
+            </span>
+          )}
+        </div>
+        <div className="text-left">
+          <div className="font-bold text-sm">Support Inbox</div>
+          <div className="text-[10px] text-gray-500">{unread > 0 ? `${unread} unread message${unread > 1 ? "s" : ""}` : "Customer service channel"}</div>
+        </div>
+      </div>
+      <ChevronRight className="h-4 w-4 text-gray-400" />
+    </button>
+  );
+}
 
 // ── Live location map for an SOS alert ──
 function SosLiveMap({ alert }: { alert: SosAlert }) {
@@ -133,7 +174,7 @@ function SosLiveMap({ alert }: { alert: SosAlert }) {
 export default function AdminApp() {
   const { user, logout } = useAuth();
   const [, setLocation] = useLocation();
-  const [view, setView] = useState<"dashboard" | "drivers" | "trips" | "pricing" | "approvals" | "review-driver" | "sos" | "users" | "statements" | "inspect-driver" | "reimbursements" | "verify">("dashboard");
+  const [view, setView] = useState<"dashboard" | "drivers" | "trips" | "pricing" | "approvals" | "review-driver" | "sos" | "users" | "statements" | "inspect-driver" | "reimbursements" | "verify" | "support">("dashboard");
   const [reviewingDriver, setReviewingDriver] = useState<User | null>(null);
   const [inspectingDriver, setInspectingDriver] = useState<User | null>(null);
   const [inspSubmitting, setInspSubmitting] = useState(false);
@@ -1536,6 +1577,11 @@ export default function AdminApp() {
     );
   }
 
+  // ── Support Inbox ──
+  if (view === "support") {
+    return <SupportChat userId={user.id} userRole="admin" userName={user.fullName} onBack={() => setView("dashboard")} />;
+  }
+
   // ── Verify Document ──
   if (view === "verify") {
     const handleVerify = async () => {
@@ -2207,6 +2253,8 @@ export default function AdminApp() {
             </div>
             <ChevronRight className="h-4 w-4 text-gray-400" />
           </Button>
+
+          <SupportInboxButton onOpen={() => setView("support")} />
 
           <Button variant="outline" className="w-full justify-between h-14 rounded-xl bg-white border-gray-100 shadow-sm px-4" onClick={() => { setView("verify"); setVerifyResult(null); setVerifyError(""); setVerifyCode(""); }} data-testid="btn-verify-document">
             <div className="flex items-center gap-3">

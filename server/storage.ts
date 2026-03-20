@@ -1,7 +1,7 @@
 import { eq, desc, and, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
-  users, trips, savedPlaces, vehicleTypes, taxiRoutes, messages, sosAlerts, passwordResetRequests, webauthnCredentials, vehicleInspections, driverReimbursements, issuedStatements,
+  users, trips, savedPlaces, vehicleTypes, taxiRoutes, messages, sosAlerts, passwordResetRequests, webauthnCredentials, vehicleInspections, driverReimbursements, issuedStatements, supportTickets, supportMessages,
   type User, type InsertUser,
   type Trip, type InsertTrip,
   type SavedPlace, type InsertSavedPlace,
@@ -14,6 +14,8 @@ import {
   type VehicleInspection, type InsertVehicleInspection,
   type DriverReimbursement, type InsertDriverReimbursement,
   type IssuedStatement, type InsertIssuedStatement,
+  type SupportTicket, type InsertSupportTicket,
+  type SupportMessage, type InsertSupportMessage,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -85,6 +87,18 @@ export interface IStorage {
   createIssuedStatement(data: InsertIssuedStatement): Promise<IssuedStatement>;
   getIssuedStatementByCode(code: string): Promise<IssuedStatement | undefined>;
   getTripByCodeSuffix(suffix: string): Promise<Trip | undefined>;
+
+  createSupportTicket(data: InsertSupportTicket): Promise<SupportTicket>;
+  getSupportTicket(id: string): Promise<SupportTicket | undefined>;
+  getSupportTicketsByUser(userId: string): Promise<SupportTicket[]>;
+  getAllSupportTickets(): Promise<SupportTicket[]>;
+  updateSupportTicket(id: string, data: Partial<SupportTicket>): Promise<SupportTicket | undefined>;
+  createSupportMessage(data: InsertSupportMessage): Promise<SupportMessage>;
+  getSupportMessagesByTicket(ticketId: string): Promise<SupportMessage[]>;
+  markSupportMessagesReadByAdmin(ticketId: string): Promise<void>;
+  markSupportMessagesReadByUser(ticketId: string): Promise<void>;
+  getUnreadSupportCountForAdmin(): Promise<number>;
+  getUnreadSupportCountForUser(userId: string): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -379,6 +393,63 @@ export class DatabaseStorage implements IStorage {
     const lower = suffix.toLowerCase();
     const allTrips = await db.select().from(trips);
     return allTrips.find(t => t.id.replace(/-/g, "").toLowerCase().endsWith(lower));
+  }
+
+  async createSupportTicket(data: InsertSupportTicket): Promise<SupportTicket> {
+    const [t] = await db.insert(supportTickets).values(data).returning();
+    return t;
+  }
+
+  async getSupportTicket(id: string): Promise<SupportTicket | undefined> {
+    const [t] = await db.select().from(supportTickets).where(eq(supportTickets.id, id));
+    return t;
+  }
+
+  async getSupportTicketsByUser(userId: string): Promise<SupportTicket[]> {
+    return db.select().from(supportTickets).where(eq(supportTickets.userId, userId)).orderBy(desc(supportTickets.updatedAt));
+  }
+
+  async getAllSupportTickets(): Promise<SupportTicket[]> {
+    return db.select().from(supportTickets).orderBy(desc(supportTickets.updatedAt));
+  }
+
+  async updateSupportTicket(id: string, data: Partial<SupportTicket>): Promise<SupportTicket | undefined> {
+    const [t] = await db.update(supportTickets).set({ ...data as any, updatedAt: new Date() }).where(eq(supportTickets.id, id)).returning();
+    return t;
+  }
+
+  async createSupportMessage(data: InsertSupportMessage): Promise<SupportMessage> {
+    const [m] = await db.insert(supportMessages).values(data).returning();
+    return m;
+  }
+
+  async getSupportMessagesByTicket(ticketId: string): Promise<SupportMessage[]> {
+    return db.select().from(supportMessages).where(eq(supportMessages.ticketId, ticketId)).orderBy(supportMessages.createdAt);
+  }
+
+  async markSupportMessagesReadByAdmin(ticketId: string): Promise<void> {
+    await db.update(supportMessages).set({ readByAdmin: true }).where(and(eq(supportMessages.ticketId, ticketId), eq(supportMessages.readByAdmin, false)));
+  }
+
+  async markSupportMessagesReadByUser(ticketId: string): Promise<void> {
+    await db.update(supportMessages).set({ readByUser: true }).where(and(eq(supportMessages.ticketId, ticketId), eq(supportMessages.readByUser, false)));
+  }
+
+  async getUnreadSupportCountForAdmin(): Promise<number> {
+    const rows = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(supportMessages)
+      .where(and(eq(supportMessages.readByAdmin, false), sql`${supportMessages.senderRole} != 'admin'`));
+    return Number(rows[0]?.count ?? 0);
+  }
+
+  async getUnreadSupportCountForUser(userId: string): Promise<number> {
+    const rows = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(supportMessages)
+      .innerJoin(supportTickets, eq(supportMessages.ticketId, supportTickets.id))
+      .where(and(eq(supportTickets.userId, userId), eq(supportMessages.readByUser, false), eq(supportMessages.senderRole, "admin")));
+    return Number(rows[0]?.count ?? 0);
   }
 }
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
 import { MapPin, DollarSign, Star, Check, X, Menu, LogOut, Navigation, Car, Clock, TrendingUp, User, ChevronLeft, History, Phone, MessageCircle, AlertTriangle, Shield, BadgeCheck, Heart, Package, Users, Bus, Upload, Banknote, FileText, Download } from "lucide-react";
+import SupportChat from "@/components/SupportChat";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth";
@@ -65,7 +66,7 @@ export default function DriverApp() {
   useWakeLock();
   const { user, setUser, logout } = useAuth();
   const [, setLocation] = useLocation();
-  const [view, setView] = useState<"home" | "trip" | "earnings" | "history" | "profile" | "menu">("home");
+  const [view, setView] = useState<"home" | "trip" | "earnings" | "history" | "profile" | "menu" | "support">("home");
   const [onTrip, setOnTrip] = useState<Trip | null>(null);
   const [tripRider, setTripRider] = useState<UserType | null>(null);
   const [tripPhase, setTripPhase] = useState<"arriving" | "pickup" | "inprogress">("arriving");
@@ -409,6 +410,7 @@ export default function DriverApp() {
             { icon: <History className="h-5 w-5" />, label: "Trip History", action: () => setView("history") },
             { icon: <User className="h-5 w-5" />, label: "Profile", action: () => setView("profile") },
             { icon: <Shield className="h-5 w-5" />, label: "Safety", action: () => toast({ title: "Safety Center", description: "Emergency settings available here" }) },
+            { icon: <MessageCircle className="h-5 w-5" />, label: "Support & Help", action: () => setView("support") },
           ].map((item, i) => (
             <Button key={i} variant="ghost" className="w-full justify-start h-14 text-base rounded-xl gap-4" onClick={item.action}>
               {item.icon} {item.label}
@@ -422,6 +424,11 @@ export default function DriverApp() {
         </div>
       </div>
     );
+  }
+
+  // ── Support ──
+  if (view === "support") {
+    return <SupportChat userId={user.id} userRole="driver" userName={user.fullName} onBack={() => setView("menu")} />;
   }
 
   // ── Earnings ──

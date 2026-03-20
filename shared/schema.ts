@@ -11,6 +11,8 @@ export const paymentStatusEnum = pgEnum("payment_status", ["pending", "paid", "f
 export const rideTypeEnum = pgEnum("ride_type", ["private", "shared", "taxi", "parcel", "medical"]);
 export const vehicleCategoryEnum = pgEnum("vehicle_category", ["standard", "premium", "xl"]);
 export const inspectionStatusEnum = pgEnum("inspection_status", ["pending", "inspected", "failed"]);
+export const supportTicketStatusEnum = pgEnum("support_ticket_status", ["open", "in_progress", "resolved", "closed"]);
+export const supportTicketCategoryEnum = pgEnum("support_ticket_category", ["general", "payment", "trip", "safety", "account", "driver", "other"]);
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -260,6 +262,40 @@ export const vehicleInspections = pgTable("vehicle_inspections", {
 export const insertVehicleInspectionSchema = createInsertSchema(vehicleInspections).omit({ id: true, inspectedAt: true });
 export type InsertVehicleInspection = z.infer<typeof insertVehicleInspectionSchema>;
 export type VehicleInspection = typeof vehicleInspections.$inferSelect;
+
+export const supportTickets = pgTable("support_tickets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  userRole: userRoleEnum("user_role").notNull(),
+  subject: text("subject").notNull(),
+  category: supportTicketCategoryEnum("category").notNull().default("general"),
+  status: supportTicketStatusEnum("status").notNull().default("open"),
+  priority: text("priority").notNull().default("normal"),
+  lastAdminReplyAt: timestamp("last_admin_reply_at"),
+  lastUserReplyAt: timestamp("last_user_reply_at"),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const supportMessages = pgTable("support_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ticketId: varchar("ticket_id").notNull().references(() => supportTickets.id),
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  senderRole: userRoleEnum("sender_role").notNull(),
+  content: text("content").notNull(),
+  readByAdmin: boolean("read_by_admin").notNull().default(false),
+  readByUser: boolean("read_by_user").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({ id: true, createdAt: true, updatedAt: true, resolvedAt: true, lastAdminReplyAt: true, lastUserReplyAt: true });
+export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
+export type SupportTicket = typeof supportTickets.$inferSelect;
+
+export const insertSupportMessageSchema = createInsertSchema(supportMessages).omit({ id: true, createdAt: true });
+export type InsertSupportMessage = z.infer<typeof insertSupportMessageSchema>;
+export type SupportMessage = typeof supportMessages.$inferSelect;
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertTripSchema = createInsertSchema(trips).omit({ id: true, createdAt: true, completedAt: true });
