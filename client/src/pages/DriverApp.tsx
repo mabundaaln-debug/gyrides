@@ -180,7 +180,10 @@ export default function DriverApp() {
     setNearDropoff(dist <= COMPLETION_RADIUS_M);
   }, [driverGps, tripPhase, onTrip?.dropoffLat, onTrip?.dropoffLng]);
 
-  // ── Fetch turn-by-turn nav steps when trip phase changes ──
+  // ── Fetch turn-by-turn nav steps when trip phase changes or GPS first becomes available ──
+  // gpsReady flips only once (null→available), so the effect re-runs exactly once when GPS
+  // arrives — preventing stale routes built from the synthetic fallback origin.
+  const gpsReady = !!driverGps;
   useEffect(() => {
     if (!onTrip || tripPhase === "pickup") {
       setNavSteps([]);
@@ -204,7 +207,8 @@ export default function DriverApp() {
         setNavCollapsed(false);
       })
       .catch(() => {});
-  }, [tripPhase, onTrip?.id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tripPhase, onTrip?.id, gpsReady]);
 
   // ── Advance through nav steps as driver approaches each maneuver point ──
   useEffect(() => {
