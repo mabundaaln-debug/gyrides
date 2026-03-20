@@ -81,6 +81,7 @@ export default function DriverApp() {
   const [nearDropoff, setNearDropoff] = useState(false);
   const [navSteps, setNavSteps] = useState<NavStep[]>([]);
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
+  const [navCollapsed, setNavCollapsed] = useState(false);
   const [pinEntry, setPinEntry] = useState("");
   const [pinVerified, setPinVerified] = useState(false);
   const [pinError, setPinError] = useState("");
@@ -200,6 +201,7 @@ export default function DriverApp() {
         setNavSteps(steps);
         // Start from index 1 — skip the "depart" step, show the first real maneuver ahead
         setCurrentStepIdx(steps.length > 1 ? 1 : 0);
+        setNavCollapsed(false);
       })
       .catch(() => {});
   }, [tripPhase, onTrip?.id]);
@@ -776,43 +778,75 @@ export default function DriverApp() {
           </div>
         </div>
 
-        {/* ── Turn-by-turn navigation bar ── */}
-        {navSteps.length > 0 && tripPhase !== "pickup" && navSteps[currentStepIdx] && (
-          <div className="absolute top-[72px] left-0 right-0 z-20 px-3" data-testid="nav-bar">
-            <div className="bg-black rounded-2xl px-4 py-3 shadow-2xl flex items-center gap-3">
-              <div className="w-11 h-11 bg-yellow-400 rounded-xl flex items-center justify-center shrink-0 text-black">
-                <ManeuverIcon
-                  maneuver={navSteps[currentStepIdx].maneuver}
-                  modifier={navSteps[currentStepIdx].modifier}
-                />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-white font-bold text-sm leading-tight" data-testid="nav-instruction">
-                  {navSteps[currentStepIdx].instruction}
-                </p>
-                {currentStepIdx + 1 < navSteps.length && (
-                  <p className="text-gray-400 text-[11px] mt-0.5 truncate">
-                    then {navSteps[currentStepIdx + 1].instruction}
-                  </p>
+        {/* ── Turn-by-turn navigation bar (requires live GPS) ── */}
+        {navSteps.length > 0 && driverGps && tripPhase !== "pickup" && navSteps[currentStepIdx] && (() => {
+          const step = navSteps[currentStepIdx];
+          const stepDist = Math.round(haversineMeters(driverGps.lat, driverGps.lng, step.lat, step.lng));
+          const stepDistLabel = stepDist >= 1000 ? `${(stepDist / 1000).toFixed(1)} km` : `${stepDist} m`;
+          const totalRem: number | null = tripPhase === "inprogress" && distToDropoff !== null
+            ? distToDropoff
+            : onTrip?.pickupLat && onTrip?.pickupLng
+              ? Math.round(haversineMeters(driverGps.lat, driverGps.lng, onTrip.pickupLat, onTrip.pickupLng))
+              : null;
+          const totalRemLabel = totalRem !== null
+            ? (totalRem >= 1000 ? `${(totalRem / 1000).toFixed(1)} km` : `${totalRem} m`)
+            : null;
+
+          return (
+            <div className="absolute top-[72px] left-0 right-0 z-20 px-3" data-testid="nav-bar">
+              <div className="bg-black rounded-2xl shadow-2xl overflow-hidden">
+                {/* Main row — always visible */}
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <div className="w-11 h-11 bg-yellow-400 rounded-xl flex items-center justify-center shrink-0 text-black">
+                    <ManeuverIcon maneuver={step.maneuver} modifier={step.modifier} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-bold text-sm leading-tight" data-testid="nav-instruction">
+                      {step.instruction}
+                    </p>
+                    {!navCollapsed && currentStepIdx + 1 < navSteps.length && (
+                      <p className="text-gray-400 text-[11px] mt-0.5 truncate">
+                        then {navSteps[currentStepIdx + 1].instruction}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {!navCollapsed && (
+                      <div className="text-right" data-testid="nav-distance">
+                        <p className="text-yellow-400 font-bold text-base tabular-nums leading-none">{stepDistLabel}</p>
+                        <p className="text-gray-500 text-[10px] mt-0.5">to turn</p>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => setNavCollapsed(v => !v)}
+                      className="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center"
+                      data-testid="btn-nav-collapse"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        {navCollapsed
+                          ? <polyline points="6 9 12 15 18 9"/>
+                          : <polyline points="18 15 12 9 6 15"/>
+                        }
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Totals strip — only when expanded and total is known */}
+                {!navCollapsed && totalRemLabel && (
+                  <div className="border-t border-gray-800 px-4 py-2 flex items-center gap-2" data-testid="nav-total-remaining">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#facc15" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+                    </svg>
+                    <p className="text-gray-400 text-[11px]">
+                      <span className="text-yellow-400 font-bold">{totalRemLabel}</span> remaining to {tripPhase === "arriving" ? "pickup" : "destination"}
+                    </p>
+                  </div>
                 )}
               </div>
-              <div className="text-right shrink-0" data-testid="nav-distance">
-                <p className="text-yellow-400 font-bold text-base tabular-nums leading-none">
-                  {driverGps
-                    ? (() => {
-                        const m = Math.round(haversineMeters(driverGps.lat, driverGps.lng, navSteps[currentStepIdx].lat, navSteps[currentStepIdx].lng));
-                        return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${m} m`;
-                      })()
-                    : navSteps[currentStepIdx].distance >= 1000
-                      ? `${(navSteps[currentStepIdx].distance / 1000).toFixed(1)} km`
-                      : `${navSteps[currentStepIdx].distance} m`
-                  }
-                </p>
-                <p className="text-gray-500 text-[10px] mt-0.5">ahead</p>
-              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         <div className="flex-1 relative">
           <GiyaniMap
