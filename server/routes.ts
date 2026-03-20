@@ -101,13 +101,43 @@ export async function registerRoutes(
   app.get("/api/directions", async (req, res) => {
     const { origin, destination } = req.query;
     if (!origin || !destination) {
-      return res.json({ routes: [], distance: 0, duration: 0 });
+      return res.json({ routes: [], distance: 0, duration: 0, steps: [] });
     }
     const [oLat, oLng] = (origin as string).split(",").map(Number);
     const [dLat, dLng] = (destination as string).split(",").map(Number);
 
+    function buildInstruction(type: string, modifier: string | undefined, roadName: string | undefined): string {
+      const road = roadName && roadName.trim() !== "" ? ` on ${roadName}` : "";
+      switch (type) {
+        case "depart":    return `Head ${modifier || "straight"}${road}`;
+        case "arrive":    return "Arrive at destination";
+        case "turn": {
+          if (modifier === "left")        return `Turn left${road}`;
+          if (modifier === "right")       return `Turn right${road}`;
+          if (modifier === "slight left") return `Bear left${road}`;
+          if (modifier === "slight right")return `Bear right${road}`;
+          if (modifier === "sharp left")  return `Sharp left${road}`;
+          if (modifier === "sharp right") return `Sharp right${road}`;
+          if (modifier === "uturn")       return `Make a U-turn${road}`;
+          return `Continue straight${road}`;
+        }
+        case "new name":        return `Continue${road}`;
+        case "continue":        return `Continue straight${road}`;
+        case "merge":           return `Merge${road}`;
+        case "on ramp":         return `Take the ramp${road}`;
+        case "off ramp":        return `Take the exit${road}`;
+        case "fork":            return modifier?.includes("left") ? `Keep left${road}` : `Keep right${road}`;
+        case "end of road":     return modifier === "left" ? `Turn left${road}` : `Turn right${road}`;
+        case "roundabout":
+        case "rotary":          return `Take the roundabout${road}`;
+        case "exit roundabout":
+        case "exit rotary":     return `Exit the roundabout${road}`;
+        default:                return `Continue${road}`;
+      }
+    }
+
     try {
-      const url = `https://router.project-osrm.org/route/v1/driving/${oLng},${oLat};${dLng},${dLat}?overview=full&geometries=geojson`;
+      const url = `https://router.project-osrm.org/route/v1/driving/${oLng},${oLat};${dLng},${dLat}?overview=full&geometries=geojson&steps=true`;
       const response = await fetch(url);
       const data = await response.json();
       if (data.routes && data.routes.length > 0) {
@@ -115,11 +145,27 @@ export async function registerRoutes(
         const points: [number, number][] = coords.map((c: [number, number]) => [c[1], c[0]]);
         const distKm = Math.round((data.routes[0].distance / 1000) * 10) / 10;
         const durMin = Math.round(data.routes[0].duration / 60);
-        return res.json({ routes: points, distance: distKm, duration: durMin });
+
+        const steps: Array<{ instruction: string; distance: number; lat: number; lng: number; maneuver: string; modifier: string }> = [];
+        if (data.routes[0].legs?.[0]?.steps) {
+          for (const step of data.routes[0].legs[0].steps) {
+            const m = step.maneuver;
+            steps.push({
+              instruction: buildInstruction(m.type, m.modifier, step.name),
+              distance: Math.round(step.distance),
+              lat: m.location[1],
+              lng: m.location[0],
+              maneuver: m.type,
+              modifier: m.modifier || "straight",
+            });
+          }
+        }
+
+        return res.json({ routes: points, distance: distKm, duration: durMin, steps });
       }
-      return res.json({ routes: [], distance: 0, duration: 0 });
+      return res.json({ routes: [], distance: 0, duration: 0, steps: [] });
     } catch {
-      return res.json({ routes: [], distance: 0, duration: 0 });
+      return res.json({ routes: [], distance: 0, duration: 0, steps: [] });
     }
   });
 

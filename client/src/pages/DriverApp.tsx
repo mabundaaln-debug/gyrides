@@ -22,6 +22,43 @@ function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number)
 }
 
 const COMPLETION_RADIUS_M = 200;
+const STEP_ADVANCE_RADIUS_M = 60;
+
+type NavStep = {
+  instruction: string;
+  distance: number;
+  lat: number;
+  lng: number;
+  maneuver: string;
+  modifier: string;
+};
+
+function ManeuverIcon({ maneuver, modifier }: { maneuver: string; modifier: string }) {
+  if (maneuver === "arrive") {
+    return (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+      </svg>
+    );
+  }
+  const rotation =
+    modifier === "left" || modifier === "sharp left" ? -90
+    : modifier === "slight left" ? -50
+    : modifier === "right" || modifier === "sharp right" ? 90
+    : modifier === "slight right" ? 50
+    : modifier === "uturn" ? 180
+    : 0;
+  return (
+    <svg
+      width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+      style={{ transform: `rotate(${rotation}deg)`, transition: "transform 0.3s" }}
+    >
+      <line x1="12" y1="19" x2="12" y2="5"/>
+      <polyline points="5 12 12 5 19 12"/>
+    </svg>
+  );
+}
 
 export default function DriverApp() {
   const { user, setUser, logout } = useAuth();
@@ -42,6 +79,8 @@ export default function DriverApp() {
   const [riderPos, setRiderPos] = useState<{ lat: number; lng: number } | null>(null);
   const [distToDropoff, setDistToDropoff] = useState<number | null>(null);
   const [nearDropoff, setNearDropoff] = useState(false);
+  const [navSteps, setNavSteps] = useState<NavStep[]>([]);
+  const [currentStepIdx, setCurrentStepIdx] = useState(0);
   const [pinEntry, setPinEntry] = useState("");
   const [pinVerified, setPinVerified] = useState(false);
   const [pinError, setPinError] = useState("");
@@ -139,6 +178,42 @@ export default function DriverApp() {
     setDistToDropoff(Math.round(dist));
     setNearDropoff(dist <= COMPLETION_RADIUS_M);
   }, [driverGps, tripPhase, onTrip?.dropoffLat, onTrip?.dropoffLng]);
+
+  // ── Fetch turn-by-turn nav steps when trip phase changes ──
+  useEffect(() => {
+    if (!onTrip || tripPhase === "pickup") {
+      setNavSteps([]);
+      setCurrentStepIdx(0);
+      return;
+    }
+    const destLat = tripPhase === "arriving" ? onTrip.pickupLat : onTrip.dropoffLat;
+    const destLng = tripPhase === "arriving" ? onTrip.pickupLng : onTrip.dropoffLng;
+    if (!destLat || !destLng) return;
+
+    const originLat = driverGps?.lat ?? (destLat - 0.005);
+    const originLng = driverGps?.lng ?? (destLng - 0.005);
+
+    fetch(`/api/directions?origin=${originLat},${originLng}&destination=${destLat},${destLng}`)
+      .then(r => r.json())
+      .then(data => {
+        const steps: NavStep[] = data.steps || [];
+        setNavSteps(steps);
+        // Start from index 1 — skip the "depart" step, show the first real maneuver ahead
+        setCurrentStepIdx(steps.length > 1 ? 1 : 0);
+      })
+      .catch(() => {});
+  }, [tripPhase, onTrip?.id]);
+
+  // ── Advance through nav steps as driver approaches each maneuver point ──
+  useEffect(() => {
+    if (!driverGps || navSteps.length === 0) return;
+    const step = navSteps[currentStepIdx];
+    if (!step) return;
+    const dist = haversineMeters(driverGps.lat, driverGps.lng, step.lat, step.lng);
+    if (dist < STEP_ADVANCE_RADIUS_M && currentStepIdx < navSteps.length - 1) {
+      setCurrentStepIdx(prev => prev + 1);
+    }
+  }, [driverGps]);
 
   const formatElapsed = (secs: number) => {
     const m = Math.floor(secs / 60).toString().padStart(2, "0");
@@ -248,6 +323,8 @@ export default function DriverApp() {
         setOnTrip(null);
         setDistToDropoff(null);
         setNearDropoff(false);
+        setNavSteps([]);
+        setCurrentStepIdx(0);
         setTripRider(null);
         setTripStartedAt(null);
         setElapsedSeconds(0);
@@ -698,6 +775,44 @@ export default function DriverApp() {
             </button>
           </div>
         </div>
+
+        {/* ── Turn-by-turn navigation bar ── */}
+        {navSteps.length > 0 && tripPhase !== "pickup" && navSteps[currentStepIdx] && (
+          <div className="absolute top-[72px] left-0 right-0 z-20 px-3" data-testid="nav-bar">
+            <div className="bg-black rounded-2xl px-4 py-3 shadow-2xl flex items-center gap-3">
+              <div className="w-11 h-11 bg-yellow-400 rounded-xl flex items-center justify-center shrink-0 text-black">
+                <ManeuverIcon
+                  maneuver={navSteps[currentStepIdx].maneuver}
+                  modifier={navSteps[currentStepIdx].modifier}
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-bold text-sm leading-tight" data-testid="nav-instruction">
+                  {navSteps[currentStepIdx].instruction}
+                </p>
+                {currentStepIdx + 1 < navSteps.length && (
+                  <p className="text-gray-400 text-[11px] mt-0.5 truncate">
+                    then {navSteps[currentStepIdx + 1].instruction}
+                  </p>
+                )}
+              </div>
+              <div className="text-right shrink-0" data-testid="nav-distance">
+                <p className="text-yellow-400 font-bold text-base tabular-nums leading-none">
+                  {driverGps
+                    ? (() => {
+                        const m = Math.round(haversineMeters(driverGps.lat, driverGps.lng, navSteps[currentStepIdx].lat, navSteps[currentStepIdx].lng));
+                        return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${m} m`;
+                      })()
+                    : navSteps[currentStepIdx].distance >= 1000
+                      ? `${(navSteps[currentStepIdx].distance / 1000).toFixed(1)} km`
+                      : `${navSteps[currentStepIdx].distance} m`
+                  }
+                </p>
+                <p className="text-gray-500 text-[10px] mt-0.5">ahead</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 relative">
           <GiyaniMap
