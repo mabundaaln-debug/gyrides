@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
-import { MapPin, DollarSign, Star, Check, X, Menu, LogOut, Navigation, Car, Clock, TrendingUp, User, ChevronLeft, History, Phone, MessageCircle, AlertTriangle, Shield, ExternalLink, BadgeCheck, Heart, Package, Users, Bus, Upload, Banknote, FileText, Download } from "lucide-react";
+import { MapPin, DollarSign, Star, Check, X, Menu, LogOut, Navigation, Car, Clock, TrendingUp, User, ChevronLeft, History, Phone, MessageCircle, AlertTriangle, Shield, BadgeCheck, Heart, Package, Users, Bus, Upload, Banknote, FileText, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth";
@@ -281,14 +281,6 @@ export default function DriverApp() {
   };
 
   const acceptTrip = async (trip: Trip) => {
-    // Launch navigation immediately — must be before any `await` or browsers block it as a pop-up
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const navDest = `${trip.pickupLat},${trip.pickupLng}`;
-    const navUrl = isIOS
-      ? `maps://maps.apple.com/?daddr=${navDest}&dirflg=d`
-      : `https://www.google.com/maps/dir/?api=1&destination=${navDest}&travelmode=driving`;
-    window.open(navUrl, "_blank");
-
     const updated = await updateTrip(trip.id, { status: "accepted", driverId: user.id });
     setOnTrip(updated);
     setTripPhase("arriving");
@@ -318,15 +310,6 @@ export default function DriverApp() {
         if (!tripIsParcel && !pinVerified) {
           toast({ title: "PIN required", description: "Enter the rider's 4-digit Trip PIN first.", variant: "destructive" });
           return;
-        }
-        // Launch navigation to dropoff immediately (before await — keeps user gesture context)
-        if (onTrip.dropoffLat && onTrip.dropoffLng) {
-          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-          const dest = `${onTrip.dropoffLat},${onTrip.dropoffLng}`;
-          const navUrl = isIOS
-            ? `maps://maps.apple.com/?daddr=${dest}&dirflg=d`
-            : `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving`;
-          window.open(navUrl, "_blank");
         }
         const now = new Date().toISOString();
         await updateTrip(onTrip.id, { status: "in_progress", startedAt: now });
@@ -371,13 +354,6 @@ export default function DriverApp() {
   const declineTrip = () => {
     refetchRequested();
   };
-
-  const openNavigation = useCallback(() => {
-    if (!onTrip) return;
-    const lat = tripPhase === "inprogress" ? onTrip.dropoffLat : onTrip.pickupLat;
-    const lng = tripPhase === "inprogress" ? onTrip.dropoffLng : onTrip.pickupLng;
-    window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, "_blank");
-  }, [onTrip, tripPhase]);
 
   const BottomNav = () => (
     <div className="bg-white border-t border-gray-100 px-4 py-2 flex justify-around items-center" data-testid="driver-bottom-nav">
@@ -785,9 +761,6 @@ export default function DriverApp() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={openNavigation} className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center shadow-lg" data-testid="btn-navigate">
-              <ExternalLink className="h-5 w-5 text-white" />
-            </button>
             <button onClick={async () => {
               try {
                 await sendSosAlert({ tripId: onTrip.id, userId: user.id, userRole: "driver", lat: onTrip.pickupLat ?? undefined, lng: onTrip.pickupLng ?? undefined });
@@ -798,6 +771,21 @@ export default function DriverApp() {
             </button>
           </div>
         </div>
+
+        {/* ── GPS acquiring indicator — shown when no GPS yet in trip ── */}
+        {!driverGps && tripPhase !== "pickup" && (
+          <div className="absolute top-[72px] left-0 right-0 z-20 px-3">
+            <div className="bg-black/80 rounded-2xl shadow-lg px-4 py-3 flex items-center gap-3">
+              <div className="w-9 h-9 bg-yellow-400/20 rounded-xl flex items-center justify-center shrink-0 animate-pulse">
+                <Navigation className="h-5 w-5 text-yellow-400" />
+              </div>
+              <div>
+                <p className="text-white text-sm font-semibold">Acquiring GPS…</p>
+                <p className="text-gray-400 text-[11px]">Navigation will start once location is locked</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Turn-by-turn navigation bar (requires live GPS) ── */}
         {navSteps.length > 0 && driverGps && tripPhase !== "pickup" && navSteps[currentStepIdx] && (() => {
