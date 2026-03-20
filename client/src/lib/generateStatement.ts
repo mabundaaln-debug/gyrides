@@ -45,7 +45,7 @@ const MONTH_NAMES = ["January","February","March","April","May","June","July","A
 
 async function fetchLogoBase64(): Promise<string | null> {
   try {
-    const res = await fetch("/logo.png");
+    const res = await fetch("/gy-logo.png");
     if (!res.ok) return null;
     const blob = await res.blob();
     return await new Promise<string>((resolve, reject) => {
@@ -326,5 +326,16 @@ export async function generateStatementPDF(data: StatementData): Promise<void> {
   }
 
   const monthStr = MONTH_NAMES[month - 1].slice(0, 3).toUpperCase();
-  doc.save(`GYRides_Statement_${driver.fullName.replace(/\s+/g, "_")}_${monthStr}${year}.pdf`);
+  const filename = `GYRides_Statement_${driver.fullName.replace(/\s+/g, "_")}_${monthStr}${year}.pdf`;
+
+  const blob = doc.output("blob");
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 500);
 }

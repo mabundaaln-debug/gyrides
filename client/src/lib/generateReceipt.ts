@@ -2,7 +2,7 @@ import { jsPDF } from "jspdf";
 
 async function fetchLogoBase64(): Promise<string | null> {
   try {
-    const res = await fetch("/logo.png");
+    const res = await fetch("/gy-logo.png");
     if (!res.ok) return null;
     const blob = await res.blob();
     return await new Promise<string>((resolve, reject) => {
@@ -252,5 +252,15 @@ export async function generateReceiptPDF(data: ReceiptData): Promise<void> {
   doc.text("GY Rides · Giyani, Limpopo, South Africa · support via WhatsApp: +27 68 642 7644", W / 2, 291, { align: "center" });
 
   const filename = `GYRides_Receipt_${trip.id.slice(-8).toUpperCase()}.pdf`;
-  doc.save(filename);
+
+  const blob = doc.output("blob");
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 500);
 }
