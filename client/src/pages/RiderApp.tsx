@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
-import { MapPin, Search, Clock, CreditCard, ChevronLeft, Star, Home as HomeIcon, Briefcase, ShoppingBag, User, History, BookmarkPlus, Car, LogOut, Menu, X, Navigation, Share2, Crosshair, Phone, MessageCircle, Shield, AlertTriangle, Edit2, Tag, StickyNote, RotateCcw, Download, Users, Package, Heart, Bus, Banknote, Wallet, Upload, CheckCircle, Check, UserPlus, Minus, Plus, BadgeCheck, LocateFixed } from "lucide-react";
+import { MapPin, Search, Clock, CreditCard, ChevronLeft, Star, Home as HomeIcon, Briefcase, ShoppingBag, User, History, BookmarkPlus, Car, LogOut, Menu, X, Navigation, Share2, Crosshair, Phone, MessageCircle, Shield, AlertTriangle, Edit2, Tag, StickyNote, RotateCcw, Download, Users, Package, Heart, Bus, Banknote, Wallet, Upload, Camera, CheckCircle, Check, UserPlus, Minus, Plus, BadgeCheck, LocateFixed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -1421,8 +1421,8 @@ export default function RiderApp() {
                 {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.fullName} />}
                 <AvatarFallback className="bg-yellow-400 text-black text-2xl font-bold">{user.fullName[0]}</AvatarFallback>
               </Avatar>
-              <label className="absolute bottom-0 right-0 bg-black text-white rounded-full p-1.5 cursor-pointer shadow-lg hover:bg-gray-800 transition-colors" data-testid="btn-upload-photo">
-                <Upload className="h-3.5 w-3.5" />
+              <label className="absolute bottom-0 right-0 bg-yellow-400 text-black rounded-full p-1.5 cursor-pointer shadow-lg hover:bg-yellow-300 transition-colors" data-testid="btn-upload-photo">
+                <Camera className="h-3.5 w-3.5" />
                 <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
               </label>
             </div>
@@ -2299,8 +2299,11 @@ export default function RiderApp() {
             <div className="mb-6">
               <p className="text-center text-gray-500 mb-3">Rate your driver</p>
               <div className="flex items-center justify-center gap-4 mb-3">
-                <Avatar className="h-12 w-12 border-2 border-yellow-400">
-                  <AvatarFallback className="bg-yellow-400 text-black font-bold">{assignedDriver.fullName[0]}</AvatarFallback>
+                <Avatar className="h-14 w-14 border-2 border-yellow-400">
+                  {(assignedDriver.profilePhotoDoc || assignedDriver.avatarUrl) && (
+                    <AvatarImage src={assignedDriver.profilePhotoDoc || assignedDriver.avatarUrl || ""} alt={assignedDriver.fullName} className="object-cover" />
+                  )}
+                  <AvatarFallback className="bg-yellow-400 text-black font-bold text-lg">{assignedDriver.fullName[0]}</AvatarFallback>
                 </Avatar>
                 <div className="flex items-center gap-1.5">
                   <span className="font-bold">{assignedDriver.fullName}</span>

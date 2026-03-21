@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
-import { MapPin, DollarSign, Star, Check, X, Menu, LogOut, Navigation, Car, Clock, TrendingUp, User, ChevronLeft, History, Phone, MessageCircle, AlertTriangle, Shield, BadgeCheck, Heart, Package, Users, Bus, Upload, Banknote, FileText, Download } from "lucide-react";
+import { MapPin, DollarSign, Star, Check, X, Menu, LogOut, Navigation, Car, Clock, TrendingUp, User, ChevronLeft, History, Phone, MessageCircle, AlertTriangle, Shield, BadgeCheck, Heart, Package, Users, Bus, Upload, Camera, Banknote, FileText, Download } from "lucide-react";
 import SupportChat from "@/components/SupportChat";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -750,8 +750,8 @@ export default function DriverApp() {
                 {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.fullName} />}
                 <AvatarFallback className="bg-yellow-400 text-black text-2xl font-bold">{user.fullName[0]}</AvatarFallback>
               </Avatar>
-              <label className="absolute bottom-0 right-0 bg-black text-white rounded-full p-1.5 cursor-pointer shadow-lg hover:bg-gray-800 transition-colors" data-testid="btn-driver-upload-photo">
-                <Upload className="h-3.5 w-3.5" />
+              <label className="absolute bottom-0 right-0 bg-yellow-400 text-black rounded-full p-1.5 cursor-pointer shadow-lg hover:bg-yellow-300 transition-colors" data-testid="btn-driver-upload-photo">
+                <Camera className="h-3.5 w-3.5" />
                 <input type="file" accept="image/*" className="hidden" onChange={handleDriverPhotoUpload} />
               </label>
             </div>
@@ -967,8 +967,9 @@ export default function DriverApp() {
 
           {tripRider && (
             <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
-              <Avatar className="h-11 w-11">
-                <AvatarFallback className="bg-gray-200 font-bold">{tripRider.fullName[0]}</AvatarFallback>
+              <Avatar className="h-14 w-14 border-2 border-yellow-400 shrink-0">
+                {tripRider.avatarUrl && <AvatarImage src={tripRider.avatarUrl} alt={tripRider.fullName} className="object-cover" />}
+                <AvatarFallback className="bg-gray-200 font-bold text-lg">{tripRider.fullName[0]}</AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
                 <h3 className="font-bold text-sm">{tripRider.fullName}</h3>
