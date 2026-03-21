@@ -44,7 +44,7 @@ jobs:
         run: chmod +x android/gradlew
 
       - name: Build debug APK
-        run: cd android && ./gradlew assembleDebug --stacktrace --info
+        run: cd android && ./gradlew assembleDebug --stacktrace
 
       - name: Rename APK
         run: cp android/app/build/outputs/apk/debug/app-debug.apk gy-rides.apk
@@ -55,17 +55,33 @@ jobs:
           name: gy-rides-debug-apk
           path: gy-rides.apk
 
-      - name: Publish APK to GitHub Release (latest)
+      - name: Delete existing latest release (if any)
+        run: |
+          RELEASE_ID=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${{ github.repository }}/releases/tags/latest \
+            | grep '"id"' | head -1 | grep -o '[0-9]*')
+          if [ -n "$RELEASE_ID" ]; then
+            curl -s -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID
+            echo "Deleted release $RELEASE_ID"
+          fi
+          git push --delete origin latest 2>/dev/null || true
+        continue-on-error: true
+
+      - name: Publish APK to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: GY Rides — Latest Build
+          name: "GY Rides — Latest Build"
           body: |
-            **GY Rides Android App — Debug Build**
+            **GY Rides Android App**
 
-            Download and install on any Android device.
-            ⚠️ You may need to enable *Install from unknown sources* in your Android settings.
-          prerelease: false
+            Tap **gy-rides.apk** below to download and install on your Android device.
+
+            > ⚠️ Before installing: go to **Settings → Security** (or **Apps**) and enable **"Install from unknown sources"** for your browser or file manager.
+
+            Compatible with Android 5.1 (Lollipop) and above.
+          make_latest: "true"
           files: gy-rides.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
