@@ -1,4 +1,4 @@
-const CACHE_NAME = "gy-rides-v3";
+const CACHE_NAME = "gy-rides-v4";
 const STATIC_ASSETS = [
   "/gy-logo.png",
   "/gy-logo-192.png",
