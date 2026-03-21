@@ -6,3 +6,9 @@ id = "8zZM02CruxVbp2l9L-NbS"
 uri = "file://GY_Rides_Source_Code.md"
 type = "text"
 title = "GY Rides — Complete Source Code (Including All UI Components)"
+
+[[outputs]]
+id = "8TZJ_iWq2kG4hW8DZyFjk"
+uri = "file://GYRides-source.tar.gz"
+type = "unspecified"
+title = "GY Rides — Full Source Code"
