@@ -12,3 +12,4 @@ android/build/
 android/local.properties
 *.keystore
 !android/app/gyrides-release.keystore
+!android/gyrides-debug.keystore
