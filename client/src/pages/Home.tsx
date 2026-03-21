@@ -22,6 +22,10 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [isAndroid] = useState(() => /android/i.test(navigator.userAgent));
+  const [apkBannerDismissed, setApkBannerDismissed] = useState(() =>
+    localStorage.getItem("gy_apk_banner_dismissed") === "1"
+  );
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetStep, setResetStep] = useState<"verify" | "newPassword" | "success">("verify");
   const [resetPhone, setResetPhone] = useState("");
@@ -983,6 +987,34 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Android APK download banner */}
+      {isAndroid && !apkBannerDismissed && (
+        <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-2xl bg-yellow-400 text-black relative z-10 shadow-lg w-full max-w-sm">
+          <div className="flex-1">
+            <p className="font-bold text-sm leading-tight">Get the Android App</p>
+            <p className="text-xs mt-0.5 leading-tight opacity-75">Download the APK for the best experience</p>
+          </div>
+          <a
+            href="https://github.com/mabundaaln-debug/gyrides/releases/download/latest/gy-rides.apk"
+            download="gy-rides.apk"
+            className="shrink-0 flex items-center gap-1.5 bg-black text-yellow-400 font-bold text-xs px-3 py-2 rounded-xl hover:bg-gray-900 transition-colors"
+            data-testid="btn-download-apk"
+          >
+            <Download size={14} />
+            Download
+          </a>
+          <button
+            className="shrink-0 text-black/50 hover:text-black transition-colors ml-0.5"
+            onClick={() => { setApkBannerDismissed(true); localStorage.setItem("gy_apk_banner_dismissed", "1"); }}
+            data-testid="btn-dismiss-apk-banner"
+            aria-label="Dismiss"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* PWA install prompt (non-Android or no APK banner) */}
       {installPrompt && (
         <button
           className="mb-4 flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/10 border border-white/20 text-white font-semibold text-sm transition-all hover:bg-yellow-400 hover:text-black hover:border-yellow-400 relative z-10"

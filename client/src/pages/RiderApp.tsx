@@ -1239,7 +1239,17 @@ export default function RiderApp() {
             </Button>
           ))}
         </div>
-        <div className="p-4 border-t">
+        <div className="p-4 border-t space-y-1">
+          {/android/i.test(navigator.userAgent) && (
+            <a
+              href="https://github.com/mabundaaln-debug/gyrides/releases/download/latest/gy-rides.apk"
+              download="gy-rides.apk"
+              className="w-full flex items-center gap-4 h-14 px-4 rounded-xl text-base font-medium text-yellow-600 hover:bg-yellow-50 transition-colors"
+              data-testid="btn-download-apk-menu"
+            >
+              <Download className="h-5 w-5" /> Download Android App
+            </a>
+          )}
           <Button variant="ghost" className="w-full justify-start h-14 text-base rounded-xl gap-4 text-red-500" onClick={() => { logout(); setLocation("/"); }} data-testid="btn-logout">
             <LogOut className="h-5 w-5" /> Sign Out
           </Button>

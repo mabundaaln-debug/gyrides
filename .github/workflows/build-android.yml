@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
@@ -44,8 +46,26 @@ jobs:
       - name: Build debug APK
         run: cd android && ./gradlew assembleDebug --stacktrace --info
 
-      - name: Upload APK
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk gy-rides.apk
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: gy-rides-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: gy-rides.apk
+
+      - name: Publish APK to GitHub Release (latest)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: GY Rides — Latest Build
+          body: |
+            **GY Rides Android App — Debug Build**
+
+            Download and install on any Android device.
+            ⚠️ You may need to enable *Install from unknown sources* in your Android settings.
+          prerelease: false
+          files: gy-rides.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
