@@ -1,77 +1,41 @@
-name: Build GY Rides Android APK (TWA)
+name: Build GY Rides Android APK (Capacitor)
 
 # ═══════════════════════════════════════════════════════════════════
 #  HOW THIS WORKS
 # ═══════════════════════════════════════════════════════════════════
-#  Bubblewrap (Google's Trusted Web Activity CLI) wraps the deployed
-#  Replit URL into a real Android APK.  No Capacitor, no Cordova —
-#  the APK opens GY Rides in Chrome's native engine.
+#  1. Builds the Vite/React frontend (npm run build)
+#  2. Syncs web assets into the Android project (npx cap sync android)
+#  3. Compiles a Debug APK (always — no secrets needed)
+#  4. Compiles a signed Release APK (when secrets are configured)
+#  5. Uploads both APKs as GitHub Actions artifacts
 #
-#  ONE-TIME SETUP (do this once on your laptop / PC)
-# ═══════════════════════════════════════════════════════════════════
-#  STEP 1 — Generate a signing keystore
-#  ──────────────────────────────────────────────────────────────────
-#  Run this in your terminal (requires Java / keytool installed):
+#  ONE-TIME SETUP — add these 4 secrets to your GitHub repo:
+#  ─────────────────────────────────────────────────────────
+#  Repo → Settings → Secrets → Actions → New repository secret
+#
+#    KEYSTORE_BASE64    = keystore file encoded as base64
+#    KEYSTORE_PASSWORD  = your keystore password
+#    KEY_ALIAS          = gyrides
+#    KEY_PASSWORD       = your key password (often same as keystore)
+#
+#  To generate a keystore (run once on your PC / Mac):
 #
 #    keytool -genkeypair -v \
 #      -keystore gyrides.keystore \
 #      -alias gyrides \
 #      -keyalg RSA -keysize 2048 \
 #      -validity 10000 \
-#      -dname "CN=GY Rides,OU=Mpfuno Medical,O=Mpfuno Medical Services,L=Giyani,ST=Limpopo,C=ZA"
+#      -dname "CN=GY Rides,O=Mpfuno Medical Services,L=Giyani,C=ZA"
 #
-#  It will ask for a password — choose one and remember it.
-#
-#  STEP 2 — Get the SHA-256 fingerprint
-#  ──────────────────────────────────────────────────────────────────
-#    keytool -list -v -keystore gyrides.keystore -alias gyrides
-#
-#  Copy the "SHA256:" line — it looks like:
-#    AB:12:CD:34:...
-#
-#  STEP 3 — Add the fingerprint to Replit secrets
-#  ──────────────────────────────────────────────────────────────────
-#  In Replit: Secrets (lock icon) → Add secret:
-#    Name:  ANDROID_SHA256_FINGERPRINT
-#    Value: AB:12:CD:34:...  (the SHA256 from step 2)
-#
-#  Then redeploy so /.well-known/assetlinks.json serves the fingerprint.
-#
-#  STEP 4 — Encode the keystore as base64
-#  ──────────────────────────────────────────────────────────────────
-#  macOS:  base64 -i gyrides.keystore | tr -d '\n'
-#  Linux:  base64 -w 0 gyrides.keystore
-#
-#  STEP 5 — Add these 4 secrets to GitHub
-#  ──────────────────────────────────────────────────────────────────
-#  GitHub repo → Settings → Secrets → Actions → New repository secret
-#
-#    KEYSTORE_BASE64    = the base64 string from step 4
-#    KEYSTORE_PASSWORD  = password you chose in step 1
-#    KEY_ALIAS          = gyrides
-#    KEY_PASSWORD       = same password (or your key password if different)
-#
-#  STEP 6 — Update APP_URL below to your Replit deployment URL
-#  ──────────────────────────────────────────────────────────────────
-#  Change the APP_URL env var below to match your actual deployed URL,
-#  e.g.  https://gyrides-mabundaaln.replit.app
-#
-#  Then push to main — the APK will appear under Actions > Artifacts.
+#  To encode it:
+#    macOS:  base64 -i gyrides.keystore | tr -d '\n'
+#    Linux:  base64 -w 0 gyrides.keystore
 # ═══════════════════════════════════════════════════════════════════
 
 on:
   push:
     branches: [main, master]
   workflow_dispatch:
-
-env:
-  # !! UPDATE THIS to your Replit deployed URL !!
-  APP_URL: "https://gyrides-mabundaaln.replit.app"
-  APP_PACKAGE: "za.co.mpfunomedical.gyrides"
-  APP_NAME: "GY Rides"
-  APP_VERSION_CODE: "1"
-  APP_VERSION_NAME: "1.0.0"
-  KEY_ALIAS: "gyrides"
 
 jobs:
   build:
@@ -83,130 +47,104 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ── 2. Java 17 (required for Android build tools) ────────────
+      # ── 2. Java 17 ───────────────────────────────────────────────
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: "17"
           distribution: "temurin"
 
-      # ── 3. Node 20 (for Bubblewrap CLI) ──────────────────────────
+      # ── 3. Node 20 ───────────────────────────────────────────────
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "npm"
 
-      # ── 4. Install Bubblewrap ─────────────────────────────────────
-      - name: Install Bubblewrap CLI
-        run: npm install -g @bubblewrap/cli
+      # ── 4. Install dependencies ───────────────────────────────────
+      - name: Install npm dependencies
+        run: npm ci
 
-      # ── 5. Accept Android SDK licenses ───────────────────────────
-      - name: Accept Android SDK licenses
-        run: |
-          yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
-          $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager \
-            "build-tools;34.0.0" \
-            "platforms;android-34" 2>/dev/null || true
+      # ── 5. Build Vite frontend ────────────────────────────────────
+      - name: Build frontend
+        run: npx vite build
 
-      # ── 6. Decode keystore from GitHub secret ────────────────────
-      - name: Decode keystore
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > gyrides.keystore
+      # ── 6. Sync web assets into Android project ───────────────────
+      - name: Capacitor sync
+        run: npx cap sync android
 
-      # ── 7. Write the Bubblewrap TWA manifest ─────────────────────
-      - name: Write twa-manifest.json
-        run: |
-          HOST=$(echo "${{ env.APP_URL }}" | sed 's|https://||' | sed 's|http://||')
-          cat > twa-manifest.json << MANIFEST
-          {
-            "packageId": "${{ env.APP_PACKAGE }}",
-            "host": "${HOST}",
-            "name": "${{ env.APP_NAME }}",
-            "launcherName": "GY Rides",
-            "display": "standalone",
-            "orientation": "portrait",
-            "themeColor": "#000000",
-            "navigationColor": "#000000",
-            "navigationColorDark": "#000000",
-            "backgroundColor": "#000000",
-            "enableNotifications": true,
-            "startUrl": "/",
-            "iconUrl": "${{ env.APP_URL }}/gy-logo.png",
-            "maskableIconUrl": "${{ env.APP_URL }}/gy-logo-192.png",
-            "monochromeIconUrl": "${{ env.APP_URL }}/gy-logo-192.png",
-            "splashScreenFadeOutDuration": 600,
-            "signingKey": {
-              "path": "./gyrides.keystore",
-              "alias": "${{ env.KEY_ALIAS }}"
-            },
-            "appVersionCode": ${{ env.APP_VERSION_CODE }},
-            "appVersion": "${{ env.APP_VERSION_NAME }}",
-            "shortcuts": [],
-            "generatorApp": "bubblewrap-cli",
-            "webManifestUrl": "${{ env.APP_URL }}/manifest.json",
-            "fallbackType": "customtabs",
-            "features": {
-              "locationDelegation": { "enabled": true },
-              "playBilling": { "enabled": false }
-            },
-            "alphaDependencies": { "enabled": false },
-            "enableSiteSettingsShortcut": true,
-            "isChromeOSOnly": false,
-            "isMetaQuest": false,
-            "fullyImmersive": false,
-            "minSdkVersion": 24,
-            "sdkVersion": 34
-          }
-          MANIFEST
+      # ── 7. Cache Gradle ───────────────────────────────────────────
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-gradle-
 
-      # ── 8. Initialise the TWA Android project ────────────────────
-      - name: Initialise Bubblewrap project
-        run: bubblewrap init --manifest twa-manifest.json
+      # ── 8. Make Gradle executable ─────────────────────────────────
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
 
-      # ── 9. Build & sign the APK ──────────────────────────────────
-      - name: Build & sign APK
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          bubblewrap build \
-            --signingKeyPassphrase "$KEY_PASSWORD" \
-            --keystorePassword "$KEYSTORE_PASSWORD"
+      # ── 9. Debug APK (sideloadable — no signing needed) ──────────
+      - name: Build Debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --stacktrace
 
-      # ── 10. Collect the output APK ───────────────────────────────
-      - name: Collect APK
-        run: |
-          mkdir -p output
-          # Bubblewrap outputs to app-release-signed.apk
-          find . -name "*.apk" ! -path "*/output/*" | while read f; do
-            NAME="GYRides-v${{ env.APP_VERSION_NAME }}-${GITHUB_SHA:0:7}.apk"
-            cp "$f" "output/$NAME"
-            echo "Copied $f → output/$NAME"
-          done
-
-      # ── 11. Upload APK as GitHub Actions artifact ─────────────────
-      - name: Upload APK
+      - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: GYRides-APK-${{ github.sha }}
-          path: output/*.apk
+          name: GYRides-debug-${{ github.sha }}
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+      # ── 10. Signed Release APK (requires secrets) ─────────────────
+      - name: Decode keystore
+        if: ${{ env.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: echo "$KEYSTORE_BASE64" | base64 -d > android/app/gyrides-release.keystore
+
+      - name: Build Release APK
+        if: ${{ env.KEYSTORE_BASE64 != '' }}
+        working-directory: android
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file=$GITHUB_WORKSPACE/android/app/gyrides-release.keystore \
+            -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
+            -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
+            -Pandroid.injected.signing.key.password=$KEY_PASSWORD \
+            --stacktrace
+
+      - name: Upload Release APK
+        if: ${{ env.KEYSTORE_BASE64 != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: GYRides-release-${{ github.sha }}
+          path: android/app/build/outputs/apk/release/app-release.apk
           retention-days: 90
 
-      # ── 12. Attach APK to a GitHub Release (when you push a tag) ──
+      # ── 11. GitHub Release on version tag ─────────────────────────
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: output/*.apk
+          files: |
+            android/app/build/outputs/apk/release/app-release.apk
+            android/app/build/outputs/apk/debug/app-debug.apk
           name: GY Rides ${{ github.ref_name }}
           body: |
-            ## GY Rides Android APK ${{ github.ref_name }}
+            ## GY Rides Android APK — ${{ github.ref_name }}
 
-            Download the APK below and install it directly on any Android phone.
-
-            ### Install steps
-            1. Download `GYRides-*.apk`
-            2. On your phone: **Settings → Apps → Install unknown apps** → allow your browser/files app
+            ### Install
+            1. Download `app-release.apk` (signed) or `app-debug.apk` (debug/sideload)
+            2. On your phone: **Settings → Apps → Install unknown apps** → allow your browser
             3. Open the downloaded APK and tap **Install**
 
             Minimum Android: 7.0 (API 24)
