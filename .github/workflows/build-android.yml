@@ -43,7 +43,14 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
+      - name: Decode signing keystore
+        run: |
+          base64 -d android/gyrides-debug.b64 > android/gyrides-debug.keystore
+
       - name: Build debug APK
+        env:
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
+          ANDROID_VERSION_NAME: "1.0.${{ github.run_number }}"
         run: cd android && ./gradlew assembleDebug --stacktrace --info
 
       - name: Rename APK
@@ -63,8 +70,15 @@ jobs:
           body: |
             **GY Rides Android App — Debug Build**
 
-            Download and install on any Android device.
-            ⚠️ You may need to enable *Install from unknown sources* in your Android settings.
+            Download and install on any Android device (Android 6.0+).
+
+            **Installation steps:**
+            1. Download `gy-rides.apk`
+            2. Open the downloaded file on your Android device
+            3. If prompted, enable *Install from unknown sources* (or *Install unknown apps*) for your browser/file manager
+            4. Tap **Install**
+
+            > ⚠️ If you installed an older build (before this consistent-signing fix) and see "App not installed", please **uninstall the old version first**, then install this one. Future updates will install directly without uninstalling.
           prerelease: false
           files: gy-rides.apk
         env:

@@ -53,7 +53,9 @@ captures/
 .idea/navEditor.xml
 
 # Keystore files
-# Uncomment the following lines if you do not want to check your keystore files in.
+# gyrides-debug.b64 is committed (base64-encoded keystore for CI signing)
+# gyrides-debug.keystore is generated at build time and must not be committed
+gyrides-debug.keystore
 #*.jks
 #*.keystore
 
