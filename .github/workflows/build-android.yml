@@ -43,11 +43,11 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      - name: Build APK (signed with fixed keystore)
-        run: cd android && ./gradlew assembleDebug --stacktrace
+      - name: Build release APK (signed with fixed keystore)
+        run: cd android && ./gradlew assembleRelease --stacktrace
 
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk gy-rides.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk gy-rides.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -74,13 +74,13 @@ jobs:
           tag_name: latest
           name: "GY Rides — Latest Build"
           body: |
-            **GY Rides Android App**
+            **GY Rides Android App — Release Build**
 
             Tap **gy-rides.apk** below to download and install on your Android device.
 
             > ⚠️ Before installing: go to **Settings → Security** (or **Apps**) and enable **"Install from unknown sources"** for your browser or file manager.
 
-            Compatible with Android 5.1 (Lollipop) and above.
+            Compatible with Android 5.0 (Lollipop, API 21) and above.
           make_latest: "true"
           files: gy-rides.apk
         env:
