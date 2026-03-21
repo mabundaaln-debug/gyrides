@@ -1,5 +1,15 @@
 apply plugin: 'com.android.application'
 
+// Fix: duplicate Kotlin stdlib classes (kotlin-stdlib vs kotlin-stdlib-jdk8)
+configurations.all {
+    resolutionStrategy {
+        force 'org.jetbrains.kotlin:kotlin-stdlib:1.9.24'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.24'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.24'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-common:1.9.24'
+    }
+}
+
 android {
     namespace "za.co.mpfunomedical.gyrides"
     compileSdk rootProject.ext.compileSdkVersion
