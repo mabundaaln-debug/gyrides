@@ -392,6 +392,13 @@ export default function DriverApp() {
         setView("home");
         queryClient.invalidateQueries({ queryKey: ["/api/trips/driver"] });
         toast({ title: "Trip completed!", description: `Fare: ${fareDisplay} · Duration: ${durationText}` });
+        // Refresh driver's user data (earnings, totalTrips) from server
+        if (onTrip.paymentMethod !== "cash") {
+          try {
+            const fresh = await fetch(`/api/users/${user!.id}`, { credentials: "include" }).then(r => r.json());
+            if (fresh?.id) setUser(fresh);
+          } catch {}
+        }
       }
     } catch (err: any) {
       console.error("advanceTrip error:", err);
@@ -1064,6 +1071,10 @@ export default function DriverApp() {
                     await confirmCashPayment(onTrip.id);
                     setCashConfirmed(true);
                     toast({ title: "Cash received ✓", description: `R${onTrip.fare?.toFixed(2)} confirmed. Earnings updated.` });
+                    try {
+                      const fresh = await fetch(`/api/users/${user.id}`, { credentials: "include" }).then(r => r.json());
+                      if (fresh?.id) setUser(fresh);
+                    } catch {}
                     try {
                       await fetch("/api/messages", {
                         method: "POST",

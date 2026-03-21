@@ -830,8 +830,61 @@ export async function registerRoutes(
   });
 
   app.patch("/api/trips/:id", async (req, res) => {
+    const existingTrip = await storage.getTrip(req.params.id);
+    if (!existingTrip) return res.status(404).json({ message: "Trip not found" });
     const trip = await storage.updateTrip(req.params.id, req.body);
     if (!trip) return res.status(404).json({ message: "Trip not found" });
+
+    // ── Post-completion hooks (run only once, first time status flips to completed) ──
+    if (req.body.status === "completed" && existingTrip.status !== "completed") {
+      // 1. Update driver earnings for all non-cash payments (cash is handled by /confirm-cash)
+      if (trip.driverId && trip.paymentMethod !== "cash") {
+        try {
+          const driver = await storage.getUser(trip.driverId);
+          if (driver) {
+            const driverShare = Math.round((trip.fare || 0) * 0.85 * 100) / 100;
+            await storage.updateUser(trip.driverId, {
+              earnings: (driver.earnings || 0) + driverShare,
+              totalTrips: (driver.totalTrips || 0) + 1,
+            } as any);
+          }
+        } catch {}
+      }
+      // 2. Deduct rider wallet balance for ewallet payments
+      if (trip.paymentMethod === "ewallet") {
+        try {
+          const rider = await storage.getUser(trip.riderId);
+          if (rider && (rider.walletBalance || 0) > 0) {
+            const newBalance = Math.max(0, (rider.walletBalance || 0) - (trip.fare || 0));
+            await storage.updateUser(trip.riderId, { walletBalance: newBalance } as any);
+          }
+        } catch {}
+      }
+      // 3. Update rider totalTrips for non-cash (cash done in /confirm-cash)
+      if (trip.paymentMethod !== "cash") {
+        try {
+          const rider = await storage.getUser(trip.riderId);
+          if (rider) {
+            await storage.updateUser(trip.riderId, { totalTrips: (rider.totalTrips || 0) + 1 } as any);
+          }
+        } catch {}
+      }
+    }
+
+    // ── Recalculate driver's rolling average rating when a rating is submitted ──
+    if (req.body.rating && trip.driverId) {
+      try {
+        const driverTrips = await storage.getTripsByDriver(trip.driverId);
+        const ratings = driverTrips
+          .filter(t => t.rating != null && t.rating > 0)
+          .map(t => t.rating as number);
+        if (ratings.length > 0) {
+          const avg = ratings.reduce((s, r) => s + r, 0) / ratings.length;
+          await storage.updateUser(trip.driverId, { rating: Math.round(avg * 10) / 10 } as any);
+        }
+      } catch {}
+    }
+
     return res.json(trip);
   });
 
@@ -861,6 +914,31 @@ export async function registerRoutes(
   app.delete("/api/saved-places/:id", async (req, res) => {
     await storage.deleteSavedPlace(req.params.id);
     return res.status(204).send();
+  });
+
+  // ── Promo Codes ──
+  const PROMO_CODES: Record<string, { discount: number; description: string; onePerUser: boolean }> = {
+    "GYFIRST": { discount: 0.20, description: "20% off your first ride!", onePerUser: true },
+    "GYRIDES": { discount: 0.10, description: "10% off your ride!", onePerUser: false },
+    "WELCOME10": { discount: 0.10, description: "Welcome! 10% off today.", onePerUser: false },
+  };
+
+  app.post("/api/promo-codes/validate", async (req, res) => {
+    try {
+      const { code, riderId } = req.body;
+      if (!code) return res.status(400).json({ valid: false, message: "No code provided" });
+      const promo = PROMO_CODES[code.toUpperCase().trim()];
+      if (!promo) return res.status(404).json({ valid: false, message: "Invalid promo code" });
+      if (promo.onePerUser && riderId) {
+        const rider = await storage.getUser(riderId);
+        if (rider && (rider.totalTrips || 0) > 0) {
+          return res.status(400).json({ valid: false, message: "GYFIRST is only for first-time riders" });
+        }
+      }
+      return res.json({ valid: true, discount: promo.discount, description: promo.description });
+    } catch (err: any) {
+      return res.status(500).json({ valid: false, message: err.message });
+    }
   });
 
   // ── Vehicle Types ──

@@ -81,6 +81,9 @@ export default function RiderApp() {
   const [tripPin, setTripPin] = useState("");
   const [rideNote, setRideNote] = useState("");
   const [promoCode, setPromoCode] = useState("");
+  const [promoDiscount, setPromoDiscount] = useState(0);
+  const [promoDescription, setPromoDescription] = useState("");
+  const [promoApplying, setPromoApplying] = useState(false);
   const [driverRating, setDriverRating] = useState(0);
   const [rideStatus, setRideStatus] = useState<"searching" | "on_the_way" | "arrived" | "in_progress">("searching");
   const rideStatusRef = useRef(rideStatus);
@@ -694,7 +697,8 @@ export default function RiderApp() {
     }
 
     const minFare = vt.minimumFare ?? 25;
-    const total = Math.max(subtotal, minFare);
+    let total = Math.max(subtotal, minFare);
+    if (promoDiscount > 0) total = Math.max(minFare, Math.round(total * (1 - promoDiscount)));
     const driverEarns = Math.round(total * (1 - PLATFORM_COMMISSION));
     return { baseFare, distFare: Math.round(distFare), timeFare: Math.round(timeFare), rural, total, driverEarns, minApplied: subtotal < minFare };
   };
@@ -861,14 +865,18 @@ export default function RiderApp() {
       await updateTrip(currentTrip.id, { status: "completed", rating: driverRating || 5 });
     }
     queryClient.invalidateQueries({ queryKey: ["/api/trips/rider"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/users"] });
     setCurrentTrip(null);
     setAssignedDriver(null);
     setPickup(null);
     setDropoff(null);
     setRideNote("");
     setPromoCode("");
+    setPromoDiscount(0);
+    setPromoDescription("");
     setMedicalNotes("");
     setParcelDescription("");
+    setDriverRating(0);
     setView("home");
     toast({ title: "Trip completed!", description: "Thanks for riding with GY Rides" });
   };
@@ -1114,12 +1122,20 @@ export default function RiderApp() {
             <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
               <h4 className="font-bold text-sm text-blue-800 mb-2">EFT Banking Details</h4>
               <div className="text-xs text-blue-700 space-y-1">
+                <p className="font-semibold">Mpfuno Medical Services (PTY) LTD</p>
                 <p>Bank: FNB</p>
-                <p>Account: 62 XXX XXX XXX</p>
                 <p>Branch Code: 250 655</p>
                 <p>Reference: Your phone number</p>
               </div>
-              <p className="text-[10px] text-blue-600 mt-2">Upload proof of payment after transferring</p>
+              <a
+                href="https://wa.me/27686427644?text=Hi%20GY%20Rides!%20Please%20send%20me%20your%20EFT%20bank%20account%20details."
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 mt-3 bg-green-500 text-white rounded-lg px-3 py-2 text-xs font-bold w-fit"
+              >
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-current"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                WhatsApp for account details
+              </a>
             </div>
           )}
         </div>
@@ -1842,11 +1858,55 @@ export default function RiderApp() {
               <StickyNote className="h-4 w-4 text-gray-400 shrink-0" />
               <input placeholder={rideType === "medical" ? "Special requirements..." : "Add a note (e.g., Call when you arrive)"} value={rideNote} onChange={e => setRideNote(e.target.value)} className="flex-1 text-sm outline-none bg-transparent" data-testid="input-ride-note" />
             </div>
-            <div className="bg-white rounded-xl p-3 border border-gray-100 flex items-center gap-3">
-              <Tag className="h-4 w-4 text-gray-400 shrink-0" />
-              <input placeholder="Promo code" value={promoCode} onChange={e => setPromoCode(e.target.value)} className="flex-1 text-sm outline-none bg-transparent" data-testid="input-promo-code" />
-              {promoCode && <button className="text-xs font-bold text-yellow-600">Apply</button>}
+            <div className={`rounded-xl p-3 border flex items-center gap-3 ${promoDiscount > 0 ? "bg-green-50 border-green-300" : "bg-white border-gray-100"}`}>
+              <Tag className={`h-4 w-4 shrink-0 ${promoDiscount > 0 ? "text-green-600" : "text-gray-400"}`} />
+              <input
+                placeholder="Promo code"
+                value={promoCode}
+                onChange={e => { setPromoCode(e.target.value); if (promoDiscount > 0) { setPromoDiscount(0); setPromoDescription(""); } }}
+                className="flex-1 text-sm outline-none bg-transparent"
+                data-testid="input-promo-code"
+                style={{ textTransform: "uppercase" }}
+              />
+              {promoDiscount > 0
+                ? <span className="text-xs font-bold text-green-600">{Math.round(promoDiscount * 100)}% OFF</span>
+                : promoCode.trim().length >= 3 && (
+                  <button
+                    className="text-xs font-bold text-yellow-600 disabled:opacity-50"
+                    disabled={promoApplying}
+                    data-testid="btn-apply-promo"
+                    onClick={async () => {
+                      setPromoApplying(true);
+                      try {
+                        const res = await fetch("/api/promo-codes/validate", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ code: promoCode.trim(), riderId: user.id }),
+                          credentials: "include",
+                        });
+                        const data = await res.json();
+                        if (data.valid) {
+                          setPromoDiscount(data.discount);
+                          setPromoDescription(data.description);
+                          toast({ title: "Promo applied! 🎉", description: data.description });
+                        } else {
+                          toast({ title: "Invalid code", description: data.message, variant: "destructive" });
+                        }
+                      } catch {
+                        toast({ title: "Could not apply promo", variant: "destructive" });
+                      } finally {
+                        setPromoApplying(false);
+                      }
+                    }}
+                  >
+                    {promoApplying ? "..." : "Apply"}
+                  </button>
+                )
+              }
             </div>
+            {promoDescription && (
+              <p className="text-xs text-green-600 font-semibold px-1">{promoDescription}</p>
+            )}
           </div>
 
           <Button
