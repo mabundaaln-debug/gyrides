@@ -798,15 +798,18 @@ export default function DriverApp() {
           </div>
         )}
 
-        {/* ── Turn-by-turn navigation bar (requires live GPS) ── */}
-        {navSteps.length > 0 && driverGps && tripPhase !== "pickup" && navSteps[currentStepIdx] && (() => {
+        {/* ── Turn-by-turn navigation bar (shows immediately; GPS lock refines distances) ── */}
+        {navSteps.length > 0 && tripPhase !== "pickup" && navSteps[currentStepIdx] && (() => {
           const step = navSteps[currentStepIdx];
-          const stepDist = Math.round(haversineMeters(driverGps.lat, driverGps.lng, step.lat, step.lng));
+          // Use live GPS if available, else fall back to trip origin for distance calculations
+          const originLat = driverGps?.lat ?? (tripPhase === "arriving" ? (onTrip.pickupLat ?? -23.31) - 0.003 : (onTrip.dropoffLat ?? -23.31) - 0.003);
+          const originLng = driverGps?.lng ?? (tripPhase === "arriving" ? (onTrip.pickupLng ?? 30.72) + 0.003 : (onTrip.dropoffLng ?? 30.72) + 0.003);
+          const stepDist = Math.round(haversineMeters(originLat, originLng, step.lat, step.lng));
           const stepDistLabel = stepDist >= 1000 ? `${(stepDist / 1000).toFixed(1)} km` : `${stepDist} m`;
           const totalRem: number | null = tripPhase === "inprogress" && distToDropoff !== null
             ? distToDropoff
             : onTrip?.pickupLat && onTrip?.pickupLng
-              ? Math.round(haversineMeters(driverGps.lat, driverGps.lng, onTrip.pickupLat, onTrip.pickupLng))
+              ? Math.round(haversineMeters(originLat, originLng, onTrip.pickupLat, onTrip.pickupLng))
               : null;
           const totalRemLabel = totalRem !== null
             ? (totalRem >= 1000 ? `${(totalRem / 1000).toFixed(1)} km` : `${totalRem} m`)

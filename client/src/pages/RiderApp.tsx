@@ -485,6 +485,8 @@ export default function RiderApp() {
           const charge = await chargeYocoToken({ token: result.id, amountInCents: Math.round(fare * 100), tripId, riderId: user?.id });
           setCardCharged(true);
           setCardChargeId(charge.chargeId);
+          // Immediately mark trip as paid in local state so UI updates without waiting for poll
+          setCurrentTrip(prev => prev ? { ...prev, paymentStatus: "paid" as any } : prev);
           toast({ title: "Card verified ✓", description: `R${fare} charged successfully. Your ride is confirmed.` });
           onSuccess();
         } catch (err: any) {
@@ -2158,6 +2160,8 @@ export default function RiderApp() {
   if (view === "completed") {
     const isCash = currentTrip?.paymentMethod === "cash";
     const isCard = currentTrip?.paymentMethod === "card";
+    const isEft = currentTrip?.paymentMethod === "eft";
+    const isEwallet = currentTrip?.paymentMethod === "ewallet";
     const isPaid = currentTrip?.paymentStatus === "paid" || cardCharged;
     const fare = currentTrip?.fare ?? 0;
 
@@ -2229,6 +2233,22 @@ export default function RiderApp() {
                 <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-2" />
                 <p className="text-green-700 font-black text-xl mb-0.5">R{fare} paid by card</p>
                 <p className="text-green-600 text-sm">Payment confirmed</p>
+              </div>
+            )}
+
+            {isEft && (
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-3xl p-5 text-center mb-4" data-testid="payment-eft-card">
+                <Upload className="h-10 w-10 text-blue-500 mx-auto mb-2" />
+                <p className="text-blue-700 font-black text-xl mb-0.5">R{fare} via EFT</p>
+                <p className="text-blue-600 text-sm">Please send your EFT proof of payment to the driver</p>
+              </div>
+            )}
+
+            {isEwallet && (
+              <div className="bg-purple-50 border-2 border-purple-200 rounded-3xl p-5 text-center mb-4" data-testid="payment-ewallet-card">
+                <Wallet className="h-10 w-10 text-purple-500 mx-auto mb-2" />
+                <p className="text-purple-700 font-black text-xl mb-0.5">R{fare} via eWallet</p>
+                <p className="text-purple-600 text-sm">Send eWallet payment to your driver now</p>
               </div>
             )}
           </div>
