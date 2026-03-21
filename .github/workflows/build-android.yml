@@ -43,7 +43,7 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      - name: Build debug APK
+      - name: Build APK (signed with fixed keystore)
         run: cd android && ./gradlew assembleDebug --stacktrace
 
       - name: Rename APK

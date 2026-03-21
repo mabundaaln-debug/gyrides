@@ -28,12 +28,25 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Fixed signing config — same key on every build so reinstalls always work
+    signingConfigs {
+        debug {
+            storeFile file("${rootDir}/../android/gyrides-debug.keystore")
+            storePassword 'gyrides123'
+            keyAlias 'gyrides-debug'
+            keyPassword 'gyrides123'
+        }
+    }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_21
         targetCompatibility JavaVersion.VERSION_21
     }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
+            signingConfig signingConfigs.debug
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
