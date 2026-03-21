@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { Car, User, Settings, ArrowRight, LogIn, UserPlus, Eye, EyeOff, Download, ArrowLeft, Phone, KeyRound, CheckCircle2, ShieldCheck, Fingerprint, X, FileText, Check } from "lucide-react";
+import { Car, User, Settings, ArrowRight, LogIn, UserPlus, Eye, EyeOff, Download, ArrowLeft, Phone, KeyRound, CheckCircle2, ShieldCheck, Fingerprint, X, FileText, Check, Share, Plus, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
@@ -30,6 +30,9 @@ export default function Home() {
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showIOSInstallModal, setShowIOSInstallModal] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -38,6 +41,14 @@ export default function Home() {
       setInstallPrompt(e);
     };
     window.addEventListener("beforeinstallprompt", handler);
+
+    // Detect iOS
+    setIsIOS(/iphone|ipad|ipod/i.test(navigator.userAgent));
+
+    // Detect if already installed as PWA
+    const standalone = (window.navigator as any).standalone === true || window.matchMedia("(display-mode: standalone)").matches;
+    setIsInstalled(standalone);
+
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
@@ -983,22 +994,50 @@ export default function Home() {
         </div>
       </div>
 
-      {installPrompt && (
-        <button
-          className="mb-4 flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/10 border border-white/20 text-white font-semibold text-sm transition-all hover:bg-yellow-400 hover:text-black hover:border-yellow-400 relative z-10"
-          onClick={async () => {
-            installPrompt.prompt();
-            const result = await installPrompt.userChoice;
-            if (result.outcome === "accepted") {
-              setInstallPrompt(null);
-              toast({ title: "App installed!", description: "GY Rides has been added to your home screen" });
-            }
-          }}
-          data-testid="btn-install-app"
-        >
-          <Download size={18} />
-          Install GY Rides App
-        </button>
+      {/* Install / Download App */}
+      {!isInstalled && (
+        <div className="w-full max-w-sm mx-auto mb-4 relative z-10">
+          {installPrompt ? (
+            <button
+              className="w-full flex items-center gap-3 px-5 py-3 rounded-2xl bg-white/10 border border-white/20 text-white font-semibold text-sm transition-all hover:bg-yellow-400 hover:text-black hover:border-yellow-400"
+              onClick={async () => {
+                installPrompt.prompt();
+                const result = await installPrompt.userChoice;
+                if (result.outcome === "accepted") {
+                  setInstallPrompt(null);
+                  // Hide button for this session; next launch from home screen will open in standalone mode
+                  setIsInstalled(true);
+                  toast({ title: "App installed!", description: "GY Rides has been added to your home screen" });
+                }
+              }}
+              data-testid="btn-install-app"
+            >
+              <Download size={18} className="shrink-0" />
+              <span className="flex-1 text-left">Download GY Rides App</span>
+              <ArrowRight size={16} className="shrink-0 opacity-60" />
+            </button>
+          ) : isIOS ? (
+            <button
+              className="w-full flex items-center gap-3 px-5 py-3 rounded-2xl bg-white/10 border border-white/20 text-white font-semibold text-sm transition-all hover:bg-white/20"
+              onClick={() => setShowIOSInstallModal(true)}
+              data-testid="btn-install-app-ios"
+            >
+              <Smartphone size={18} className="shrink-0" />
+              <span className="flex-1 text-left">Add GY Rides to Home Screen</span>
+              <ArrowRight size={16} className="shrink-0 opacity-60" />
+            </button>
+          ) : (
+            <button
+              className="w-full flex items-center gap-3 px-5 py-3 rounded-2xl bg-white/10 border border-white/20 text-white font-semibold text-sm transition-all hover:bg-white/20"
+              onClick={() => toast({ title: "Install GY Rides", description: "On Android, open in Chrome and tap the menu → 'Add to Home Screen'. On iPhone, open in Safari and tap Share → 'Add to Home Screen'." })}
+              data-testid="btn-install-app-other"
+            >
+              <Download size={18} className="shrink-0" />
+              <span className="flex-1 text-left">Download GY Rides App</span>
+              <ArrowRight size={16} className="shrink-0 opacity-60" />
+            </button>
+          )}
+        </div>
       )}
 
       <div className="mt-4 text-sm text-gray-600 text-center relative z-10">
@@ -1007,6 +1046,70 @@ export default function Home() {
       <div className="mt-3 text-[10px] text-gray-500 text-center relative z-10 leading-tight">
         © {new Date().getFullYear()} Mpfuno Medical Services (PTY) LTD & Dr NI Mabunda. All rights reserved.
       </div>
+
+      {/* iOS Install Instructions Modal */}
+      {showIOSInstallModal && (
+        <div className="fixed inset-0 z-[9999] bg-black/80 flex items-end justify-center" onClick={() => setShowIOSInstallModal(false)}>
+          <div className="w-full max-w-md pointer-events-auto" onClick={e => e.stopPropagation()} style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+            <div className="mx-3 mb-3 bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden">
+              {/* Header */}
+              <div className="bg-black px-5 pt-5 pb-4 flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-yellow-400 flex items-center justify-center shrink-0">
+                  <Smartphone className="h-6 w-6 text-black" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-white font-black text-base leading-tight">Add GY Rides to iPhone</p>
+                  <p className="text-gray-400 text-xs mt-0.5">Install the app for the best experience</p>
+                </div>
+                <button onClick={() => setShowIOSInstallModal(false)} className="text-gray-500 hover:text-white transition-colors p-1" data-testid="ios-modal-close">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Steps */}
+              <div className="px-5 py-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 bg-blue-500 rounded-xl flex items-center justify-center shrink-0">
+                    <Share className="h-4 w-4 text-white" />
+                  </div>
+                  <p className="text-sm text-gray-700 leading-snug pt-1">Tap the <strong>Share</strong> button at the bottom of Safari</p>
+                </div>
+                <div className="border-l-2 border-dashed border-gray-200 ml-4 h-3" />
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 bg-gray-800 rounded-xl flex items-center justify-center shrink-0">
+                    <Plus className="h-4 w-4 text-white" />
+                  </div>
+                  <p className="text-sm text-gray-700 leading-snug pt-1">Scroll down and tap <strong>"Add to Home Screen"</strong></p>
+                </div>
+                <div className="border-l-2 border-dashed border-gray-200 ml-4 h-3" />
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 bg-yellow-400 rounded-xl flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="h-4 w-4 text-black" />
+                  </div>
+                  <p className="text-sm text-gray-700 leading-snug pt-1">Tap <strong>"Add"</strong> — GY Rides will appear on your home screen</p>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-5 pb-5">
+                <button
+                  onClick={() => setShowIOSInstallModal(false)}
+                  className="w-full py-3 rounded-2xl bg-black text-yellow-400 text-sm font-black"
+                  data-testid="ios-modal-got-it"
+                >
+                  Got it!
+                </button>
+              </div>
+            </div>
+            <div className="flex justify-center mb-1">
+              <div className="bg-black text-yellow-400 text-xs font-bold px-4 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg">
+                <Share className="h-3 w-3" />
+                Tap the share icon below ↓
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
