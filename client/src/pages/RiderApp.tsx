@@ -83,6 +83,7 @@ export default function RiderApp() {
   const [promoCode, setPromoCode] = useState("");
   const [driverRating, setDriverRating] = useState(0);
   const [rideStatus, setRideStatus] = useState<"searching" | "on_the_way" | "arrived" | "in_progress">("searching");
+  const rideStatusRef = useRef(rideStatus);
   const [activeTab, setActiveTab] = useState<"home" | "activity" | "profile">("home");
   const [rideType, setRideType] = useState<RideType>("private");
   const [preferredCategory, setPreferredCategory] = useState<"standard" | "premium" | "xl">("standard");
@@ -183,13 +184,14 @@ export default function RiderApp() {
     };
   }, [user?.id]); // Only re-run if user changes — GPS runs for the whole session
 
+  // Keep ref in sync so the poll closure always reads the latest rideStatus
+  useEffect(() => { rideStatusRef.current = rideStatus; }, [rideStatus]);
+
   // ── Real-time trip status polling ──
-  // Polls every 3s whenever rider has an active trip (searching or tracking).
-  // The status machine is SERVER-DRIVEN: we always sync to the server's current
-  // status regardless of which transitions we may have missed. This handles the
-  // case where the driver accepts AND arrives before the next 3s poll fires,
-  // which would have left the passenger stuck on the searching screen with the
-  // old sequence-based approach.
+  // Polls every 2 s whenever rider has an active trip (searching or tracking).
+  // Deps intentionally omit rideStatus — we use rideStatusRef.current instead
+  // so the interval never restarts mid-flight when rideStatus changes, which
+  // was causing brief polling gaps that could miss the "completed" transition.
   useEffect(() => {
     if (!currentTrip?.id) return;
     if (!["searching", "tracking"].includes(view)) return;
@@ -262,9 +264,10 @@ export default function RiderApp() {
           toast(toastMsg);
         }
 
-        // ── Sync rideStatus to server state (only when it differs) ──
-        if (targetRideStatus !== rideStatus) {
+        // ── Sync rideStatus to server state (use ref so closure is never stale) ──
+        if (targetRideStatus !== rideStatusRef.current) {
           setRideStatus(targetRideStatus);
+          rideStatusRef.current = targetRideStatus;
           if (targetRideStatus === "arrived" && view === "tracking") {
             toast({ title: "Driver arrived!", description: "Your driver is at the pickup point." });
           }
@@ -297,7 +300,8 @@ export default function RiderApp() {
     document.addEventListener("visibilitychange", onVisible);
 
     return () => { cancelled = true; clearInterval(interval); document.removeEventListener("visibilitychange", onVisible); };
-  }, [currentTrip?.id, view, rideStatus]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTrip?.id, view]); // rideStatus intentionally excluded — use rideStatusRef.current
 
   // ── Wait timer displayed on searching screen ──
   useEffect(() => {

@@ -152,6 +152,45 @@ export default function DriverApp() {
     }
   }, [tripPhase, onTrip]);
 
+  // ── Poll active trip — detect rider cancellation in real time ──
+  // The driver has no other mechanism to know the rider cancelled. This polls
+  // the server every 3 s while a trip is active and resets the driver to home
+  // if the trip is cancelled by the rider.
+  useEffect(() => {
+    if (!onTrip?.id) return;
+    let stopped = false;
+
+    const checkStatus = async () => {
+      if (stopped) return;
+      try {
+        const res = await fetch(`/api/trips/${onTrip.id}`, { credentials: "include" });
+        if (!res.ok || stopped) return;
+        const data = await res.json();
+        if (stopped) return;
+        if (data.status === "cancelled") {
+          stopped = true;
+          setOnTrip(null);
+          setTripPhase("arriving");
+          setNavSteps([]);
+          setCurrentStepIdx(0);
+          setTripRider(null);
+          setPinVerified(false);
+          setPinEntry("");
+          setView("home");
+          toast({
+            title: "Trip cancelled by rider",
+            description: "The rider has cancelled this trip.",
+            variant: "destructive",
+          });
+        }
+      } catch {}
+    };
+
+    checkStatus();
+    const interval = setInterval(checkStatus, 3000);
+    return () => { stopped = true; clearInterval(interval); };
+  }, [onTrip?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Poll rider's live GPS every 4 seconds while on a trip ──
   useEffect(() => {
     if (!onTrip?.riderId) { setRiderPos(null); return; }
