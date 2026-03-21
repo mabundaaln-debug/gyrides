@@ -81,6 +81,7 @@ export default function DriverApp() {
   const [riderPos, setRiderPos] = useState<{ lat: number; lng: number } | null>(null);
   const [distToDropoff, setDistToDropoff] = useState<number | null>(null);
   const [nearDropoff, setNearDropoff] = useState(false);
+  const [hasReachedDropoff, setHasReachedDropoff] = useState(false);
   const [navSteps, setNavSteps] = useState<NavStep[]>([]);
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
   const [navCollapsed, setNavCollapsed] = useState(false);
@@ -213,15 +214,21 @@ export default function DriverApp() {
   }, [onTrip?.id, onTrip?.riderId]);
 
   // ── Geo-fence: compute distance to dropoff when driving ──
+  // hasReachedDropoff latches to true once the driver enters the 200m radius
+  // and NEVER resets back to false during a trip — so the "Complete Trip"
+  // button stays enabled even if they drive a little further past the destination.
   useEffect(() => {
     if (tripPhase !== "inprogress" || !driverGps || !onTrip?.dropoffLat || !onTrip?.dropoffLng) {
       setDistToDropoff(null);
       setNearDropoff(false);
+      if (tripPhase !== "inprogress") setHasReachedDropoff(false); // reset only when trip ends
       return;
     }
     const dist = haversineMeters(driverGps.lat, driverGps.lng, onTrip.dropoffLat, onTrip.dropoffLng);
     setDistToDropoff(Math.round(dist));
-    setNearDropoff(dist <= COMPLETION_RADIUS_M);
+    const isNear = dist <= COMPLETION_RADIUS_M;
+    setNearDropoff(isNear);
+    if (isNear) setHasReachedDropoff(true); // latch — never goes false once triggered
   }, [driverGps, tripPhase, onTrip?.dropoffLat, onTrip?.dropoffLng]);
 
   // ── Fetch turn-by-turn nav steps when trip phase changes or GPS first becomes available ──
@@ -373,6 +380,7 @@ export default function DriverApp() {
         setOnTrip(null);
         setDistToDropoff(null);
         setNearDropoff(false);
+        setHasReachedDropoff(false);
         setNavSteps([]);
         setCurrentStepIdx(0);
         setTripRider(null);
@@ -1197,7 +1205,10 @@ export default function DriverApp() {
 
           {(() => {
             const isCompletionPhase = tripPhase === "inprogress";
-            const completionBlocked = isCompletionPhase && distToDropoff !== null && !nearDropoff;
+            // Blocked only while driver hasn't yet reached within 200m of the destination.
+            // Once hasReachedDropoff latches to true it stays true for the rest of the trip,
+            // so the button stays enabled even if they overshoot by more than 200m.
+            const completionBlocked = isCompletionPhase && distToDropoff !== null && !hasReachedDropoff;
             const pinBlocked = tripPhase === "pickup" && !isParcel && !pinVerified;
             const isDisabled = pinBlocked || completionBlocked;
             const btnLabel = tripPhase === "arriving"
@@ -1210,7 +1221,7 @@ export default function DriverApp() {
             return (
               <Button
                 size="lg"
-                className={`w-full h-14 rounded-2xl text-lg font-bold transition-all ${isDisabled ? "bg-gray-300 text-gray-500 cursor-not-allowed" : nearDropoff && isCompletionPhase ? "bg-green-600 text-white hover:bg-green-700" : "bg-black text-white hover:bg-gray-900"}`}
+                className={`w-full h-14 rounded-2xl text-lg font-bold transition-all ${isDisabled ? "bg-gray-300 text-gray-500 cursor-not-allowed" : (nearDropoff || hasReachedDropoff) && isCompletionPhase ? "bg-green-600 text-white hover:bg-green-700" : "bg-black text-white hover:bg-gray-900"}`}
                 onClick={advanceTrip}
                 disabled={isDisabled}
                 data-testid="btn-advance-trip"
