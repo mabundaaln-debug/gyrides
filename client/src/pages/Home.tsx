@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { Car, User, Settings, ArrowRight, LogIn, UserPlus, Eye, EyeOff, Download, ArrowLeft, Phone, KeyRound, CheckCircle2, ShieldCheck, Fingerprint, X, FileText, Check } from "lucide-react";
+import { Car, User, Settings, ArrowRight, LogIn, UserPlus, Eye, EyeOff, Download, ArrowLeft, Phone, KeyRound, CheckCircle2, ShieldCheck, Fingerprint, X, FileText, Check, Share, Plus, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
@@ -25,6 +25,15 @@ export default function Home() {
   const [isAndroid] = useState(() => /android/i.test(navigator.userAgent));
   const [apkBannerDismissed, setApkBannerDismissed] = useState(() =>
     localStorage.getItem("gy_apk_banner_dismissed") === "1"
+  );
+  const [isIos] = useState(() => /iphone|ipad|ipod/i.test(navigator.userAgent));
+  const [isInStandaloneMode] = useState(() =>
+    ("standalone" in navigator && (navigator as any).standalone === true) ||
+    window.matchMedia("(display-mode: standalone)").matches
+  );
+  const [showIosGuide, setShowIosGuide] = useState(false);
+  const [iosBannerDismissed, setIosBannerDismissed] = useState(() =>
+    localStorage.getItem("gy_ios_banner_dismissed") === "1"
   );
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetStep, setResetStep] = useState<"verify" | "newPassword" | "success">("verify");
@@ -986,6 +995,95 @@ export default function Home() {
           </button>
         </div>
       </div>
+
+      {/* iOS Add to Home Screen banner */}
+      {isIos && !isInStandaloneMode && !iosBannerDismissed && (
+        <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/10 border border-white/20 text-white relative z-10 shadow-lg w-full max-w-sm">
+          <div className="flex-1">
+            <p className="font-bold text-sm leading-tight">Install on iPhone / iPad</p>
+            <p className="text-xs mt-0.5 leading-tight text-gray-300">Add to Home Screen for the full app experience</p>
+          </div>
+          <button
+            className="shrink-0 flex items-center gap-1.5 bg-yellow-400 text-black font-bold text-xs px-3 py-2 rounded-xl hover:bg-yellow-300 transition-colors"
+            onClick={() => setShowIosGuide(true)}
+            data-testid="btn-ios-install"
+          >
+            <Share size={14} />
+            How to
+          </button>
+          <button
+            className="shrink-0 text-white/40 hover:text-white transition-colors ml-0.5"
+            onClick={() => { setIosBannerDismissed(true); localStorage.setItem("gy_ios_banner_dismissed", "1"); }}
+            data-testid="btn-dismiss-ios-banner"
+            aria-label="Dismiss"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* iOS install step-by-step guide modal */}
+      {showIosGuide && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowIosGuide(false)}>
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 mb-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="text-xl font-black text-black">Add to Home Screen</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Install GY Rides on your iPhone</p>
+              </div>
+              <button onClick={() => setShowIosGuide(false)} className="text-gray-400 hover:text-gray-600" data-testid="btn-close-ios-guide">
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-start gap-4">
+                <div className="shrink-0 w-10 h-10 rounded-2xl bg-blue-100 flex items-center justify-center">
+                  <Share size={20} className="text-blue-600" />
+                </div>
+                <div>
+                  <p className="font-bold text-black text-sm">Step 1 — Tap Share</p>
+                  <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">At the bottom of Safari, tap the <span className="font-semibold text-blue-600">Share</span> button (the box with an arrow pointing up).</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4">
+                <div className="shrink-0 w-10 h-10 rounded-2xl bg-yellow-100 flex items-center justify-center">
+                  <Plus size={20} className="text-yellow-600" />
+                </div>
+                <div>
+                  <p className="font-bold text-black text-sm">Step 2 — Add to Home Screen</p>
+                  <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">Scroll down in the menu and tap <span className="font-semibold text-black">"Add to Home Screen"</span>.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4">
+                <div className="shrink-0 w-10 h-10 rounded-2xl bg-green-100 flex items-center justify-center">
+                  <CheckCircle2 size={20} className="text-green-600" />
+                </div>
+                <div>
+                  <p className="font-bold text-black text-sm">Step 3 — Tap Add</p>
+                  <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">Tap <span className="font-semibold text-black">"Add"</span> in the top right. GY Rides will appear on your Home Screen like a native app.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 p-3 bg-gray-50 rounded-2xl">
+              <p className="text-xs text-gray-500 leading-relaxed text-center">
+                ⚠️ <strong>Must use Safari</strong> — Chrome and other browsers on iPhone don't support Add to Home Screen.
+              </p>
+            </div>
+
+            <button
+              className="mt-4 w-full h-12 rounded-2xl bg-black text-yellow-400 font-bold text-sm hover:bg-gray-900 transition-colors"
+              onClick={() => { setShowIosGuide(false); setIosBannerDismissed(true); localStorage.setItem("gy_ios_banner_dismissed", "1"); }}
+              data-testid="btn-got-it-ios"
+            >
+              Got it!
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Android APK download banner */}
       {isAndroid && !apkBannerDismissed && (

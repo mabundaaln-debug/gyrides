@@ -5,25 +5,56 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#000000" />
 
-    <!-- iOS PWA -->
+    <!-- iOS PWA core -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="GY Rides" />
+
+    <!-- iOS touch icon (multiple sizes for all devices) -->
+    <link rel="apple-touch-icon" href="/gy-logo-192.png" />
+    <link rel="apple-touch-icon" sizes="120x120" href="/gy-logo-192.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/gy-logo-192.png" />
+    <link rel="apple-touch-icon" sizes="167x167" href="/gy-logo-192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/gy-logo-192.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="/gy-logo-192.png" />
     <link rel="apple-touch-icon" sizes="512x512" href="/gy-logo.png" />
 
-    <!-- iOS Splash Screens -->
-    <link rel="apple-touch-startup-image" href="/splash-2796x1290.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
-    <link rel="apple-touch-startup-image" href="/splash-2556x1179.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
-    <link rel="apple-touch-startup-image" href="/splash-2532x1170.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
-    <link rel="apple-touch-startup-image" href="/splash-2778x1284.png" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
-    <link rel="apple-touch-startup-image" href="/splash-2436x1125.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
-    <link rel="apple-touch-startup-image" href="/splash-1334x750.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+    <!-- iOS Splash Screens — iPhone models -->
+    <!-- iPhone 15 Pro Max / 14 Pro Max (430×932 @3x) -->
+    <link rel="apple-touch-startup-image" href="/splash-2796x1290.png"
+      media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <!-- iPhone 15 Pro / 14 Pro (393×852 @3x) -->
+    <link rel="apple-touch-startup-image" href="/splash-2556x1179.png"
+      media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <!-- iPhone 15 / 14 / 13 (390×844 @3x) -->
+    <link rel="apple-touch-startup-image" href="/splash-2532x1170.png"
+      media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <!-- iPhone 14 Plus / 13 Pro Max (428×926 @3x) -->
+    <link rel="apple-touch-startup-image" href="/splash-2778x1284.png"
+      media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <!-- iPhone 13 mini / 12 mini / SE 3 (375×812 @3x) -->
+    <link rel="apple-touch-startup-image" href="/splash-2436x1125.png"
+      media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <!-- iPhone SE 2 / iPhone 8 / 7 / 6s (375×667 @2x) -->
+    <link rel="apple-touch-startup-image" href="/splash-1334x750.png"
+      media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+    <!-- iPhone 8 Plus / 7 Plus / 6s Plus (414×736 @3x) -->
+    <link rel="apple-touch-startup-image" href="/splash-2778x1284.png"
+      media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <!-- iPhone X / XS / 11 Pro (375×812 @3x) - same as 13 mini -->
+    <link rel="apple-touch-startup-image" href="/splash-2436x1125.png"
+      media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <!-- iPhone XR / 11 (414×896 @2x) -->
+    <link rel="apple-touch-startup-image" href="/splash-1334x750.png"
+      media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+    <!-- iPhone XS Max / 11 Pro Max (414×896 @3x) -->
+    <link rel="apple-touch-startup-image" href="/splash-2778x1284.png"
+      media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
 
     <!-- Android / General PWA -->
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="application-name" content="GY Rides" />
+    <meta name="format-detection" content="telephone=no" />
 
     <!-- Open Graph -->
     <meta property="og:title" content="GY Rides" />
@@ -42,6 +73,47 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+      /* iOS Safari PWA fixes */
+
+      /* Prevent elastic scroll bounce on iOS PWA */
+      html, body {
+        overscroll-behavior: none;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      /* Fill the safe area (iPhone notch / Dynamic Island / home indicator) */
+      body {
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+      }
+
+      /* Prevent text size adjustment on orientation change */
+      html {
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+      }
+
+      /* Prevent callout menu on long-press (iOS) */
+      * {
+        -webkit-touch-callout: none;
+      }
+
+      /* Allow text selection in inputs */
+      input, textarea {
+        -webkit-touch-callout: default;
+        -webkit-user-select: text;
+        user-select: text;
+      }
+
+      /* Fix iOS button tap highlight */
+      button, a {
+        -webkit-tap-highlight-color: transparent;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
