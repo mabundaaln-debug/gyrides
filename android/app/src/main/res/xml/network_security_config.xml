@@ -8,5 +8,6 @@
     <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="true">replit.app</domain>
         <domain includeSubdomains="true">replit.dev</domain>
+        <domain includeSubdomains="true">giyani-transport.autos</domain>
     </domain-config>
 </network-security-config>
