@@ -382,6 +382,32 @@ export async function registerRoutes(
     }
   });
 
+  // Called by the app after returning from Yoco Checkout redirect (APK flow)
+  app.post("/api/payments/yoco/confirm", async (req, res) => {
+    try {
+      const { tripId } = req.body;
+      if (!tripId) return res.status(400).json({ message: "tripId required" });
+      const trip = await storage.getTrip(tripId);
+      if (!trip) return res.status(404).json({ message: "Trip not found" });
+      // Mark trip as paid via card
+      await storage.updateTrip(tripId, { paymentMethod: "card" as any, paymentStatus: "paid" as any });
+      // Credit driver earnings if trip was completed
+      if (trip.status === "completed" && trip.driverId && trip.fare) {
+        const driver = await storage.getUser(trip.driverId);
+        if (driver) {
+          const commission = Math.round((trip.fare * 0.15) * 100) / 100;
+          const driverEarnings = Math.round((trip.fare - commission) * 100) / 100;
+          await storage.updateUser(trip.driverId, {
+            earnings: (driver.earnings || 0) + driverEarnings,
+          });
+        }
+      }
+      return res.json({ success: true });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── Auth / Users ──
   app.post("/api/auth/login", async (req, res) => {
     const { username, password } = req.body;

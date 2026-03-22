@@ -469,7 +469,33 @@ export default function RiderApp() {
     }
   }, [user?.id]);
 
-  const handleYocoVerify = useCallback((fare: number, onSuccess: () => void, tripId?: string) => {
+  // Detect if running as a native Capacitor APK (Android/iOS)
+  const isNativeApp = !!(window as any).Capacitor?.isNativePlatform?.() || (typeof navigator !== "undefined" && /wv/.test(navigator.userAgent));
+
+  const handleYocoVerify = useCallback(async (fare: number, onSuccess: () => void, tripId?: string) => {
+    // On native APK: Yoco popup is blocked by WebView — use redirect checkout instead
+    if (isNativeApp) {
+      setCardVerifying(true);
+      try {
+        const checkout = await createYocoCheckout({
+          amount: Math.round(fare * 100),
+          tripId,
+          riderId: user?.id,
+          description: `GY Rides trip — R${fare}`,
+        });
+        // Save tripId so we can confirm payment when the app returns from the browser
+        if (tripId) localStorage.setItem("gy_pending_payment_tripId", tripId);
+        localStorage.setItem("gy_pending_payment_fare", String(fare));
+        // Navigate to Yoco hosted payment page — WebView will follow the redirect
+        window.location.href = checkout.redirectUrl;
+      } catch (err: any) {
+        setCardVerifying(false);
+        toast({ title: "Could not start payment", description: err.message || "Please try again.", variant: "destructive" });
+      }
+      return;
+    }
+
+    // On web browser: use Yoco popup SDK as usual
     const YocoSDK = (window as any).YocoSDK;
     if (!YocoSDK || !yocoPublicKey) {
       toast({ title: "Yoco not ready", description: "Payment SDK is loading, please try again in a moment.", variant: "destructive" });
@@ -492,23 +518,20 @@ export default function RiderApp() {
           const charge = await chargeYocoToken({ token: result.id, amountInCents: Math.round(fare * 100), tripId, riderId: user?.id });
           setCardCharged(true);
           setCardChargeId(charge.chargeId);
-          // Immediately mark trip as paid in local state so UI updates without waiting for poll
           setCurrentTrip(prev => prev ? { ...prev, paymentStatus: "paid" as any } : prev);
           toast({ title: "Card verified ✓", description: `R${fare} charged successfully. Your ride is confirmed.` });
           onSuccess();
         } catch (err: any) {
-          // Immediate failure notification
           toast({
             title: "⚠️ Payment failed",
             description: `R${fare} could not be charged. The amount has been added to your account balance and will be collected on your next trip.`,
             variant: "destructive",
           });
-          // Refresh pending balance
           if (user?.id) getRiderPendingBalance(user.id).then(bal => setPendingBalance(bal)).catch(() => {});
         }
       },
     });
-  }, [yocoPublicKey, toast, user?.id]);
+  }, [yocoPublicKey, toast, user?.id, isNativeApp]);
 
   const { data: savedPlaces = [] } = useQuery<SavedPlace[]>({
     queryKey: ["/api/saved-places", user?.id ?? ""],
