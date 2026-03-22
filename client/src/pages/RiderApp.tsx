@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth";
-import { createTrip, updateTrip, updateUser, sendSosAlert, uploadProfilePicture, getWebauthnRegisterOptions, verifyWebauthnRegistration, getWebauthnCredentials, deleteWebauthnCredential, createYocoCheckout, getPublicConfig, chargeYocoToken, getRiderPendingBalance, getTripReceipt } from "@/lib/api";
+import { createTrip, updateTrip, updateUser, sendSosAlert, uploadProfilePicture, getWebauthnRegisterOptions, verifyWebauthnRegistration, getWebauthnCredentials, deleteWebauthnCredential, createYocoCheckout, getRiderPendingBalance, getTripReceipt } from "@/lib/api";
 import { generateReceiptPDF } from "@/lib/generateReceipt";
 import SupportChat from "@/components/SupportChat";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -105,7 +105,6 @@ export default function RiderApp() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [searchWaitSecs, setSearchWaitSecs] = useState(0);
   const searchStartRef = useRef<number | null>(null);
-  const [yocoPublicKey, setYocoPublicKey] = useState("");
   const [cardCharged, setCardCharged] = useState(false);
   const [cardChargeId, setCardChargeId] = useState("");
   const [cardVerifying, setCardVerifying] = useState(false);
@@ -453,85 +452,33 @@ export default function RiderApp() {
     return () => { cancelled = true; };
   }, [user?.id]);
 
-  // Load Yoco SDK, public key and pending balance
+  // Load pending balance on mount
   useEffect(() => {
-    getPublicConfig().then(cfg => {
-      if (cfg.yocoPublicKey) setYocoPublicKey(cfg.yocoPublicKey);
-    }).catch(() => {});
-    if (!document.getElementById("yoco-sdk")) {
-      const s = document.createElement("script");
-      s.id = "yoco-sdk";
-      s.src = "https://js.yoco.com/sdk/v1/yoco-sdk-web.js";
-      document.head.appendChild(s);
-    }
     if (user?.id) {
       getRiderPendingBalance(user.id).then(bal => setPendingBalance(bal)).catch(() => {});
     }
   }, [user?.id]);
 
-  // Detect if running as a native Capacitor APK (Android/iOS)
-  const isNativeApp = !!(window as any).Capacitor?.isNativePlatform?.() || (typeof navigator !== "undefined" && /wv/.test(navigator.userAgent));
-
   const handleYocoVerify = useCallback(async (fare: number, onSuccess: () => void, tripId?: string) => {
-    // On native APK: Yoco popup is blocked by WebView — use redirect checkout instead
-    if (isNativeApp) {
-      setCardVerifying(true);
-      try {
-        const checkout = await createYocoCheckout({
-          amount: Math.round(fare * 100),
-          tripId,
-          riderId: user?.id,
-          description: `GY Rides trip — R${fare}`,
-        });
-        // Save tripId so we can confirm payment when the app returns from the browser
-        if (tripId) localStorage.setItem("gy_pending_payment_tripId", tripId);
-        localStorage.setItem("gy_pending_payment_fare", String(fare));
-        // Navigate to Yoco hosted payment page — WebView will follow the redirect
-        window.location.href = checkout.redirectUrl;
-      } catch (err: any) {
-        setCardVerifying(false);
-        toast({ title: "Could not start payment", description: err.message || "Please try again.", variant: "destructive" });
-      }
-      return;
-    }
-
-    // On web browser: use Yoco popup SDK as usual
-    const YocoSDK = (window as any).YocoSDK;
-    if (!YocoSDK || !yocoPublicKey) {
-      toast({ title: "Yoco not ready", description: "Payment SDK is loading, please try again in a moment.", variant: "destructive" });
-      return;
-    }
+    // Use Yoco Checkout (hosted redirect) for ALL platforms — more reliable than the popup SDK
+    // which suffers from domain restrictions and WebView popup blocking on Android
     setCardVerifying(true);
-    const yoco = new YocoSDK({ publicKey: yocoPublicKey });
-    yoco.showPopup({
-      amountInCents: Math.round(fare * 100),
-      currency: "ZAR",
-      name: "GY Rides",
-      description: "Card verification & payment",
-      callback: async (result: any) => {
-        setCardVerifying(false);
-        if (result.error) {
-          toast({ title: "Card declined", description: result.error.message || "Please check your card details and try again.", variant: "destructive" });
-          return;
-        }
-        try {
-          const charge = await chargeYocoToken({ token: result.id, amountInCents: Math.round(fare * 100), tripId, riderId: user?.id });
-          setCardCharged(true);
-          setCardChargeId(charge.chargeId);
-          setCurrentTrip(prev => prev ? { ...prev, paymentStatus: "paid" as any } : prev);
-          toast({ title: "Card verified ✓", description: `R${fare} charged successfully. Your ride is confirmed.` });
-          onSuccess();
-        } catch (err: any) {
-          toast({
-            title: "⚠️ Payment failed",
-            description: `R${fare} could not be charged. The amount has been added to your account balance and will be collected on your next trip.`,
-            variant: "destructive",
-          });
-          if (user?.id) getRiderPendingBalance(user.id).then(bal => setPendingBalance(bal)).catch(() => {});
-        }
-      },
-    });
-  }, [yocoPublicKey, toast, user?.id, isNativeApp]);
+    try {
+      const checkout = await createYocoCheckout({
+        amount: Math.round(fare * 100),
+        tripId,
+        riderId: user?.id,
+        description: `GY Rides trip — R${fare}`,
+      });
+      if (tripId) localStorage.setItem("gy_pending_payment_tripId", tripId);
+      localStorage.setItem("gy_pending_payment_fare", String(fare));
+      // Navigate to Yoco's hosted payment page (works on web and native WebView)
+      window.location.href = checkout.redirectUrl;
+    } catch (err: any) {
+      setCardVerifying(false);
+      toast({ title: "Could not start payment", description: err.message || "Please try again.", variant: "destructive" });
+    }
+  }, [toast, user?.id]);
 
   const { data: savedPlaces = [] } = useQuery<SavedPlace[]>({
     queryKey: ["/api/saved-places", user?.id ?? ""],
