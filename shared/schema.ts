@@ -113,6 +113,8 @@ export const trips = pgTable("trips", {
   completedAt: timestamp("completed_at"),
   tripPin: varchar("trip_pin", { length: 4 }),
   requestedCategory: vehicleCategoryEnum("requested_category").default("standard"),
+  nearestDriverId: varchar("nearest_driver_id").references(() => users.id),
+  offerExpiresAt: timestamp("offer_expires_at"),
 });
 
 export const savedPlaces = pgTable("saved_places", {

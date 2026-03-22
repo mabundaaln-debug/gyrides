@@ -745,10 +745,46 @@ export async function registerRoutes(
   });
 
   // ── Trips ──
+  // Haversine formula — returns distance in km between two lat/lng points
+  function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
   app.post("/api/trips", async (req, res) => {
     const parsed = insertTripSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
     const trip = await storage.createTrip(parsed.data);
+
+    // ── Nearest-driver exclusive offer (30 seconds) ──
+    try {
+      const { pickupLat, pickupLng } = parsed.data;
+      if (pickupLat != null && pickupLng != null) {
+        const onlineDrivers = await storage.getOnlineDrivers();
+        // Only consider drivers with a recent GPS fix (within last 10 minutes)
+        const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000);
+        const locatedDrivers = onlineDrivers.filter(
+          d => d.currentLat != null && d.currentLng != null &&
+               d.approvalStatus === "approved" &&
+               (!d.locationUpdatedAt || new Date(d.locationUpdatedAt) > tenMinsAgo)
+        );
+        if (locatedDrivers.length > 0) {
+          // Sort by distance to pickup
+          const sorted = locatedDrivers
+            .map(d => ({ driver: d, dist: haversineKm(pickupLat, pickupLng, d.currentLat!, d.currentLng!) }))
+            .sort((a, b) => a.dist - b.dist);
+          const nearest = sorted[0].driver;
+          const offerExpiresAt = new Date(Date.now() + 30_000); // 30-second exclusive window
+          await storage.updateTrip(trip.id, { nearestDriverId: nearest.id, offerExpiresAt } as any);
+          trip.nearestDriverId = nearest.id;
+          (trip as any).offerExpiresAt = offerExpiresAt;
+        }
+      }
+    } catch {}
+
     return res.status(201).json(trip);
   });
 
@@ -862,6 +898,16 @@ export async function registerRoutes(
     // Race condition guard: if a driver is trying to accept, reject if already taken
     if (req.body.status === "accepted" && existingTrip.status !== "requested") {
       return res.status(409).json({ message: "Trip already accepted by another driver", alreadyTaken: true });
+    }
+
+    // Nearest-driver exclusive window guard: block other drivers during the priority window
+    if (req.body.status === "accepted" && req.body.driverId) {
+      const nearest = (existingTrip as any).nearestDriverId;
+      const expires = (existingTrip as any).offerExpiresAt;
+      if (nearest && nearest !== req.body.driverId && expires && new Date(expires) > new Date()) {
+        const secsLeft = Math.ceil((new Date(expires).getTime() - Date.now()) / 1000);
+        return res.status(423).json({ message: `Nearest driver has priority for ${secsLeft} more second${secsLeft === 1 ? "" : "s"}`, priorityLocked: true, secsLeft });
+      }
     }
 
     const trip = await storage.updateTrip(req.params.id, req.body);

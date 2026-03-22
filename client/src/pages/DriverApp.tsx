@@ -305,6 +305,24 @@ export default function DriverApp() {
 
   const pendingRequest = requestedTrips[0];
 
+  // Priority window: track seconds remaining in the nearest-driver exclusive offer
+  const [prioritySecs, setPrioritySecs] = useState(0);
+  const isNearestDriver = !!(pendingRequest && (pendingRequest as any).nearestDriverId === user?.id);
+  const inPriorityWindow = !!(pendingRequest && (pendingRequest as any).nearestDriverId && (pendingRequest as any).nearestDriverId !== user?.id && prioritySecs > 0);
+
+  useEffect(() => {
+    if (!pendingRequest) { setPrioritySecs(0); return; }
+    const expires = (pendingRequest as any).offerExpiresAt;
+    if (!expires) { setPrioritySecs(0); return; }
+    const update = () => {
+      const left = Math.ceil((new Date(expires).getTime() - Date.now()) / 1000);
+      setPrioritySecs(Math.max(0, left));
+    };
+    update();
+    const interval = setInterval(update, 500);
+    return () => clearInterval(interval);
+  }, [pendingRequest?.id, (pendingRequest as any)?.offerExpiresAt]);
+
   useEffect(() => {
     if (!pendingRequest) { setCountdown(30); return; }
     setCountdown(30);
@@ -362,13 +380,10 @@ export default function DriverApp() {
         setTripRider(rider);
       } catch {}
     } catch (err: any) {
-      // Another driver accepted first — clear the request from screen
       if (err?.message?.includes("409") || err?.message?.includes("already accepted")) {
-        toast({
-          title: "Trip taken",
-          description: "Another driver accepted that trip first. Waiting for the next one.",
-          variant: "destructive",
-        });
+        toast({ title: "Trip taken", description: "Another driver accepted that trip first. Waiting for the next one.", variant: "destructive" });
+      } else if (err?.message?.includes("423") || err?.message?.includes("priority")) {
+        toast({ title: "Nearest driver has priority", description: "Wait for the priority window to expire, then accept.", variant: "destructive" });
       } else {
         toast({ title: "Could not accept trip", description: err?.message || "Please try again.", variant: "destructive" });
       }
@@ -1439,6 +1454,20 @@ export default function DriverApp() {
                 </div>
               </div>
 
+              {/* Priority window banner for non-nearest drivers */}
+              {inPriorityWindow && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3 text-center">
+                  <p className="text-amber-700 text-xs font-semibold">⭐ Nearest driver has priority</p>
+                  <p className="text-amber-600 text-xs">Open to all drivers in <span className="font-black">{prioritySecs}s</span></p>
+                </div>
+              )}
+              {isNearestDriver && (
+                <div className="bg-green-50 border border-green-200 rounded-xl px-3 py-2 mb-3 text-center">
+                  <p className="text-green-700 text-xs font-semibold">⭐ You're the closest driver!</p>
+                  <p className="text-green-600 text-xs">You have {prioritySecs > 0 ? `${prioritySecs}s exclusive offer` : "priority"} on this ride</p>
+                </div>
+              )}
+
               <div className="flex gap-3">
                 {isOnline && (
                   <Button size="lg" variant="outline" className="flex-1 h-13 rounded-2xl" onClick={declineTrip} data-testid="btn-decline-trip">
@@ -1446,9 +1475,15 @@ export default function DriverApp() {
                   </Button>
                 )}
                 {isOnline ? (
-                  <Button size="lg" className="flex-1 h-13 rounded-2xl bg-black text-white hover:bg-gray-900" onClick={() => acceptTrip(pendingRequest)} data-testid="btn-accept-trip">
-                    <Check className="mr-2 h-4 w-4" /> Accept
-                  </Button>
+                  inPriorityWindow ? (
+                    <Button size="lg" className="flex-1 h-13 rounded-2xl bg-gray-300 text-gray-500 cursor-not-allowed" disabled data-testid="btn-accept-trip-locked">
+                      🔒 Locked · {prioritySecs}s
+                    </Button>
+                  ) : (
+                    <Button size="lg" className={`flex-1 h-13 rounded-2xl ${isNearestDriver ? "bg-green-600 hover:bg-green-700" : "bg-black hover:bg-gray-900"} text-white`} onClick={() => acceptTrip(pendingRequest)} data-testid="btn-accept-trip">
+                      <Check className="mr-2 h-4 w-4" /> {isNearestDriver ? "⭐ Accept (Priority)" : "Accept"}
+                    </Button>
+                  )
                 ) : (
                   <Button size="lg" className="w-full h-13 rounded-2xl bg-orange-500 text-white hover:bg-orange-600 font-bold" onClick={async () => { await toggleOnline(); await acceptTrip(pendingRequest); }} data-testid="btn-go-online-accept">
                     <Check className="mr-2 h-4 w-4" /> Go Online &amp; Accept
