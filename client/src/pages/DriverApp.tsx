@@ -317,6 +317,25 @@ export default function DriverApp() {
     return () => clearInterval(timer);
   }, [pendingRequest?.id]);
 
+  // Alert driver (sound + vibration) when a new trip request arrives
+  useEffect(() => {
+    if (!pendingRequest?.id) return;
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      [0, 0.25, 0.5].forEach(t => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.4, ctx.currentTime + t);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.2);
+        osc.start(ctx.currentTime + t);
+        osc.stop(ctx.currentTime + t + 0.25);
+      });
+    } catch {}
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
+  }, [pendingRequest?.id]);
+
   if (!user) return null;
   if (user.role !== "driver" || user.approvalStatus !== "approved") return null;
 
@@ -1308,15 +1327,18 @@ export default function DriverApp() {
               </span>
             )}
           </div>
-          <p className="text-gray-500 text-sm">{isOnline ? "You're online and ready for trips" : "Go online to start earning"}</p>
+          <p className="text-gray-500 text-sm">{isOnline ? "You're online and ready for trips" : pendingRequest ? "⚠️ Ride waiting — go online to accept!" : "Go online to start earning"}</p>
         </div>
       </div>
 
       <div className="flex-1 flex items-center justify-center relative z-10">
-        {!isOnline && (
-          <button onClick={toggleOnline} className="w-28 h-28 bg-yellow-400 text-black rounded-full shadow-[0_10px_40px_rgba(250,204,21,0.4)] flex items-center justify-center text-3xl font-black border-4 border-white/20 transition-transform active:scale-95" data-testid="btn-go-online">
-            GO
-          </button>
+        {!isOnline && !pendingRequest && (
+          <div className="flex flex-col items-center gap-4">
+            <button onClick={toggleOnline} className="w-28 h-28 bg-yellow-400 text-black rounded-full shadow-[0_10px_40px_rgba(250,204,21,0.4)] flex items-center justify-center text-3xl font-black border-4 border-white/20 transition-transform active:scale-95" data-testid="btn-go-online">
+              GO
+            </button>
+            <p className="text-white/60 text-sm">Tap to go online</p>
+          </div>
         )}
 
         {isOnline && !pendingRequest && (
@@ -1335,20 +1357,21 @@ export default function DriverApp() {
           </div>
         )}
 
-        {isOnline && pendingRequest && (
+        {pendingRequest && (
           <div className="absolute inset-x-4 bottom-4 top-auto bg-white rounded-3xl overflow-hidden shadow-2xl text-black animate-in slide-in-from-bottom-8">
-            <div className="bg-yellow-400 p-4 flex items-center justify-between">
+            <div className={`p-4 flex items-center justify-between ${isOnline ? "bg-yellow-400" : "bg-orange-500"}`}>
               <div>
-                <h3 className="font-black text-lg">
+                <h3 className="font-black text-lg text-black">
+                  {isOnline ? "" : "⚠️ "}
                   {pendingRequest.rideType === "medical" ? "Medical Transport" :
                    pendingRequest.rideType === "parcel" ? "Parcel Delivery" :
                    pendingRequest.rideType === "shared" ? "Shared Ride" :
                    "New Ride Request"}
                 </h3>
-                <p className="text-black/60 text-xs">{pendingRequest.vehicleType}</p>
+                <p className="text-black/60 text-xs">{isOnline ? pendingRequest.vehicleType : "You're offline — go online to accept"}</p>
               </div>
               <div className="w-12 h-12 bg-black rounded-full flex items-center justify-center">
-                <span className="text-yellow-400 font-black text-lg" data-testid="text-countdown">{countdown}</span>
+                <span className="text-yellow-400 font-black text-lg" data-testid="text-countdown">{isOnline ? countdown : "!"}</span>
               </div>
             </div>
             <div className="p-5">
@@ -1403,12 +1426,20 @@ export default function DriverApp() {
               </div>
 
               <div className="flex gap-3">
-                <Button size="lg" variant="outline" className="flex-1 h-13 rounded-2xl" onClick={declineTrip} data-testid="btn-decline-trip">
-                  <X className="mr-2 h-4 w-4" /> Decline
-                </Button>
-                <Button size="lg" className="flex-1 h-13 rounded-2xl bg-black text-white hover:bg-gray-900" onClick={() => acceptTrip(pendingRequest)} data-testid="btn-accept-trip">
-                  <Check className="mr-2 h-4 w-4" /> Accept
-                </Button>
+                {isOnline && (
+                  <Button size="lg" variant="outline" className="flex-1 h-13 rounded-2xl" onClick={declineTrip} data-testid="btn-decline-trip">
+                    <X className="mr-2 h-4 w-4" /> Decline
+                  </Button>
+                )}
+                {isOnline ? (
+                  <Button size="lg" className="flex-1 h-13 rounded-2xl bg-black text-white hover:bg-gray-900" onClick={() => acceptTrip(pendingRequest)} data-testid="btn-accept-trip">
+                    <Check className="mr-2 h-4 w-4" /> Accept
+                  </Button>
+                ) : (
+                  <Button size="lg" className="w-full h-13 rounded-2xl bg-orange-500 text-white hover:bg-orange-600 font-bold" onClick={async () => { await toggleOnline(); await acceptTrip(pendingRequest); }} data-testid="btn-go-online-accept">
+                    <Check className="mr-2 h-4 w-4" /> Go Online &amp; Accept
+                  </Button>
+                )}
               </div>
             </div>
           </div>
