@@ -351,16 +351,30 @@ export default function DriverApp() {
   };
 
   const acceptTrip = async (trip: Trip) => {
-    const updated = await updateTrip(trip.id, { status: "accepted", driverId: user.id });
-    setOnTrip(updated);
-    setTripPhase("arriving");
-    setView("trip");
     try {
-      const res = await fetch(`/api/users/${trip.riderId}`, { credentials: "include" });
-      const rider = await res.json();
-      setTripRider(rider);
-    } catch {}
-    refetchRequested();
+      const updated = await updateTrip(trip.id, { status: "accepted", driverId: user.id });
+      setOnTrip(updated);
+      setTripPhase("arriving");
+      setView("trip");
+      try {
+        const res = await fetch(`/api/users/${trip.riderId}`, { credentials: "include" });
+        const rider = await res.json();
+        setTripRider(rider);
+      } catch {}
+    } catch (err: any) {
+      // Another driver accepted first — clear the request from screen
+      if (err?.message?.includes("409") || err?.message?.includes("already accepted")) {
+        toast({
+          title: "Trip taken",
+          description: "Another driver accepted that trip first. Waiting for the next one.",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Could not accept trip", description: err?.message || "Please try again.", variant: "destructive" });
+      }
+    } finally {
+      refetchRequested();
+    }
   };
 
   const advanceTrip = async () => {

@@ -858,6 +858,12 @@ export async function registerRoutes(
   app.patch("/api/trips/:id", async (req, res) => {
     const existingTrip = await storage.getTrip(req.params.id);
     if (!existingTrip) return res.status(404).json({ message: "Trip not found" });
+
+    // Race condition guard: if a driver is trying to accept, reject if already taken
+    if (req.body.status === "accepted" && existingTrip.status !== "requested") {
+      return res.status(409).json({ message: "Trip already accepted by another driver", alreadyTaken: true });
+    }
+
     const trip = await storage.updateTrip(req.params.id, req.body);
     if (!trip) return res.status(404).json({ message: "Trip not found" });
 
