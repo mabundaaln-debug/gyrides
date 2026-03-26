@@ -59,11 +59,11 @@ jobs:
 
       - name: Delete existing latest release (if any)
         run: |
-          RELEASE_ID=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          RELEASE_ID=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_PAT }}" \
             https://api.github.com/repos/${{ github.repository }}/releases/tags/latest \
             | grep '"id"' | head -1 | grep -o '[0-9]*')
           if [ -n "$RELEASE_ID" ]; then
-            curl -s -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            curl -s -X DELETE -H "Authorization: token ${{ secrets.GITHUB_PAT }}" \
               https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID
             echo "Deleted release $RELEASE_ID"
           fi
@@ -86,4 +86,4 @@ jobs:
           make_latest: "true"
           files: gy-rides.apk
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_PAT }}
