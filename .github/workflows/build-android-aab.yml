@@ -1,0 +1,89 @@
+name: Build GY Rides AAB
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Sync Capacitor (with server URL)
+        env:
+          SERVER_URL: ${{ secrets.SERVER_URL }}
+        run: npx cap sync android
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Verify Java
+        run: |
+          java -version
+          echo "JAVA_HOME=$JAVA_HOME"
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build release AAB (signed with fixed keystore)
+        run: cd android && ./gradlew bundleRelease --stacktrace
+
+      - name: Rename AAB
+        run: cp android/app/build/outputs/bundle/release/app-release.aab gy-rides.aab
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gy-rides-release-aab
+          path: gy-rides.aab
+
+      - name: Delete existing latest-aab release (if any)
+        run: |
+          RELEASE_ID=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${{ github.repository }}/releases/tags/latest-aab \
+            | grep '"id"' | head -1 | grep -o '[0-9]*')
+          if [ -n "$RELEASE_ID" ]; then
+            curl -s -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID
+            echo "Deleted release $RELEASE_ID"
+          fi
+          git push --delete origin latest-aab 2>/dev/null || true
+        continue-on-error: true
+
+      - name: Publish AAB to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-aab
+          name: "GY Rides — Latest AAB Build"
+          body: |
+            **GY Rides Android App — AAB Release Build**
+
+            Tap **gy-rides.aab** below to download the Android App Bundle.
+
+            > ℹ️ AAB files are intended for upload to the **Google Play Store**. To install directly on a device, use the APK release instead.
+
+            Compatible with Android 5.1 (Lollipop, API 22) and above.
+          make_latest: "false"
+          files: gy-rides.aab
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
