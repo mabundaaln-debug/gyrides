@@ -5,9 +5,9 @@ const SERVER_URL =
   "https://giyani-transport.autos";
 
 const config: CapacitorConfig = {
-  appId: "za.co.mpfunomedical.gyrides",
+  appId: "com.gyrides.app",
   appName: "GY Rides",
-  webDir: "dist/public",
+  webDir: "dist",
   server: {
     url: SERVER_URL,
     cleartext: false,

@@ -1,4 +1,4 @@
-package za.co.mpfunomedical.gyrides;
+package com.gyrides.app;
 
 import com.getcapacitor.BridgeActivity;
 
